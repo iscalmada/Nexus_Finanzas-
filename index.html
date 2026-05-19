@@ -1,0 +1,2049 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="theme-color" content="#080810"/>
+  <title>Nexus Finanzas</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:#080810;color:#e2e8f0;font-family:'DM Sans',sans-serif;overscroll-behavior:none;}
+    #root{min-height:100vh;}
+    #loading{position:fixed;inset:0;background:#080810;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;}
+    #loading .logo{font-size:13px;font-weight:800;letter-spacing:3px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px;}
+    #loading .sub{font-size:9px;color:#475569;letter-spacing:2px;}
+    #loading .spinner{width:28px;height:28px;border:2px solid #1e293b;border-top:2px solid #C9A84C;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);}
+    select option{background:#13131f;}
+    ::-webkit-scrollbar{width:0;height:0;}
+    input,select,button{font-family:'DM Sans',sans-serif;}
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="logo">Nexus Partners</div>
+    <div class="sub">CARGANDO APLICACIÓN...</div>
+  </div>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+
+  <script>
+    // Normalizar Recharts global - diferentes builds lo exponen diferente
+    if(typeof Recharts === 'undefined' && typeof window.Recharts !== 'undefined') {
+      window.Recharts = window.Recharts;
+    }
+    // Fallback: si Recharts no carga, crear stubs para que la app no crashee
+    if(typeof Recharts === 'undefined') {
+      window.Recharts = {
+        PieChart: ({children})=>React.createElement('div',null,children),
+        Pie: ()=>null, Cell: ()=>null,
+        BarChart: ({children})=>React.createElement('div',null,children),
+        Bar: ()=>null, XAxis: ()=>null, YAxis: ()=>null,
+        Tooltip: ()=>null, CartesianGrid: ()=>null,
+        ResponsiveContainer: ({children,width,height})=>React.createElement('div',{style:{width:'100%',height:height||200}},children)
+      };
+    }
+  </script>
+
+  <script type="text/babel" data-presets="react">
+
+const { useState, useMemo, useRef, useCallback, memo, useEffect } = React;
+const { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = Recharts;
+
+// ─── CONSTANTES ───────────────────────────────────────────────
+const CUENTA_COLORS = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8"];
+const ESTATUS_LIST  = ["PENDIENTE","PROGRAMADO","INGRESADO","PAGADO"];
+const TIPO_OP       = ["Ingreso","Egreso","Transferencia","Pago Tarjeta"];
+const REC_OPTS      = ["Diaria","Semanal","Quincenal","Mensual","Anual"];
+const DIAS_SEM      = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const MESES         = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const MESES_FULL    = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const PRIO_LBL      = {1:"Alta",2:"Media",3:"Baja"};
+const OP_COLORS     = {Ingreso:"#22c55e",Egreso:"#f87171",Transferencia:"#a78bfa","Pago Tarjeta":"#60a5fa"};
+const COLOR_EST     = {
+  INGRESADO:{bg:"rgba(34,197,94,0.12)",  text:"#22c55e",dot:"#22c55e"},
+  PAGADO:   {bg:"rgba(148,163,184,0.12)",text:"#94a3b8",dot:"#94a3b8"},
+  PENDIENTE:{bg:"rgba(251,191,36,0.12)", text:"#fbbf24",dot:"#fbbf24"},
+  PROGRAMADO:{bg:"rgba(139,92,246,0.12)",text:"#a78bfa",dot:"#a78bfa"},
+};
+const PIE_PALETTE = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8","#f87171","#4ade80","#facc15","#e879f9","#34d399"];
+
+// ─── CATÁLOGOS ────────────────────────────────────────────────
+const INIT_CAT_ING = [
+  {id:"i1",nombre:"Nexus Partners",subs:[{id:"i1s1",nombre:"Comisiones Fianzas"},{id:"i1s2",nombre:"Honorarios Consultoría"}]},
+  {id:"i2",nombre:"Sicresa",       subs:[{id:"i2s1",nombre:"Honorarios"},{id:"i2s2",nombre:"Reembolsos"}]},
+  {id:"i3",nombre:"Inversiones",   subs:[{id:"i3s1",nombre:"ETFs"},{id:"i3s2",nombre:"Criptomonedas"}]},
+  {id:"i4",nombre:"Otros",         subs:[{id:"i4s1",nombre:"Préstamos recibidos"},{id:"i4s2",nombre:"Ventas"}]},
+];
+const INIT_CAT_EG = [
+  {id:"e1",nombre:"Vivienda",      subs:[{id:"e1s1",nombre:"Renta"},{id:"e1s2",nombre:"Servicios"}]},
+  {id:"e2",nombre:"Transporte",    subs:[{id:"e2s1",nombre:"Combustible"},{id:"e2s2",nombre:"Mantenimiento"}]},
+  {id:"e3",nombre:"Nexus Partners",subs:[{id:"e3s1",nombre:"Suscripciones"},{id:"e3s2",nombre:"Marketing"}]},
+  {id:"e4",nombre:"Personal",      subs:[{id:"e4s1",nombre:"Alimentación"},{id:"e4s2",nombre:"Salud"}]},
+  {id:"e5",nombre:"Financiero",    subs:[{id:"e5s1",nombre:"Intereses TC"},{id:"e5s2",nombre:"Comisiones TC"}]},
+];
+const INIT_CUENTAS = [
+  {id:1,nombre:"Stori",    saldoInicial:0,    color:"#C9A84C"},
+  {id:2,nombre:"Carl",     saldoInicial:0,    color:"#60a5fa"},
+  {id:3,nombre:"Spin OXXO",saldoInicial:0,color:"#22c55e"},
+];
+const INIT_TARJETAS = [
+  {id:1,nombre:"Stori Crédito",banco:"Stori",limite:10000,fechaCorte:15,fechaLimPago:5,saldoDeudorInicial:0,color:"#f472b6"},
+];
+const INIT_MOVS = [];
+// Presupuestos: clave = "catId_mes_anio" | tipo: "ing" o "eg"
+const INIT_PRESUPUESTOS = {};
+
+// ─── HELPERS ─────────────────────────────────────────────────
+const fmt      = n=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN",minimumFractionDigits:2}).format(n||0);
+const fmtShort = n=>{const v=Math.abs(n||0);if(v>=1000000)return`$${(v/1e6).toFixed(1)}M`;if(v>=1000)return`$${(v/1000).toFixed(1)}k`;return fmt(n);};
+const fmtDate  = d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
+const todayStr = ()=>new Date().toISOString().split("T")[0];
+const addD     = (d,n)=>{const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().split("T")[0];};
+const addM_    = (d,n)=>{const dt=new Date(d+"T12:00:00");dt.setMonth(dt.getMonth()+n);return dt.toISOString().split("T")[0];};
+const addY_    = (d,n)=>{const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0];};
+const mesKey   = (sm,sy)=>`_${sm+1}_${sy}`;
+const presKey  = (id,sm,sy)=>`${id}${mesKey(sm,sy)}`;
+
+function estatusParaTipo(tipoOp){
+  if(tipoOp==="Ingreso")      return ESTATUS_LIST.filter(e=>e!=="PAGADO");
+  if(tipoOp==="Egreso")       return ESTATUS_LIST.filter(e=>e!=="INGRESADO");
+  if(tipoOp==="Pago Tarjeta") return ESTATUS_LIST.filter(e=>e!=="INGRESADO");
+  return ESTATUS_LIST;
+}
+
+function generarFechas(rec){
+  const fechas=[];let cur=rec.fechaInicio;
+  for(let i=0;i<500;i++){
+    if(rec.finTipo==="fecha"&&cur>rec.finFecha)break;
+    if(rec.recurrencia==="Diaria"){fechas.push(cur);cur=addD(cur,1);}
+    else if(rec.recurrencia==="Semanal"){
+      const dow=rec.diasSemana.length?rec.diasSemana:[new Date(cur+"T12:00:00").getDay()];
+      let d=cur;for(let w=0;w<7;w++){if(dow.includes(new Date(d+"T12:00:00").getDay()))fechas.push(d);d=addD(d,1);}
+      cur=addD(cur,7);
+    }
+    else if(rec.recurrencia==="Quincenal"){fechas.push(cur);cur=addD(cur,15);}
+    else if(rec.recurrencia==="Mensual")  {fechas.push(cur);cur=addM_(cur,1);}
+    else if(rec.recurrencia==="Anual")    {fechas.push(cur);cur=addY_(cur,1);}
+    if(fechas.length>=(rec.finTipo==="repeticiones"?rec.finReps:500))break;
+  }
+  return fechas.slice(0,rec.finTipo==="repeticiones"?rec.finReps:undefined);
+}
+
+// ─── SALDOS ──────────────────────────────────────────────────
+function calcConsolidado(movs,pI,pE){
+  const sorted=[...movs].filter(r=>r.fecha).sort((a,b)=>a.fecha!==b.fecha?a.fecha.localeCompare(b.fecha):a.orden-b.orden);
+  let s=0;
+  return sorted.map(r=>{
+    const real=["INGRESADO","PAGADO"].includes(r.estatus);
+    const prog=r.estatus==="PROGRAMADO";
+    let cuenta=false;
+    if(real)cuenta=true;
+    if(prog){if(r.tipoOp==="Ingreso"&&r.prioridad<=(pI||3))cuenta=true;if(r.tipoOp==="Egreso"&&r.prioridad<=(pE||3))cuenta=true;}
+    if(cuenta){if(r.tipoOp==="Ingreso")s+=r.monto||0;else if(r.tipoOp==="Egreso")s-=r.monto||0;}
+    return{...r,saldoConsolidado:s,enProyeccion:cuenta};
+  });
+}
+function calcCuentaSaldos(cuentas,movs){
+  const s={};cuentas.forEach(c=>{s[c.id]=c.saldoInicial||0;});
+  [...movs].filter(r=>r.fecha).sort((a,b)=>a.fecha!==b.fecha?a.fecha.localeCompare(b.fecha):a.orden-b.orden).forEach(r=>{
+    if(!["INGRESADO","PAGADO"].includes(r.estatus))return;
+    if(r.tipoOp==="Ingreso"&&r.cuentaId&&!r.usaTarjeta)s[r.cuentaId]=(s[r.cuentaId]||0)+(r.monto||0);
+    if(r.tipoOp==="Egreso" &&r.cuentaId&&!r.usaTarjeta)s[r.cuentaId]=(s[r.cuentaId]||0)-(r.monto||0);
+    if(r.tipoOp==="Transferencia"){if(r.cuentaId)s[r.cuentaId]=(s[r.cuentaId]||0)-(r.monto||0);if(r.cuentaDestinoId)s[r.cuentaDestinoId]=(s[r.cuentaDestinoId]||0)+(r.monto||0);}
+    if(r.tipoOp==="Pago Tarjeta"&&r.cuentaId)s[r.cuentaId]=(s[r.cuentaId]||0)-(r.monto||0);
+  });
+  return s;
+}
+function calcTarjetaSaldos(tarjetas,movs){
+  const s={};tarjetas.forEach(t=>{s[t.id]=t.saldoDeudorInicial||0;});
+  [...movs].filter(r=>r.fecha).sort((a,b)=>a.fecha!==b.fecha?a.fecha.localeCompare(b.fecha):a.orden-b.orden).forEach(r=>{
+    if(!["INGRESADO","PAGADO"].includes(r.estatus))return;
+    if(r.tipoOp==="Egreso"&&r.usaTarjeta&&r.tarjetaId)s[r.tarjetaId]=(s[r.tarjetaId]||0)+(r.monto||0);
+    if(r.tipoOp==="Pago Tarjeta"&&r.tarjetaId)s[r.tarjetaId]=(s[r.tarjetaId]||0)-(r.monto||0);
+  });
+  return s;
+}
+function calcSaldoCuentaAntesDe(cuentaId,movId,movs,cuentas){
+  let s=cuentas.find(c=>c.id===cuentaId)?.saldoInicial||0;
+  [...movs].filter(r=>r.fecha&&r.id!==movId).sort((a,b)=>a.fecha.localeCompare(b.fecha)).forEach(r=>{
+    if(!["INGRESADO","PAGADO"].includes(r.estatus))return;
+    if(r.tipoOp==="Ingreso"&&r.cuentaId===cuentaId&&!r.usaTarjeta)s+=(r.monto||0);
+    if(r.tipoOp==="Egreso" &&r.cuentaId===cuentaId&&!r.usaTarjeta)s-=(r.monto||0);
+    if(r.tipoOp==="Transferencia"){if(r.cuentaId===cuentaId)s-=(r.monto||0);if(r.cuentaDestinoId===cuentaId)s+=(r.monto||0);}
+    if(r.tipoOp==="Pago Tarjeta"&&r.cuentaId===cuentaId)s-=(r.monto||0);
+  });
+  return s;
+}
+
+// Saldo proyectado al cierre de un mes (para saldo inicial de Proyección Presupuestal)
+function calcSaldoProyFin(movs,cuentas,pI,pE,sm,sy){
+  const withS=calcConsolidado(movs,pI,pE);
+  const endDate=`${sy}-${String(sm+1).padStart(2,"0")}-31`;
+  const relevant=withS.filter(r=>r.fecha&&r.fecha<=endDate&&r.enProyeccion);
+  if(!relevant.length){
+    return Object.values(calcCuentaSaldos(cuentas,movs)).reduce((s,v)=>s+v,0);
+  }
+  return relevant[relevant.length-1].saldoConsolidado;
+}
+
+// ─── DRAG ────────────────────────────────────────────────────
+function useDrag(setMovs){
+  const dR=useRef(null),oR=useRef(null),snR=useRef(null);
+  const[aId,setAId]=useState(null),[oViz,setOViz]=useState(null);
+  const start=(id,sn)=>{dR.current=id;snR.current=sn;setAId(id);};
+  const enter=id=>{oR.current=id;setOViz(id);};
+  const commit=useCallback(()=>{
+    const f=snR.current?.find(r=>r.id===dR.current),t=snR.current?.find(r=>r.id===oR.current);
+    if(f&&t&&f.id!==t.id)setMovs(p=>p.map(r=>r.id===f.id?{...r,orden:t.orden,fecha:t.fecha}:r.id===t.id?{...r,orden:f.orden,fecha:f.fecha}:r));
+    dR.current=null;oR.current=null;snR.current=null;setAId(null);setOViz(null);
+  },[setMovs]);
+  const tm=useCallback(e=>{
+    if(!dR.current)return;e.preventDefault();
+    const el=document.elementFromPoint(e.touches[0].clientX,e.touches[0].clientY)?.closest("[data-movid]");
+    if(el){const oid=parseInt(el.dataset.movid);if(oid&&oid!==dR.current){oR.current=oid;setOViz(oid);}}
+  },[]);
+  return{aId,oViz,start,enter,commit,tm};
+}
+function useCatDrag(setCats){
+  const dR=useRef(null),oR=useRef(null);
+  const[aId,setAId]=useState(null),[oViz,setOViz]=useState(null);
+  const start=id=>{dR.current=id;setAId(id);};
+  const enter=id=>{oR.current=id;setOViz(id);};
+  const commit=useCallback(()=>{
+    if(dR.current&&oR.current&&dR.current!==oR.current){
+      setCats(p=>{const arr=[...p];const fi=arr.findIndex(c=>c.id===dR.current);const ti=arr.findIndex(c=>c.id===oR.current);if(fi!==-1&&ti!==-1){const[el]=arr.splice(fi,1);arr.splice(ti,0,el);}return arr;});
+    }
+    dR.current=null;oR.current=null;setAId(null);setOViz(null);
+  },[setCats]);
+  return{aId,oViz,start,enter,commit};
+}
+
+// ─── PERIODS ─────────────────────────────────────────────────
+function usePeriod(){
+  const now=new Date();
+  const[mode,setMode]=useState("mes");
+  const[sm,setSm]=useState(now.getMonth());
+  const[sy,setSy]=useState(now.getFullYear());
+  const[fr,setFr]=useState(todayStr());
+  const[to,setTo]=useState(todayStr());
+  const inP=useCallback(d=>{
+    if(!d)return false;
+    if(mode==="mes"){const[y,m]=d.split("-").map(Number);return y===sy&&m-1===sm;}
+    if(mode==="anio")return d.startsWith(String(sy));
+    return d>=fr&&d<=to;
+  },[mode,sm,sy,fr,to]);
+  const label=()=>mode==="mes"?`${MESES_FULL[sm]} ${sy}`:mode==="anio"?`Año ${sy}`:`${fmtDate(fr)}–${fmtDate(to)}`;
+  const prev=()=>{if(mode==="mes"){setSm(m=>{if(m===0){setSy(y=>y-1);return 11;}return m-1;});}if(mode==="anio")setSy(y=>y-1);};
+  const next=()=>{if(mode==="mes"){setSm(m=>{if(m===11){setSy(y=>y+1);return 0;}return m+1;});}if(mode==="anio")setSy(y=>y+1);};
+  return{mode,setMode,sm,sy,setSm,setSy,fr,setFr,to,setTo,inP,label,prev,next};
+}
+function usePeriodMes(){
+  const now=new Date();
+  const[sm,setSm]=useState(now.getMonth());
+  const[sy,setSy]=useState(now.getFullYear());
+  const inP=useCallback(d=>{if(!d)return false;const[y,m]=d.split("-").map(Number);return y===sy&&m-1===sm;},[sm,sy]);
+  const label=()=>`${MESES_FULL[sm]} ${sy}`;
+  const prev=()=>setSm(m=>{if(m===0){setSy(y=>y-1);return 11;}return m-1;});
+  const next=()=>setSm(m=>{if(m===11){setSy(y=>y+1);return 0;}return m+1;});
+  return{sm,sy,inP,label,prev,next};
+}
+
+// ─── STYLES ──────────────────────────────────────────────────
+const S={
+  app:{background:"#080810",minHeight:"100vh",fontFamily:"'DM Sans',sans-serif",color:"#e2e8f0",maxWidth:480,margin:"0 auto",paddingBottom:72},
+  hdr:{padding:"16px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"center"},
+  logo:{fontSize:12,fontWeight:800,letterSpacing:3,color:"#C9A84C",textTransform:"uppercase"},
+  sub:{fontSize:8,color:"#475569",letterSpacing:1.5},
+  line:{height:1,background:"linear-gradient(90deg,#C9A84C44,transparent)",margin:"10px 20px 0"},
+  sec:{padding:"14px 18px 0"},
+  card:(b)=>({background:"#10101e",border:`1px solid ${b||"#1e293b"}`,borderRadius:14,padding:"14px 16px",marginBottom:10}),
+  lbl:{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",marginBottom:3},
+  bigA:(c)=>({fontSize:22,fontWeight:800,color:c||"#C9A84C",letterSpacing:-1}),
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:10},
+  sTit:{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",marginBottom:9,fontWeight:700},
+  chip:(a,c)=>({padding:"5px 11px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap",cursor:"pointer",background:a?(c||"#C9A84C"):"#1a1a2e",color:a?"#080810":"#64748b",border:"none"}),
+  chips:{display:"flex",gap:6,overflowX:"auto",paddingBottom:4,marginBottom:7,scrollbarWidth:"none"},
+  perBar:{display:"flex",alignItems:"center",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,marginBottom:7,overflow:"hidden"},
+  perBtn:{background:"none",border:"none",color:"#C9A84C",fontSize:16,padding:"7px 12px",cursor:"pointer",fontWeight:700},
+  perLbl:{flex:1,textAlign:"center",fontSize:11,fontWeight:700,color:"#e2e8f0",padding:"7px 0"},
+  perModes:{display:"flex",gap:5,marginBottom:9},
+  perMode:(a)=>({flex:1,padding:"6px 0",borderRadius:8,border:a?"1px solid #C9A84C":"1px solid #1e293b",background:a?"rgba(201,168,76,0.1)":"#13131f",color:a?"#C9A84C":"#475569",fontSize:10,fontWeight:700,cursor:"pointer"}),
+  alertCard:{background:"rgba(251,191,36,0.06)",border:"1px solid rgba(251,191,36,0.3)",borderRadius:11,padding:"11px 14px",marginBottom:10,cursor:"pointer"},
+  alertRojo:{background:"rgba(248,113,113,0.08)",border:"1px solid rgba(248,113,113,0.4)",borderRadius:11,padding:"11px 14px",marginBottom:10},
+  movWrap:(a,o,r,n)=>({background:a?"#1e2a1e":o?"#1a2030":r?"rgba(251,191,36,0.04)":n?"rgba(248,113,113,0.04)":"#10101e",borderRadius:11,marginBottom:6,boxShadow:a?"0 4px 20px rgba(201,168,76,0.15)":"none",transition:"background 0.15s",display:"flex",alignItems:"stretch",border:r?"1px solid rgba(251,191,36,0.2)":n?"1px solid rgba(248,113,113,0.25)":"1px solid transparent"}),
+  handle:{width:30,display:"flex",alignItems:"center",justifyContent:"center",cursor:"grab",color:"#334155",fontSize:13,flexShrink:0,borderRight:"1px solid #1e293b",userSelect:"none",touchAction:"none"},
+  movBody:(est)=>({flex:1,padding:"10px 11px 9px",borderTop:`1px solid ${COLOR_EST[est]?.dot||"#1e293b"}22`,borderRight:`1px solid ${COLOR_EST[est]?.dot||"#1e293b"}22`,borderBottom:`1px solid ${COLOR_EST[est]?.dot||"#1e293b"}22`,borderLeft:`2px solid ${COLOR_EST[est]?.dot||"#1e293b"}`,borderRadius:"0 11px 11px 0"}),
+  badge:(e)=>({fontSize:8,fontWeight:700,padding:"2px 6px",borderRadius:9,background:COLOR_EST[e]?.bg,color:COLOR_EST[e]?.text}),
+  acBtn:(c)=>({fontSize:9,padding:"4px 9px",borderRadius:7,border:"none",cursor:"pointer",background:`${c}22`,color:c,fontWeight:700}),
+  fab:{position:"fixed",bottom:82,right:18,width:50,height:50,borderRadius:25,background:"linear-gradient(135deg,#C9A84C,#8a6520)",border:"none",cursor:"pointer",fontSize:24,color:"#080810",fontWeight:900,boxShadow:"0 4px 20px #C9A84C55",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100},
+  nav:{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#0a0a16",borderTop:"1px solid #1e293b",display:"flex",padding:"5px 0 8px",zIndex:99},
+  navB:(a)=>({flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,background:"none",border:"none",cursor:"pointer",color:a?"#C9A84C":"#334155",fontSize:8,fontWeight:a?800:400}),
+  modal:{position:"fixed",inset:0,background:"rgba(0,0,0,0.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
+  mBox:{background:"#0d0d1a",borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,maxHeight:"93vh",overflowY:"auto",border:"1px solid #C9A84C33",borderBottom:"none"},
+  mTit:{fontSize:13,fontWeight:800,color:"#C9A84C",marginBottom:16,letterSpacing:1},
+  fg:{marginBottom:11},
+  fl:{fontSize:9,color:"#64748b",letterSpacing:1.5,textTransform:"uppercase",marginBottom:4,display:"block"},
+  srch:{width:"100%",background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"8px 12px",color:"#e2e8f0",fontSize:12,boxSizing:"border-box",outline:"none",marginBottom:7},
+  inp:{width:"100%",background:"#13131f",border:"1px solid #1e293b",borderRadius:9,padding:"9px 12px",color:"#e2e8f0",fontSize:15,boxSizing:"border-box",outline:"none"},
+  inpErr:{width:"100%",background:"#13131f",border:"1px solid #f87171",borderRadius:9,padding:"9px 12px",color:"#e2e8f0",fontSize:15,boxSizing:"border-box",outline:"none"},
+  inpDis:{width:"100%",background:"#0d0d1a",border:"1px solid #1e293b44",borderRadius:9,padding:"9px 12px",color:"#334155",fontSize:15,boxSizing:"border-box",outline:"none",cursor:"not-allowed"},
+  sel:{width:"100%",background:"#13131f",border:"1px solid #1e293b",borderRadius:9,padding:"9px 12px",color:"#e2e8f0",fontSize:13,boxSizing:"border-box",outline:"none"},
+  selErr:{width:"100%",background:"#13131f",border:"1px solid #f87171",borderRadius:9,padding:"9px 12px",color:"#e2e8f0",fontSize:13,boxSizing:"border-box",outline:"none"},
+  r2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9},
+  saveB:{width:"100%",padding:12,borderRadius:11,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#C9A84C,#8a6520)",color:"#080810",fontSize:12,fontWeight:800,marginTop:5},
+  cancB:{width:"100%",padding:10,borderRadius:11,border:"1px solid #1e293b",cursor:"pointer",background:"transparent",color:"#475569",fontSize:11,marginTop:5},
+  opRow:{display:"flex",gap:5,marginBottom:11,flexWrap:"wrap"},
+  opB:(a,c)=>({padding:"8px 7px",borderRadius:9,border:`1px solid ${a?c:"#1e293b"}`,background:a?`${c}18`:"#13131f",color:a?c:"#475569",fontSize:10,fontWeight:700,cursor:"pointer",flex:1}),
+  prioR:{display:"flex",gap:7},
+  prioB2:(a,c)=>({flex:1,padding:"8px 0",borderRadius:9,border:`1px solid ${a?(c||"#C9A84C"):"#1e293b"}`,background:a?`${c||"#C9A84C"}18`:"#13131f",color:a?(c||"#C9A84C"):"#475569",fontSize:10,fontWeight:a?700:400,cursor:"pointer"}),
+  cCard:(color)=>({background:"#10101e",border:`1px solid ${color}44`,borderLeft:`3px solid ${color}`,borderRadius:11,padding:"12px 14px",marginBottom:8}),
+  dotS:(c,sel)=>({width:22,height:22,borderRadius:11,background:c,cursor:"pointer",border:sel?"2px solid #fff":"2px solid transparent",boxSizing:"border-box"}),
+  delCon:{position:"fixed",inset:0,background:"rgba(0,0,0,0.92)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:22},
+  delBox:{background:"#10101e",border:"1px solid #f8717144",borderRadius:15,padding:22,maxWidth:330,width:"100%"},
+  infoBx:(c)=>({fontSize:10,padding:"8px 11px",borderRadius:8,marginBottom:11,display:"flex",alignItems:"flex-start",gap:6,background:`${c}11`,border:`1px solid ${c}33`,color:c}),
+  prioTag:(a,err)=>({padding:"5px 10px",borderRadius:9,fontSize:10,fontWeight:700,cursor:"pointer",border:`1px solid ${err?"#f87171":a?"#C9A84C33":"#1e293b"}`,background:err?"rgba(248,113,113,0.1)":a?"rgba(201,168,76,0.08)":"transparent",color:err?"#f87171":a?"#C9A84C":"#475569",whiteSpace:"nowrap"}),
+  prioPanel:{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:13,padding:14,marginBottom:9},
+  prioRow:{display:"flex",gap:5,marginBottom:9},
+  prioB:(a,c)=>({flex:1,padding:"7px 0",borderRadius:8,border:`1px solid ${a?c:"#1e293b"}`,background:a?`${c}18`:"#13131f",color:a?c:"#475569",fontSize:10,fontWeight:700,cursor:"pointer"}),
+  multiBar:{position:"fixed",bottom:72,left:"50%",transform:"translateX(-50%)",width:"calc(100% - 36px)",maxWidth:444,background:"#1a1a2e",border:"1px solid #C9A84C44",borderRadius:13,padding:"9px 14px",zIndex:98,display:"flex",gap:7,alignItems:"center"},
+  divider:{borderTop:"1px solid #1e293b",margin:"13px 0"},
+  smBtn:(c)=>({padding:"4px 9px",borderRadius:7,border:`1px solid ${c}44`,background:`${c}11`,color:c,fontSize:9,fontWeight:700,cursor:"pointer"}),
+  errBox:{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.4)",borderRadius:9,padding:"9px 12px",marginBottom:11,fontSize:11,color:"#f87171",display:"flex",gap:6,alignItems:"flex-start"},
+  menuRow:{display:"flex",alignItems:"center",gap:13,padding:"14px 0",borderBottom:"1px solid #1e293b",cursor:"pointer"},
+  menuIco:{width:36,height:36,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0},
+  statTab:(a)=>({flex:1,padding:"7px 0",fontSize:10,fontWeight:700,cursor:"pointer",border:"none",background:"none",color:a?"#C9A84C":"#334155",borderBottom:a?"2px solid #C9A84C":"2px solid transparent"}),
+  // totales fila
+  totRow:{display:"flex",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:10,padding:"9px 13px",marginBottom:9},
+  // semáforo
+  semVerde:{background:"rgba(34,197,94,0.12)",border:"1px solid #22c55e44"},
+  semAmarillo:{background:"rgba(251,191,36,0.10)",border:"1px solid #fbbf2444"},
+  semRojo:{background:"rgba(248,113,113,0.10)",border:"1px solid #f8717144"},
+};
+
+// ─── BUDGET BAR ───────────────────────────────────────────────
+function BudgetBar({gasto,presupuesto,color="#C9A84C",esIngreso=false}){
+  if(!presupuesto)return null;
+  const pct=gasto/presupuesto;
+  const over=gasto>presupuesto;
+  const c=over?(esIngreso?"#22c55e":"#f87171"):(pct>0.8?(esIngreso?"#22c55e":"#fbbf24"):color);
+  let etiqueta;
+  if(esIngreso){
+    if(over) etiqueta=<span style={{color:"#22c55e",fontWeight:700}}>✓ Meta alcanzada</span>;
+    else etiqueta=<span style={{color:"#fbbf24"}}>Falta para meta {fmt(presupuesto-gasto)}</span>;
+  } else {
+    if(over) etiqueta=<span style={{color:"#f87171"}}>Exceso {fmt(gasto-presupuesto)}</span>;
+    else etiqueta=<span style={{color:"#22c55e"}}>Disponible {fmt(presupuesto-gasto)}</span>;
+  }
+  return(
+    <div>
+      <div style={{height:5,borderRadius:3,background:"#1e293b",overflow:"hidden",marginTop:5}}>
+        <div style={{height:"100%",borderRadius:3,background:c,width:`${Math.min(pct/1.2,1)*100}%`,transition:"width 0.4s"}}/>
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569",marginTop:2}}>
+        <span style={{color:c,fontWeight:700}}>{Math.round(pct*100)}%</span>
+        {etiqueta}
+      </div>
+    </div>
+  );
+}
+
+// ─── MODAL MOV ───────────────────────────────────────────────
+const ModalMov=memo(function ModalMov({
+  formMov,setFormMov,editMovId,isEditReal,recForm,setRecForm,
+  cuentas,cuentaSaldos,tarjetas,tarjetaSaldos,catIng,catEg,
+  onSave,onClose,saveError,fieldErrors
+}){
+  const isT  = formMov.tipoOp==="Transferencia";
+  const isPT = formMov.tipoOp==="Pago Tarjeta";
+  const isProg= ["PENDIENTE","PROGRAMADO"].includes(formMov.estatus);
+  const isPend= formMov.estatus==="PENDIENTE";
+  const ptNecesitaCuenta = isPT&&formMov.estatus==="PAGADO";
+  const cats   = formMov.tipoOp==="Ingreso"?catIng:catEg;
+  const subcats= cats.find(c=>c.id===formMov.cat)?.subs||[];
+  const set    = useCallback((k,v)=>setFormMov(f=>({...f,[k]:v})),[setFormMov]);
+  const estatusOpts = estatusParaTipo(formMov.tipoOp);
+
+  // Refs para scroll a campos con error
+  const cuentaRef=useRef(null);
+  const fechaRef=useRef(null);
+  const tarjetaRef=useRef(null);
+
+  useEffect(()=>{
+    if(fieldErrors?.cuentaId&&cuentaRef.current) cuentaRef.current.scrollIntoView({behavior:"smooth",block:"center"});
+    else if(fieldErrors?.tarjetaId&&tarjetaRef.current) tarjetaRef.current.scrollIntoView({behavior:"smooth",block:"center"});
+    else if(fieldErrors?.fecha&&fechaRef.current) fechaRef.current.scrollIntoView({behavior:"smooth",block:"center"});
+  },[fieldErrors]);
+
+  const handleEstatus = useCallback((val)=>{
+    const esProg2=["PENDIENTE","PROGRAMADO"].includes(val);
+    setFormMov(f=>({...f,estatus:val,...(esProg2?{cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false}:{})}));
+  },[setFormMov]);
+
+  return(
+    <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={S.mBox}>
+        <div style={S.mTit}>{editMovId?"✏ EDITAR":"+ NUEVO MOVIMIENTO"}</div>
+
+        {!editMovId&&(
+          <div style={S.fg}>
+            <label style={S.fl}>Tipo</label>
+            <div style={S.opRow}>
+              {TIPO_OP.map(op=>(
+                <button key={op} style={S.opB(formMov.tipoOp===op,OP_COLORS[op])}
+                  onClick={()=>setFormMov(f=>{
+                    const newEst=estatusParaTipo(op).includes(f.estatus)?f.estatus:estatusParaTipo(op)[0];
+                    return{...f,tipoOp:op,estatus:newEst,cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false};
+                  })}>
+                  {op==="Ingreso"?"↑":op==="Egreso"?"↓":op==="Transferencia"?"⇄":"💳"} {op}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {editMovId&&<div style={{...S.infoBx("#60a5fa"),marginBottom:11}}><span>✏</span><span>Tipo: <strong>{formMov.tipoOp}</strong> — para cambiar el monto, elimina y crea de nuevo.</span></div>}
+
+        {/* TRANSFERENCIA */}
+        {isT&&(<>
+          <div style={S.infoBx("#a78bfa")}><span>⇄</span><span>Mueve saldo entre cuentas.</span></div>
+          <div style={S.fg}><label style={S.fl}>Concepto</label><input style={S.inp} value={formMov.concepto} onChange={e=>set("concepto",e.target.value)} placeholder="Traspaso…"/></div>
+          <div style={{...S.r2,marginBottom:11}}>
+            <div ref={fechaRef}><label style={S.fl}>Fecha</label><input style={fieldErrors?.fecha?S.inpErr:S.inp} type="date" value={formMov.fecha||""} onChange={e=>set("fecha",e.target.value)}/></div>
+            <div><label style={S.fl}>Monto $</label>{isEditReal?<input style={S.inpDis} value={fmt(formMov.monto)} readOnly/>:<input style={S.inp} type="number" value={formMov.monto} onChange={e=>set("monto",e.target.value)}/>}</div>
+          </div>
+          <div style={S.fg} ref={cuentaRef}><label style={S.fl}>Cuenta Origen</label>
+            <select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}>
+              <option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} ({fmt(cuentaSaldos[c.id])})</option>)}
+            </select>
+          </div>
+          <div style={S.fg}><label style={S.fl}>Cuenta Destino</label>
+            <select style={S.sel} value={formMov.cuentaDestinoId||""} onChange={e=>set("cuentaDestinoId",parseInt(e.target.value)||null)}>
+              <option value="">— Seleccionar —</option>{cuentas.filter(c=>c.id!==formMov.cuentaId).map(c=><option key={c.id} value={c.id}>{c.nombre} ({fmt(cuentaSaldos[c.id])})</option>)}
+            </select>
+          </div>
+          <div style={S.fg}><label style={S.fl}>Observaciones</label><input style={S.inp} value={formMov.obs} onChange={e=>set("obs",e.target.value)}/></div>
+        </>)}
+
+        {/* PAGO TARJETA */}
+        {isPT&&(<>
+          <div style={S.infoBx("#60a5fa")}><span>💳</span><span>Reduce saldo deudor de la tarjeta.</span></div>
+          <div style={S.fg}><label style={S.fl}>Concepto</label><input style={S.inp} value={formMov.concepto} onChange={e=>set("concepto",e.target.value)} placeholder="Pago TC…"/></div>
+          <div style={{...S.r2,marginBottom:11}}>
+            <div ref={fechaRef}><label style={S.fl}>Fecha</label><input style={fieldErrors?.fecha?S.inpErr:S.inp} type="date" value={formMov.fecha||""} onChange={e=>set("fecha",e.target.value)}/></div>
+            <div><label style={S.fl}>Monto $</label>{isEditReal?<input style={S.inpDis} value={fmt(formMov.monto)} readOnly/>:<input style={S.inp} type="number" value={formMov.monto} onChange={e=>set("monto",e.target.value)}/>}</div>
+          </div>
+          <div style={S.fg}><label style={S.fl}>Estatus</label>
+            <select style={S.sel} value={formMov.estatus} onChange={e=>handleEstatus(e.target.value)}>{estatusOpts.map(e=><option key={e} value={e}>{e}</option>)}</select>
+          </div>
+          {ptNecesitaCuenta&&(<>
+            <div style={S.fg} ref={tarjetaRef}><label style={S.fl}>Tarjeta a pagar</label>
+              <select style={fieldErrors?.tarjetaId?S.selErr:S.sel} value={formMov.tarjetaId||""} onChange={e=>set("tarjetaId",parseInt(e.target.value)||null)}>
+                <option value="">— Seleccionar —</option>{tarjetas.map(t=><option key={t.id} value={t.id}>{t.nombre} · {fmt(tarjetaSaldos[t.id])}</option>)}
+              </select>
+            </div>
+            <div style={S.fg} ref={cuentaRef}><label style={S.fl}>Cuenta débito origen</label>
+              <select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}>
+                <option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}
+              </select>
+            </div>
+          </>)}
+          {!ptNecesitaCuenta&&<div style={S.infoBx("#a78bfa")}><span>⚡</span><span>Tarjeta y cuenta se asignan al confirmar como PAGADO.</span></div>}
+          <div style={S.fg}><label style={S.fl}>Observaciones</label><input style={S.inp} value={formMov.obs} onChange={e=>set("obs",e.target.value)}/></div>
+        </>)}
+
+        {/* INGRESO / EGRESO */}
+        {!isT&&!isPT&&(<>
+          <div style={S.fg}><label style={S.fl}>Estatus</label>
+            <select style={S.sel} value={formMov.estatus} onChange={e=>handleEstatus(e.target.value)}>{estatusOpts.map(e=><option key={e} value={e}>{e}</option>)}</select>
+          </div>
+          {isPend&&<div style={S.infoBx("#fbbf24")}><span>📋</span><span>PENDIENTE: sin fecha. Compromiso sin programar. Cambia a PROGRAMADO para asignar fecha.</span></div>}
+          {!isPend&&(
+            <div style={S.fg} ref={fechaRef}><label style={S.fl}>Fecha</label>
+              <input style={fieldErrors?.fecha?S.inpErr:S.inp} type="date" value={formMov.fecha||""} onChange={e=>set("fecha",e.target.value)}/>
+              {fieldErrors?.fecha&&<div style={{fontSize:9,color:"#f87171",marginTop:2}}>⚠ Se requiere fecha</div>}
+            </div>
+          )}
+          <div style={S.fg}><label style={S.fl}>Monto $</label>
+            {isEditReal?<><input style={S.inpDis} value={fmt(formMov.monto)} readOnly/><div style={{fontSize:9,color:"#fbbf24",marginTop:3}}>⚠ Para cambiar el monto, elimina y crea de nuevo.</div></>
+             :<input style={S.inp} type="number" value={formMov.monto} onChange={e=>set("monto",e.target.value)} placeholder="0.00"/>}
+          </div>
+          <div style={S.fg}><label style={S.fl}>Concepto</label><input style={S.inp} value={formMov.concepto} onChange={e=>set("concepto",e.target.value)} placeholder="Descripción…"/></div>
+          <div style={{...S.r2,marginBottom:11}}>
+            <div><label style={S.fl}>Categoría</label>
+              <select style={S.sel} value={formMov.cat} onChange={e=>setFormMov(f=>({...f,cat:e.target.value,subcat:""}))}>
+                <option value="">— —</option>{cats.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </div>
+            <div><label style={S.fl}>Subcategoría</label>
+              <select style={S.sel} value={formMov.subcat} onChange={e=>set("subcat",e.target.value)}>
+                <option value="">— —</option>{subcats.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
+              </select>
+            </div>
+          </div>
+          {!isProg&&(<>
+            {formMov.tipoOp==="Egreso"&&(
+              <div style={S.fg} ref={cuentaRef}>
+                <label style={S.fl}>Cargo a</label>
+                <div style={{display:"flex",gap:7,marginBottom:9}}>
+                  <button style={S.prioB2(!formMov.usaTarjeta,"#60a5fa")} onClick={()=>setFormMov(f=>({...f,usaTarjeta:false,tarjetaId:null}))}>🏦 Cuenta Débito</button>
+                  <button style={S.prioB2(formMov.usaTarjeta,"#f472b6")} onClick={()=>setFormMov(f=>({...f,usaTarjeta:true,cuentaId:null}))}>💳 Tarjeta TC</button>
+                </div>
+                {!formMov.usaTarjeta&&<select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}><option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}</select>}
+                {formMov.usaTarjeta&&<select style={fieldErrors?.tarjetaId?S.selErr:S.sel} value={formMov.tarjetaId||""} onChange={e=>set("tarjetaId",parseInt(e.target.value)||null)}><option value="">— Seleccionar —</option>{tarjetas.map(t=><option key={t.id} value={t.id}>{t.nombre} · Disp:{fmt((t.limite||0)-tarjetaSaldos[t.id])}</option>)}</select>}
+                {(fieldErrors?.cuentaId||fieldErrors?.tarjetaId)&&<div style={{fontSize:9,color:"#f87171",marginTop:3}}>⚠ Selecciona cuenta o tarjeta</div>}
+              </div>
+            )}
+            {formMov.tipoOp==="Ingreso"&&(
+              <div style={S.fg} ref={cuentaRef}><label style={S.fl}>Depositar en</label>
+                <select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}>
+                  <option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}
+                </select>
+                {fieldErrors?.cuentaId&&<div style={{fontSize:9,color:"#f87171",marginTop:3}}>⚠ Selecciona cuenta de depósito</div>}
+              </div>
+            )}
+          </>)}
+          {isProg&&<div style={S.infoBx("#a78bfa")}><span>⚡</span><span>Programado — cuenta se asigna al confirmar como ejecutado.</span></div>}
+          <div style={S.fg}>
+            <label style={S.fl}>{formMov.tipoOp==="Ingreso"?"Probabilidad":"Prioridad"}</label>
+            <div style={S.prioR}>{[[1,"Alta"],[2,"Media"],[3,"Baja"]].map(([v,l])=><button key={v} style={S.prioB2(formMov.prioridad===v)} onClick={()=>set("prioridad",v)}>{l}</button>)}</div>
+          </div>
+          <div style={S.fg}><label style={S.fl}>Observaciones</label><input style={S.inp} value={formMov.obs} onChange={e=>set("obs",e.target.value)}/></div>
+          {!editMovId&&(
+            <div style={{border:"1px solid #1e293b",borderRadius:11,padding:13,marginBottom:11}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:recForm.activo?11:0}}>
+                <span style={{fontSize:11,fontWeight:700,color:recForm.activo?"#C9A84C":"#475569"}}>↻ Repetitivo</span>
+                <button style={{...S.prioB2(recForm.activo),width:42,flex:"none",padding:"4px 0",fontSize:10}} onClick={()=>setRecForm(f=>({...f,activo:!f.activo}))}>{recForm.activo?"ON":"OFF"}</button>
+              </div>
+              {recForm.activo&&(<>
+                <div style={S.fg}><label style={S.fl}>Recurrencia</label>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:4}}>{REC_OPTS.map(r=><button key={r} style={{...S.prioB2(recForm.recurrencia===r),flex:"none",padding:"5px 9px",fontSize:9}} onClick={()=>setRecForm(f=>({...f,recurrencia:r}))}>{r}</button>)}</div>
+                </div>
+                {recForm.recurrencia==="Semanal"&&(
+                  <div style={S.fg}><label style={S.fl}>Días</label>
+                    <div style={{display:"flex",gap:3}}>{DIAS_SEM.map((d,i)=><button key={i} style={{...S.prioB2(recForm.diasSemana.includes(i)),flex:1,padding:"4px 0",fontSize:8}} onClick={()=>setRecForm(f=>({...f,diasSemana:f.diasSemana.includes(i)?f.diasSemana.filter(x=>x!==i):[...f.diasSemana,i]}))}>{d}</button>)}</div>
+                  </div>
+                )}
+                <div style={{...S.r2,marginBottom:9}}><div><label style={S.fl}>Fecha inicio</label><input style={S.inp} type="date" value={recForm.fechaInicio} onChange={e=>setRecForm(f=>({...f,fechaInicio:e.target.value}))}/></div></div>
+                <div style={S.fg}><label style={S.fl}>Termina por</label>
+                  <div style={{display:"flex",gap:7,marginBottom:7}}>
+                    <button style={{...S.prioB2(recForm.finTipo==="repeticiones"),flex:1,padding:"6px 0",fontSize:10}} onClick={()=>setRecForm(f=>({...f,finTipo:"repeticiones"}))}>Nº veces</button>
+                    <button style={{...S.prioB2(recForm.finTipo==="fecha"),flex:1,padding:"6px 0",fontSize:10}} onClick={()=>setRecForm(f=>({...f,finTipo:"fecha"}))}>Fecha límite</button>
+                  </div>
+                  {recForm.finTipo==="repeticiones"&&<input style={S.inp} type="number" min="1" max="60" value={recForm.finReps} onChange={e=>setRecForm(f=>({...f,finReps:parseInt(e.target.value)||1}))}/>}
+                  {recForm.finTipo==="fecha"&&<input style={S.inp} type="date" value={recForm.finFecha} onChange={e=>setRecForm(f=>({...f,finFecha:e.target.value}))}/>}
+                </div>
+                <div style={{fontSize:9,color:"#475569"}}>Se generarán {recForm.finTipo==="repeticiones"?recForm.finReps:"varios"} movimientos.</div>
+              </>)}
+            </div>
+          )}
+        </>)}
+        {saveError&&<div style={S.errBox}><span>⛔</span><span>{saveError}</span></div>}
+        <button style={S.saveB} onClick={onSave}>{recForm.activo?"GENERAR SERIE":"GUARDAR"}</button>
+        <button style={S.cancB} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+});
+
+// ─── MODAL PRESUPUESTO ────────────────────────────────────────
+function ModalPresupuesto({data,presupuestos,setPresupuestos,sm,sy,onClose}){
+  const{catId,subId,nombre,getPres}=data;
+  const id=subId||catId;
+  const currentVal=getPres(id);
+  const[val,setVal]=useState(currentVal?String(currentVal):"");
+  const[proyMode,setProyMode]=useState(false);
+  const[endSm,setEndSm]=useState(sy===new Date().getFullYear()&&sm===new Date().getMonth()?sm+1:sm);
+  const[endSy,setEndSy]=useState(sy+(sm>=11?1:0));
+
+  const guardar=(smFin,syFin)=>{
+    const monto=parseFloat(val)||0;
+    setPresupuestos(p=>{
+      const n={...p};
+      let cm=sm,cy=sy;
+      while(cy<syFin||(cy===syFin&&cm<=smFin)){
+        const k=presKey(id,cm,cy);
+        if(monto>0) n[k]=monto; else delete n[k];
+        cm++; if(cm>11){cm=0;cy++;}
+      }
+      return n;
+    });
+    onClose();
+  };
+
+  const prevEndM=()=>{
+    if(endSm===0){setEndSm(11);setEndSy(y=>y-1);}else setEndSm(m=>m-1);
+  };
+  const nextEndM=()=>{
+    if(endSm===11){setEndSm(0);setEndSy(y=>y+1);}else setEndSm(m=>m+1);
+  };
+
+  return(
+    <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={S.mBox}>
+        <div style={S.mTit}>🎯 PRESUPUESTO</div>
+        <div style={{fontSize:11,color:"#94a3b8",marginBottom:13}}>{nombre} — {MESES_FULL[sm]} {sy}</div>
+        <div style={S.fg}><label style={S.fl}>Monto $</label>
+          <input style={S.inp} type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="0.00" autoFocus/>
+        </div>
+        {/* Opción de proyectar varios meses */}
+        <div style={{border:"1px solid #1e293b",borderRadius:11,padding:13,marginBottom:11}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:proyMode?11:0}}>
+            <span style={{fontSize:11,fontWeight:700,color:proyMode?"#C9A84C":"#475569"}}>↻ Proyectar varios meses</span>
+            <button style={{...S.prioB2(proyMode),width:42,flex:"none",padding:"4px 0",fontSize:10}} onClick={()=>setProyMode(v=>!v)}>{proyMode?"ON":"OFF"}</button>
+          </div>
+          {proyMode&&(
+            <div>
+              <div style={{fontSize:10,color:"#475569",marginBottom:9}}>El mismo monto se aplicará desde <strong>{MESES_FULL[sm]} {sy}</strong> hasta:</div>
+              <div style={S.perBar}>
+                <button style={S.perBtn} onClick={prevEndM}>‹</button>
+                <span style={S.perLbl}>{MESES_FULL[endSm]} {endSy}</span>
+                <button style={S.perBtn} onClick={nextEndM}>›</button>
+              </div>
+              <div style={{fontSize:9,color:"#475569",marginTop:4}}>
+                Se aplicará a {(()=>{let c=0,cm=sm,cy=sy;while(cy<endSy||(cy===endSy&&cm<=endSm)){c++;cm++;if(cm>11){cm=0;cy++;}}return c;})() } meses
+              </div>
+            </div>
+          )}
+        </div>
+        <button style={S.saveB} onClick={()=>proyMode?guardar(endSm,endSy):guardar(sm,sy)}>
+          {proyMode?"GUARDAR Y PROYECTAR":"GUARDAR"}
+        </button>
+        {currentVal>0&&(
+          <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{
+            setPresupuestos(p=>{const n={...p};delete n[presKey(id,sm,sy)];return n;});
+            onClose();
+          }}>Sin presupuesto este mes</button>
+        )}
+        <button style={S.cancB} onClick={onClose}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── PROY SWIPE CARD (componente para evitar IIFE en JSX) ────
+function ProySwipeCard({mes,total,idx,setIdx,semColor,fmt,fmtShort}){
+  const sc=semColor(mes.semaforo);
+  return(
+    <div>
+      <div style={{background:"#10101e",border:`1px solid ${sc}44`,borderRadius:14,padding:"16px 18px",marginBottom:9}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:12}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:800,color:"#e2e8f0"}}>{mes.label}</div>
+            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:3}}>
+              <div style={{width:8,height:8,borderRadius:4,background:sc}}/>
+              <span style={{fontSize:10,color:sc,fontWeight:700}}>{mes.semaforo==="verde"?"Favorable":mes.semaforo==="amarillo"?"Precaución":"Déficit"}</span>
+            </div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div style={{fontSize:9,color:"#64748b"}}>Resultado del mes</div>
+            <div style={{fontSize:20,fontWeight:800,color:mes.resultado>=0?"#22c55e":"#f87171"}}>{mes.resultado>=0?"+":""}{fmt(mes.resultado)}</div>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+          {[["Saldo Ini.","#C9A84C",mes.saldoInicial],["+ Ingresos","#22c55e",mes.totalIng],["− Egresos","#f87171",mes.totalEg]].map(([l,c,v])=>(
+            <div key={l} style={{background:`${c}11`,border:`1px solid ${c}33`,borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
+              <div style={{fontSize:8,color:c,marginBottom:3,fontWeight:700}}>{l}</div>
+              <div style={{fontSize:11,fontWeight:800,color:c}}>{fmtShort(v)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:`${sc}11`,border:`1px solid ${sc}33`,borderRadius:9,padding:"9px 13px"}}>
+          <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>Saldo Final Acumulado</span>
+          <span style={{fontSize:16,fontWeight:800,color:mes.saldoFin>=0?sc:"#f87171"}}>{fmt(mes.saldoFin)}</span>
+        </div>
+      </div>
+      {/* Detalle categorías */}
+      {(mes.detalleIng.length>0||mes.detalleEg.length>0)&&(
+        <div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:11,padding:"12px 14px",marginBottom:9}}>
+          {mes.detalleIng.length>0&&(<>
+            <div style={{fontSize:9,color:"#22c55e",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:7}}>↑ Ingresos presupuestados</div>
+            {mes.detalleIng.map(c=>(
+              <div key={c.id} style={{marginBottom:5}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:c.subs.length?2:0}}>
+                  <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(c.pres)}</span>
+                </div>
+                {c.subs.map(s=>(
+                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #22c55e33"}}>
+                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
+                    <span style={{fontSize:10,fontWeight:700,color:"#22c55e"}}>{fmt(s.pres)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </>)}
+          {mes.detalleEg.length>0&&(<>
+            <div style={{fontSize:9,color:"#f87171",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:7,marginTop:mes.detalleIng.length?10:0}}>↓ Egresos presupuestados</div>
+            {mes.detalleEg.map(c=>(
+              <div key={c.id} style={{marginBottom:5}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:c.subs.length?2:0}}>
+                  <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#f87171"}}>{fmt(c.pres)}</span>
+                </div>
+                {c.subs.map(s=>(
+                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #f8717133"}}>
+                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
+                    <span style={{fontSize:10,fontWeight:700,color:"#f87171"}}>{fmt(s.pres)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </>)}
+        </div>
+      )}
+      <div style={{display:"flex",gap:9}}>
+        <button style={{flex:1,padding:"9px 0",borderRadius:9,border:"1px solid #1e293b",background:"#13131f",color:idx===0?"#334155":"#e2e8f0",fontSize:11,cursor:idx===0?"default":"pointer"}} onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx===0}>‹ Anterior</button>
+        <button style={{flex:1,padding:"9px 0",borderRadius:9,border:"1px solid #1e293b",background:"#13131f",color:idx===total-1?"#334155":"#e2e8f0",fontSize:11,cursor:idx===total-1?"default":"pointer"}} onClick={()=>setIdx(i=>Math.min(total-1,i+1))} disabled={idx===total-1}>Siguiente ›</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── APP ─────────────────────────────────────────────────────
+function App(){
+  const[view,setView]=useState("dashboard");
+  const[movs,setMovs]=useState(INIT_MOVS);
+  const[cuentas,setCuentas]=useState(INIT_CUENTAS);
+  const[tarjetas,setTarjetas]=useState(INIT_TARJETAS);
+  const[catIng,setCatIng]=useState(INIT_CAT_ING);
+  const[catEg,setCatEg]=useState(INIT_CAT_EG);
+  const[presupuestos,setPresupuestos]=useState(INIT_PRESUPUESTOS);
+
+  // modales
+  const[showMov,setShowMov]=useState(false);
+  const[showCuenta,setShowCuenta]=useState(false);
+  const[showTC,setShowTC]=useState(false);
+  const[showPresModal,setShowPresModal]=useState(false);
+  const[presModalData,setPresModalData]=useState(null);
+  const[saveError,setSaveError]=useState("");
+  const[fieldErrors,setFieldErrors]=useState(null);
+
+  // edición
+  const[editMovId,setEditMovId]=useState(null);
+  const[editCuentaId,setEditCuentaId]=useState(null);
+  const[editTCId,setEditTCId]=useState(null);
+  const[editingCatId,setEditingCatId]=useState(null);
+  const[editingCatName,setEditingCatName]=useState("");
+  const[editingSubId,setEditingSubId]=useState(null);
+  const[editingSubName,setEditingSubName]=useState("");
+  const[catMode,setCatMode]=useState("eg");
+
+  // filtros movimientos
+  const[filterTipo,setFilterTipo]=useState("TODOS");
+  const[filterEst,setFilterEst]=useState("TODOS");
+  const[search,setSearch]=useState("");
+  const[filterRetrasados,setFilterRetrasados]=useState(false);
+  // filtro categorías - sets de ids seleccionados (null = todas)
+  const[filterCatIng,setFilterCatIng]=useState(null); // null=todas
+  const[filterCatEg,setFilterCatEg]=useState(null);
+  const[showCatFilter,setShowCatFilter]=useState(false); // modal selector
+
+  const[showPeriod,setShowPeriod]=useState(false);
+  const[showPrioPanel,setShowPrioPanel]=useState(false);
+  const[prioI,setPrioI]=useState(3);
+  const[prioE,setPrioE]=useState(3);
+  const[multiMode,setMultiMode]=useState(false);
+  const[selected,setSelected]=useState(new Set());
+  const[showMultiEdit,setShowMultiEdit]=useState(false);
+  const[multiForm,setMultiForm]=useState({estatus:"",prioridad:"",fecha:""});
+
+  const[confirmDel,setConfirmDel]=useState(null);
+  const[serieConfirm,setSerieConfirm]=useState(null);
+  const[showReset,setShowReset]=useState(false);
+  const[resetPhase,setResetPhase]=useState(0);
+  const[resetInput,setResetInput]=useState("");
+  const[newCatName,setNewCatName]=useState("");
+  const[newSubName,setNewSubName]=useState("");
+  const[addingSubTo,setAddingSubTo]=useState(null);
+
+  // estadísticas
+  const[statTab,setStatTab]=useState("gastos");
+  const[statOpenCat,setStatOpenCat]=useState(null);
+
+  // presupuestos vista
+  const[budgetOpenCat,setBudgetOpenCat]=useState(null);
+  const[budgetTab,setBudgetTab]=useState("eg"); // "eg" | "ing"
+
+  // proyección presupuestal
+  const[proyMeses,setProyMeses]=useState(12);
+  const[proyVistaMode,setProyVistaMode]=useState("acordeon"); // "acordeon" | "swipe"
+  const[proyOpenMes,setProyOpenMes]=useState(null);
+  const[proySwipeIdx,setProySwipeIdx]=useState(0);
+  const[proyTooltipIdx,setProyTooltipIdx]=useState(null);
+
+  // exportar
+  const[showExportModal,setShowExportModal]=useState(false);
+
+  const[showJsonModal,setShowJsonModal]=useState(false);
+  const[jsonImportError,setJsonImportError]=useState("");
+
+  const[exportPeriod,setExportPeriod]=useState({sm:new Date().getMonth(),sy:new Date().getFullYear(),mode:"mes"});
+
+  const BLANK_MOV={fecha:todayStr(),estatus:"PENDIENTE",tipoOp:"Egreso",concepto:"",cat:"",subcat:"",prioridad:1,monto:"",cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false,obs:"",serieId:null};
+  const BLANK_REC={activo:false,recurrencia:"Mensual",diasSemana:[],fechaInicio:todayStr(),finTipo:"repeticiones",finReps:6,finFecha:addM_(todayStr(),6)};
+
+  const[formMov,setFormMov]=useState(BLANK_MOV);
+  const[formCuenta,setFormCuenta]=useState({nombre:"",saldoInicial:"",color:CUENTA_COLORS[0]});
+  const[formTC,setFormTC]=useState({nombre:"",banco:"",limite:"",fechaCorte:"",fechaLimPago:"",saldoDeudorInicial:"",color:"#f472b6"});
+  const[recForm,setRecForm]=useState(BLANK_REC);
+
+  const period=usePeriod();
+  const statPeriod=usePeriodMes();
+  const budgetPeriod=usePeriodMes();
+  const drag=useDrag(setMovs);
+  const catIngDrag=useCatDrag(setCatIng);
+  const catEgDrag=useCatDrag(setCatEg);
+  const tdStr=todayStr();
+
+  const retrasados=useMemo(()=>movs.filter(r=>r.fecha&&r.fecha<tdStr&&r.estatus==="PROGRAMADO"),[movs,tdStr]);
+  const withSaldos=useMemo(()=>calcConsolidado(movs,prioI,prioE),[movs,prioI,prioE]);
+  const cuentaSaldos=useMemo(()=>calcCuentaSaldos(cuentas,movs),[cuentas,movs]);
+  const tarjetaSaldos=useMemo(()=>calcTarjetaSaldos(tarjetas,movs),[tarjetas,movs]);
+
+  // ── Todos los subcatIds de un set de catIds ──
+  const subIdsOf=useCallback((catIds,cats)=>{
+    if(!catIds)return null;
+    const subs=new Set();
+    cats.forEach(c=>{if(catIds.has(c.id))c.subs.forEach(s=>subs.add(s.id));});
+    return subs;
+  },[]);
+
+  // ── filtered con filtro categoría ──
+  const filtered=useMemo(()=>{
+    const retSet=new Set(retrasados.map(r=>r.id));
+    const hasCatIng=filterCatIng!==null&&filterCatIng.size>0;
+    const hasCatEg=filterCatEg!==null&&filterCatEg.size>0;
+    const hasCatFilter=hasCatIng||hasCatEg;
+    const subIng=subIdsOf(filterCatIng,catIng);
+    const subEg=subIdsOf(filterCatEg,catEg);
+
+    return withSaldos
+      .filter(r=>{
+        // PENDIENTES: solo visibles cuando filterEst es explícitamente "PENDIENTE"
+        if(r.estatus==="PENDIENTE") return filterEst==="PENDIENTE";
+        if(filterRetrasados) return retSet.has(r.id);
+        return retSet.has(r.id)||period.inP(r.fecha);
+      })
+      .filter(r=>filterTipo==="TODOS"||r.tipoOp===filterTipo)
+      .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
+      .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
+      .filter(r=>{
+        if(!hasCatFilter)return true;
+        if(r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return !hasCatFilter;
+        if(r.tipoOp==="Ingreso"&&hasCatIng) return filterCatIng.has(r.cat)||(subIng&&subIng.has(r.subcat));
+        if(r.tipoOp==="Egreso"&&hasCatEg)  return filterCatEg.has(r.cat)||(subEg&&subEg.has(r.subcat));
+        if(r.tipoOp==="Ingreso"&&!hasCatIng) return true;
+        if(r.tipoOp==="Egreso"&&!hasCatEg)   return true;
+        return true;
+      });
+  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf]);
+
+  // Totales filtrados — respeta todos los filtros activos, divide Reales y Proyectados
+  const filteredTotals=useMemo(()=>{
+    const ingReal=filtered.filter(r=>["INGRESADO","PAGADO"].includes(r.estatus)&&r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0);
+    const egReal =filtered.filter(r=>["INGRESADO","PAGADO"].includes(r.estatus)&&r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0);
+    const ingProy=filtered.filter(r=>r.estatus==="PROGRAMADO"&&r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0);
+    const egProy =filtered.filter(r=>r.estatus==="PROGRAMADO"&&r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0);
+    return{ingReal,egReal,ingProy,egProy};
+  },[filtered]);
+
+  const primerNegativo=useMemo(()=>{
+    const retSet=new Set(retrasados.map(r=>r.id));
+    return withSaldos.filter(r=>r.enProyeccion&&r.fecha&&(period.inP(r.fecha)||retSet.has(r.id))).find(r=>r.saldoConsolidado<0)||null;
+  },[withSaldos,period.inP,retrasados]);
+
+  const stats=useMemo(()=>{
+    const real=withSaldos.filter(r=>["INGRESADO","PAGADO"].includes(r.estatus));
+    const retSet=new Set(retrasados.map(r=>r.id));
+    const progAll=withSaldos.filter(r=>r.estatus==="PROGRAMADO"&&r.enProyeccion);
+    const progPer=withSaldos.filter(r=>r.enProyeccion&&r.estatus==="PROGRAMADO"&&(period.inP(r.fecha)||retSet.has(r.id)));
+    const saldoReal=Object.values(cuentaSaldos).reduce((s,v)=>s+v,0);
+    const ig=x=>x.filter(r=>r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0);
+    const eg=x=>x.filter(r=>r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0);
+    return{totalIngresos:real.filter(r=>r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0),totalEgresos:real.filter(r=>r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0),saldoReal,ingEspPer:ig(progPer),egEspPer:eg(progPer),saldoProy_per:saldoReal+ig(progPer)-eg(progPer),saldoProy_total:saldoReal+ig(progAll)-eg(progAll),ingEspTotal:ig(progAll),egEspTotal:eg(progAll)};
+  },[withSaldos,cuentaSaldos,retrasados,period.inP]);
+
+  // Estadísticas
+  const statData=useMemo(()=>{
+    const isMov=r=>["INGRESADO","PAGADO"].includes(r.estatus)&&r.fecha&&statPeriod.inP(r.fecha);
+    const egMovs=movs.filter(r=>isMov(r)&&r.tipoOp==="Egreso");
+    const ingMovs=movs.filter(r=>isMov(r)&&r.tipoOp==="Ingreso");
+    const build=(movArr,catArr)=>{
+      const byC={};
+      movArr.forEach(r=>{
+        const cat=catArr.find(c=>c.id===r.cat);const catNom=cat?.nombre||"Sin categoría";
+        if(!byC[r.cat])byC[r.cat]={id:r.cat,nombre:catNom,total:0,subs:{}};
+        byC[r.cat].total+=r.monto;
+        const sub=cat?.subs?.find(s=>s.id===r.subcat);const subNom=sub?.nombre||"Sin subcategoría";
+        if(!byC[r.cat].subs[r.subcat])byC[r.cat].subs[r.subcat]={id:r.subcat,nombre:subNom,total:0};
+        byC[r.cat].subs[r.subcat].total+=r.monto;
+      });
+      return Object.values(byC).sort((a,b)=>b.total-a.total);
+    };
+    const egArr=build(egMovs,catEg);const ingArr=build(ingMovs,catIng);
+    return{egArr,ingArr,totalEg:egArr.reduce((s,c)=>s+c.total,0),totalIng:ingArr.reduce((s,c)=>s+c.total,0)};
+  },[movs,catEg,catIng,statPeriod.inP]);
+
+  const evolucionData=useMemo(()=>{
+    const arr=[];const now=new Date();
+    for(let i=7;i>=0;i--){
+      const d=new Date(now.getFullYear(),now.getMonth()-i,1);const mes=d.getMonth();const anio=d.getFullYear();
+      const inP2=r=>{if(!r.fecha)return false;const[y,m]=r.fecha.split("-").map(Number);return y===anio&&m-1===mes;};
+      const real=movs.filter(r=>["INGRESADO","PAGADO"].includes(r.estatus)&&inP2(r));
+      arr.push({name:MESES[mes],ing:real.filter(r=>r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0),eg:real.filter(r=>r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0)});
+    }
+    return arr;
+  },[movs]);
+
+  // Presupuestos
+  const budgetData=useMemo(()=>{
+    const isMov=r=>["INGRESADO","PAGADO"].includes(r.estatus)&&r.fecha&&budgetPeriod.inP(r.fecha);
+    const gastosEg={};const gastosIng={};
+    movs.filter(isMov).forEach(r=>{
+      if(r.tipoOp==="Egreso"){gastosEg[r.cat]=(gastosEg[r.cat]||0)+r.monto;if(r.subcat)gastosEg[r.subcat]=(gastosEg[r.subcat]||0)+r.monto;}
+      if(r.tipoOp==="Ingreso"){gastosIng[r.cat]=(gastosIng[r.cat]||0)+r.monto;if(r.subcat)gastosIng[r.subcat]=(gastosIng[r.subcat]||0)+r.monto;}
+    });
+    const getPres=id=>presupuestos[presKey(id,budgetPeriod.sm,budgetPeriod.sy)]||0;
+    return{gastosEg,gastosIng,getPres};
+  },[movs,budgetPeriod.sm,budgetPeriod.sy,budgetPeriod.inP,presupuestos]);
+
+  // ── PROYECCIÓN PRESUPUESTAL ──────────────────────────────────
+  const proyData=useMemo(()=>{
+    const now=new Date();
+    const curSm=now.getMonth();const curSy=now.getFullYear();
+    // Saldo inicial = proyectado al cierre del mes actual
+    const saldoInicial=calcSaldoProyFin(movs,cuentas,prioI,prioE,curSm,curSy);
+    const meses=[];
+    let saldoAcum=saldoInicial;
+    for(let i=0;i<proyMeses;i++){
+      let sm2=curSm+1+i;let sy2=curSy;
+      while(sm2>11){sm2-=12;sy2++;}
+      // Sumar todos los presupuestos de ingresos
+      const totalIng=catIng.reduce((s,c)=>{
+        if(c.subs.length>0)return s+c.subs.reduce((ss,sub)=>ss+(presupuestos[presKey(sub.id,sm2,sy2)]||0),0);
+        return s+(presupuestos[presKey(c.id,sm2,sy2)]||0);
+      },0);
+      // Sumar todos los presupuestos de egresos
+      const totalEg=catEg.reduce((s,c)=>{
+        if(c.subs.length>0)return s+c.subs.reduce((ss,sub)=>ss+(presupuestos[presKey(sub.id,sm2,sy2)]||0),0);
+        return s+(presupuestos[presKey(c.id,sm2,sy2)]||0);
+      },0);
+      const resultado=totalIng-totalEg;
+      const saldoFin=saldoAcum+resultado;
+      // Semáforo
+      const semaforo=saldoFin<0?"rojo":(saldoFin<saldoAcum*0.2||resultado<0)?"amarillo":"verde";
+      // Detalle por categoría
+      const detalleIng=catIng.map(c=>{
+        const subs=c.subs.map(s=>({...s,pres:presupuestos[presKey(s.id,sm2,sy2)]||0})).filter(s=>s.pres>0);
+        const catPres=c.subs.length>0?subs.reduce((s,x)=>s+x.pres,0):(presupuestos[presKey(c.id,sm2,sy2)]||0);
+        return{...c,pres:catPres,subs};
+      }).filter(c=>c.pres>0);
+      const detalleEg=catEg.map(c=>{
+        const subs=c.subs.map(s=>({...s,pres:presupuestos[presKey(s.id,sm2,sy2)]||0})).filter(s=>s.pres>0);
+        const catPres=c.subs.length>0?subs.reduce((s,x)=>s+x.pres,0):(presupuestos[presKey(c.id,sm2,sy2)]||0);
+        return{...c,pres:catPres,subs};
+      }).filter(c=>c.pres>0);
+      meses.push({sm:sm2,sy:sy2,label:`${MESES_FULL[sm2]} ${sy2}`,labelCorto:`${MESES[sm2]} ${sy2}`,saldoInicial:saldoAcum,totalIng,totalEg,resultado,saldoFin,semaforo,detalleIng,detalleEg});
+      saldoAcum=saldoFin;
+    }
+    return{meses,saldoInicial};
+  },[presupuestos,catIng,catEg,movs,cuentas,prioI,prioE,proyMeses]);
+
+  const nextId=arr=>arr.length?Math.max(...arr.map(x=>x.id))+1:1;
+  const nextOrd=()=>movs.length?Math.max(...movs.map(x=>x.orden))+1:1;
+
+  const isEditReal=useMemo(()=>{
+    if(!editMovId)return false;
+    const r=movs.find(x=>x.id===editMovId);
+    return r?["INGRESADO","PAGADO"].includes(r.estatus):false;
+  },[editMovId,movs]);
+
+  const openNewMov=useCallback(()=>{setFormMov({...BLANK_MOV});setRecForm({...BLANK_REC,fechaInicio:todayStr()});setEditMovId(null);setSaveError("");setFieldErrors(null);setShowMov(true);},[]);
+  const openEditMov=useCallback(r=>{setFormMov({...r,monto:String(r.monto||"")});setRecForm({...BLANK_REC,activo:false,fechaInicio:r.fecha||todayStr()});setEditMovId(r.id);setSaveError("");setFieldErrors(null);setShowMov(true);},[]);
+  const openNewCuenta=useCallback(()=>{setFormCuenta({nombre:"",saldoInicial:"",color:CUENTA_COLORS[0]});setEditCuentaId(null);setShowCuenta(true);},[]);
+  const openEditCuenta=useCallback(c=>{setFormCuenta({...c});setEditCuentaId(c.id);setShowCuenta(true);},[]);
+  const openNewTC=useCallback(()=>{setFormTC({nombre:"",banco:"",limite:"",fechaCorte:"",fechaLimPago:"",saldoDeudorInicial:"",color:"#f472b6"});setEditTCId(null);setShowTC(true);},[]);
+  const openEditTC=useCallback(t=>{setFormTC({...t});setEditTCId(t.id);setShowTC(true);},[]);
+
+  const handleSetFormMov=useCallback(updater=>{
+    setFormMov(prev=>{
+      const next=typeof updater==="function"?updater(prev):updater;
+      if(next.fecha!==prev.fecha)setRecForm(r=>({...r,fechaInicio:next.fecha||todayStr()}));
+      return next;
+    });
+  },[]);
+
+  const saveMov=useCallback(()=>{
+    if(!formMov.concepto||!formMov.monto)return;
+    const data={...formMov,monto:isEditReal?(movs.find(r=>r.id===editMovId)?.monto||parseFloat(formMov.monto)||0):parseFloat(formMov.monto)||0};
+    if(data.tipoOp==="Transferencia")data.estatus="PAGADO";
+
+    const esEfectivo=["PAGADO","INGRESADO"].includes(data.estatus);
+    // PENDIENTE: limpiar fecha siempre (filosofía: sin fecha)
+    if(data.estatus==="PENDIENTE") data.fecha=null;
+    // Limpiar cuenta/tarjeta si es PENDIENTE o PROGRAMADO
+    if(["PENDIENTE","PROGRAMADO"].includes(data.estatus)){
+      data.cuentaId=null;data.cuentaDestinoId=null;data.tarjetaId=null;data.usaTarjeta=false;
+    }
+
+    // ── Validaciones de campos requeridos ──
+    const errs={};
+    // Fecha: requerida para PROGRAMADO, INGRESADO, PAGADO (no para PENDIENTE)
+    if(data.estatus==="PROGRAMADO"&&!data.fecha)errs.fecha=true;
+    if(esEfectivo&&!data.fecha)errs.fecha=true;
+    // Cuenta/tarjeta: requerida solo para movimientos efectivos
+    if(esEfectivo&&data.tipoOp==="Ingreso"&&!data.cuentaId)errs.cuentaId=true;
+    if(esEfectivo&&data.tipoOp==="Egreso"&&!data.usaTarjeta&&!data.cuentaId)errs.cuentaId=true;
+    if(esEfectivo&&data.tipoOp==="Egreso"&&data.usaTarjeta&&!data.tarjetaId)errs.tarjetaId=true;
+    if(esEfectivo&&data.tipoOp==="Pago Tarjeta"&&!data.tarjetaId)errs.tarjetaId=true;
+    if(esEfectivo&&data.tipoOp==="Pago Tarjeta"&&!data.cuentaId)errs.cuentaId=true;
+    if(esEfectivo&&data.tipoOp==="Transferencia"&&!data.cuentaId)errs.cuentaId=true;
+
+    if(Object.keys(errs).length>0){setFieldErrors(errs);setSaveError("Completa los campos marcados en rojo.");return;}
+
+    // Validar saldo suficiente
+    if(esEfectivo&&!isEditReal){
+      let cuentaADebitar=null;
+      if(data.tipoOp==="Egreso"&&!data.usaTarjeta&&data.cuentaId)cuentaADebitar=data.cuentaId;
+      if(data.tipoOp==="Transferencia"&&data.cuentaId)cuentaADebitar=data.cuentaId;
+      if(data.tipoOp==="Pago Tarjeta"&&data.cuentaId)cuentaADebitar=data.cuentaId;
+      if(cuentaADebitar){
+        const sa=calcSaldoCuentaAntesDe(cuentaADebitar,editMovId,movs,cuentas);
+        if(sa-data.monto<0){setSaveError(`Saldo insuficiente en "${cuentas.find(c=>c.id===cuentaADebitar)?.nombre}". Disponible: ${fmt(sa)}.`);return;}
+      }
+    }
+
+    setFieldErrors(null);setSaveError("");
+    if(editMovId!==null){
+      const orig=movs.find(r=>r.id===editMovId);
+      if(orig?.serieId){setSerieConfirm({action:"edit",id:editMovId,serieId:orig.serieId,payload:data});setShowMov(false);return;}
+      setMovs(p=>p.map(r=>r.id===editMovId?{...r,...data}:r));
+    } else if(recForm.activo){
+      const fechas=generarFechas(recForm);const sid="s"+Date.now();let bid=nextId(movs),bord=nextOrd();
+      setMovs(p=>[...p,...fechas.map((f,i)=>({...data,id:bid+i,orden:bord+i,fecha:f,serieId:sid}))]);
+    } else {
+      setMovs(p=>[...p,{...data,id:nextId(movs),orden:nextOrd()}]);
+    }
+    setShowMov(false);setEditMovId(null);
+  },[formMov,editMovId,isEditReal,movs,recForm,cuentas]);
+
+  const saveCuenta=useCallback(()=>{
+    if(!formCuenta.nombre)return;
+    const data={...formCuenta,saldoInicial:parseFloat(formCuenta.saldoInicial)||0};
+    if(editCuentaId!==null)setCuentas(p=>p.map(c=>c.id===editCuentaId?{...c,...data}:c));
+    else setCuentas(p=>[...p,{...data,id:nextId(cuentas)}]);
+    setShowCuenta(false);setEditCuentaId(null);
+  },[formCuenta,editCuentaId,cuentas]);
+
+  const saveTC=useCallback(()=>{
+    if(!formTC.nombre)return;
+    const data={...formTC,limite:parseFloat(formTC.limite)||0,saldoDeudorInicial:parseFloat(formTC.saldoDeudorInicial)||0,fechaCorte:parseInt(formTC.fechaCorte)||0,fechaLimPago:parseInt(formTC.fechaLimPago)||0};
+    if(editTCId!==null)setTarjetas(p=>p.map(t=>t.id===editTCId?{...t,...data}:t));
+    else setTarjetas(p=>[...p,{...data,id:nextId(tarjetas)}]);
+    setShowTC(false);setEditTCId(null);
+  },[formTC,editTCId,tarjetas]);
+
+  const doDelete=id=>{const r=movs.find(x=>x.id===id);if(r?.serieId){setSerieConfirm({action:"delete",id,serieId:r.serieId,payload:null});setConfirmDel(null);}else{setMovs(p=>p.filter(x=>x.id!==id));setConfirmDel(null);}};
+  const applySerieConfirm=scope=>{const{action,id,serieId,payload}=serieConfirm;if(action==="edit"){if(scope==="one")setMovs(p=>p.map(r=>r.id===id?{...r,...payload}:r));else setMovs(p=>p.map(r=>r.serieId===serieId?{...r,...payload,fecha:r.fecha,id:r.id,orden:r.orden}:r));}else{if(scope==="one")setMovs(p=>p.filter(r=>r.id!==id));else setMovs(p=>p.filter(r=>r.serieId!==serieId));}setSerieConfirm(null);};
+  const toggleSelect=id=>setSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
+  const applyMultiEdit=()=>{setMovs(p=>p.map(r=>{if(!selected.has(r.id))return r;const u={...r};if(multiForm.estatus)u.estatus=multiForm.estatus;if(multiForm.prioridad)u.prioridad=parseInt(multiForm.prioridad);if(multiForm.fecha)u.fecha=multiForm.fecha;return u;}));setSelected(new Set());setMultiMode(false);setShowMultiEdit(false);};
+
+  const exportExcel=useCallback((sm_,sy_,mode_)=>{
+    const inPE=r=>{if(!r.fecha)return false;if(mode_==="mes"){const[y,m]=r.fecha.split("-").map(Number);return y===sy_&&m-1===sm_;}return r.fecha.startsWith(String(sy_));};
+    const rows=movs.filter(r=>r.fecha&&inPE(r)).map(r=>{
+      const cats=r.tipoOp==="Ingreso"?catIng:catEg;
+      const catNom=cats.find(c=>c.id===r.cat)?.nombre||"";
+      const subNom=cats.find(c=>c.id===r.cat)?.subs?.find(s=>s.id===r.subcat)?.nombre||"";
+      return{Fecha:fmtDate(r.fecha),Concepto:r.concepto,Tipo:r.tipoOp,Estatus:r.estatus,Categoría:catNom,Subcategoría:subNom,Ingreso:r.tipoOp==="Ingreso"?r.monto:"",Egreso:r.tipoOp==="Egreso"?r.monto:"",Monto:r.monto,Prioridad:PRIO_LBL[r.prioridad]||"",Obs:r.obs||""};
+    });
+    const ws=XLSX.utils.json_to_sheet(rows);const wb=XLSX.utils.book_new();
+    const lbl=mode_==="mes"?`${MESES_FULL[sm_]} ${sy_}`:`Año ${sy_}`;
+    XLSX.utils.book_append_sheet(wb,ws,`Mov ${lbl}`);XLSX.writeFile(wb,`NexusFinanzas_${lbl.replace(/ /g,"_")}.xlsx`);
+    setShowExportModal(false);
+  },[movs,catIng,catEg]);
+
+
+  const exportJSON=useCallback(()=>{
+    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,exportedAt:new Date().toISOString(),version:"v7"};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`NexusFinanzas_${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  },[movs,cuentas,tarjetas,catIng,catEg,presupuestos]);
+
+  const importJSON=useCallback((e)=>{
+    const file=e.target.files[0];if(!file)return;
+    setJsonImportError("");
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const data=JSON.parse(ev.target.result);
+        if(!data.movs||!data.cuentas)throw new Error("Formato inválido");
+        if(data.movs)setMovs(data.movs);
+        if(data.cuentas)setCuentas(data.cuentas);
+        if(data.tarjetas)setTarjetas(data.tarjetas);
+        if(data.catIng)setCatIng(data.catIng);
+        if(data.catEg)setCatEg(data.catEg);
+        if(data.presupuestos)setPresupuestos(data.presupuestos);
+        setShowJsonModal(false);
+        setView("dashboard");
+      }catch(err){setJsonImportError("Archivo inválido. Usa un JSON exportado desde esta app.");}
+    };
+    reader.readAsText(file);
+    e.target.value="";
+  },[]);
+
+  // cat helpers
+  const cats_=catMode==="ing"?catIng:catEg;
+  const setCats_=catMode==="ing"?setCatIng:setCatEg;
+  const catDrag=catMode==="ing"?catIngDrag:catEgDrag;
+  const addCat=()=>{if(!newCatName.trim())return;setCats_(p=>[...p,{id:"c"+Date.now(),nombre:newCatName.trim(),subs:[]}]);setNewCatName("");};
+  const delCat=id=>setCats_(p=>p.filter(c=>c.id!==id));
+  const addSub=catId=>{if(!newSubName.trim())return;setCats_(p=>p.map(c=>c.id===catId?{...c,subs:[...c.subs,{id:"s"+Date.now(),nombre:newSubName.trim()}]}:c));setNewSubName("");setAddingSubTo(null);};
+  const delSub=(catId,subId)=>setCats_(p=>p.map(c=>c.id===catId?{...c,subs:c.subs.filter(s=>s.id!==subId)}:c));
+  const saveEditCat=catId=>{if(!editingCatName.trim())return;setCats_(p=>p.map(c=>c.id===catId?{...c,nombre:editingCatName.trim()}:c));setEditingCatId(null);setEditingCatName("");};
+  const saveEditSub=(catId,subId)=>{if(!editingSubName.trim())return;setCats_(p=>p.map(c=>c.id===catId?{...c,subs:c.subs.map(s=>s.id===subId?{...s,nombre:editingSubName.trim()}:s)}:c));setEditingSubId(null);setEditingSubName("");};
+
+  // Helpers filtro categoría
+  const hasCatFilterActive=(filterCatIng!==null&&filterCatIng.size>0)||(filterCatEg!==null&&filterCatEg.size>0);
+  const showIngCatFilter=filterTipo==="TODOS"||filterTipo==="Ingreso";
+  const showEgCatFilter=filterTipo==="TODOS"||filterTipo==="Egreso";
+
+  const PrioILabel=prioI===3?"Todas":PRIO_LBL[prioI];
+  const PrioELabel=prioE===3?"Todas":PRIO_LBL[prioE];
+  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","configuracion"];
+
+  // Semáforo color
+  const semColor=s=>s==="verde"?"#22c55e":s==="amarillo"?"#fbbf24":"#f87171";
+  const semBg=s=>s==="verde"?S.semVerde:s==="amarillo"?S.semAmarillo:S.semRojo;
+
+  // ── RENDER ───────────────────────────────────────────────────
+  return(
+    <>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+      <div style={S.app}>
+        <div style={S.hdr}>
+          <div><div style={S.logo}>Nexus Partners</div><div style={S.sub}>PROYECCIÓN FINANCIERA PERSONAL</div></div>
+          <div style={{textAlign:"right"}}><div style={{color:"#C9A84C",fontWeight:800,fontSize:12}}>{fmt(stats.saldoReal)}</div><div style={{fontSize:8,color:"#334155"}}>saldo real</div></div>
+        </div>
+        <div style={S.line}/><div style={{height:10}}/>
+
+        {/* ── DASHBOARD ── */}
+        {view==="dashboard"&&(
+          <div style={S.sec}>
+            {retrasados.length>0&&(
+              <div style={S.alertCard} onClick={()=>{setView("movimientos");setFilterRetrasados(true);}}>
+                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:3}}><span>⚠️</span><span style={{fontSize:11,fontWeight:800,color:"#fbbf24"}}>{retrasados.length} movimiento{retrasados.length>1?"s":""} retrasado{retrasados.length>1?"s":""}</span></div>
+                <div style={{fontSize:10,color:"#92400e"}}>Toca para ver</div>
+              </div>
+            )}
+            {primerNegativo&&(
+              <div style={S.alertRojo}>
+                <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:3}}><span>🔴</span><span style={{fontSize:11,fontWeight:800,color:"#f87171"}}>Saldo negativo en {period.label()}</span></div>
+                <div style={{fontSize:10,color:"#f87171",opacity:.8}}>Primer rojo el <strong>{fmtDate(primerNegativo.fecha)}</strong> → {fmt(primerNegativo.saldoConsolidado)}</div>
+              </div>
+            )}
+            <div style={S.card("rgba(201,168,76,0.25)")}><div style={S.lbl}>Saldo Real</div><div style={S.bigA()}>{fmt(stats.saldoReal)}</div><div style={{fontSize:10,color:"#475569",marginTop:2}}>Suma de cuentas débito</div></div>
+            <div style={S.g2}>
+              <div style={S.card()}><div style={S.lbl}>Ingresos Reales</div><div style={{fontSize:16,fontWeight:800,color:"#22c55e"}}>{fmt(stats.totalIngresos)}</div></div>
+              <div style={S.card()}><div style={S.lbl}>Egresos Reales</div><div style={{fontSize:16,fontWeight:800,color:"#f87171"}}>{fmt(stats.totalEgresos)}</div></div>
+            </div>
+            <div style={S.card("rgba(167,139,250,0.2)")}>
+              <div style={S.lbl}>Proyectado — {period.label()}</div>
+              <div style={S.bigA("#a78bfa")}>{fmt(stats.saldoProy_per)}</div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontSize:10}}><span style={{color:"#64748b"}}>+ Ingresos proy.</span><span style={{color:"#22c55e",fontWeight:700}}>{fmt(stats.ingEspPer)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:2,fontSize:10}}><span style={{color:"#64748b"}}>− Egresos proy.</span><span style={{color:"#f87171",fontWeight:700}}>{fmt(stats.egEspPer)}</span></div>
+              <div style={S.divider}/>
+              <div style={S.lbl}>Proyección Total</div>
+              <div style={{fontSize:18,fontWeight:800,color:"#60a5fa"}}>{fmt(stats.saldoProy_total)}</div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontSize:10}}><span style={{color:"#64748b"}}>+ Total ing. proy.</span><span style={{color:"#22c55e",fontWeight:700}}>{fmt(stats.ingEspTotal)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginTop:2,fontSize:10}}><span style={{color:"#64748b"}}>− Total eg. proy.</span><span style={{color:"#f87171",fontWeight:700}}>{fmt(stats.egEspTotal)}</span></div>
+              <div style={{fontSize:9,color:"#475569",marginTop:7}}>Prob.ing: <span style={{color:"#22c55e",fontWeight:700}}>{PrioILabel}</span> · Prior.eg: <span style={{color:"#f87171",fontWeight:700}}>{PrioELabel}</span></div>
+            </div>
+            <div style={S.sTit}>CUENTAS DÉBITO</div>
+            {cuentas.map(c=>(
+              <div key={c.id} style={S.cCard(c.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{display:"flex",alignItems:"center",gap:7}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span></div>
+                <span style={{fontSize:16,fontWeight:800,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</span>
+              </div></div>
+            ))}
+            {tarjetas.length>0&&(<><div style={{...S.sTit,marginTop:7}}>TARJETAS DE CRÉDITO</div>
+              {tarjetas.map(t=>{const sd=tarjetaSaldos[t.id]||0;return(
+                <div key={t.id} style={S.cCard(t.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2}}><div style={{width:8,height:8,borderRadius:4,background:t.color}}/><span style={{fontSize:12,fontWeight:700}}>{t.nombre}</span></div>
+                    <div style={{fontSize:9,color:"#475569"}}>Disponible: <span style={{color:"#22c55e",fontWeight:700}}>{fmt((t.limite||0)-sd)}</span></div></div>
+                  <div style={{textAlign:"right"}}><div style={{fontSize:8,color:"#64748b"}}>Saldo deudor</div><div style={{fontSize:16,fontWeight:800,color:sd>0?"#f87171":"#22c55e"}}>{fmt(sd)}</div></div>
+                </div></div>
+              );})}
+            </>)}
+          </div>
+        )}
+
+        {/* ── MOVIMIENTOS ── */}
+        {view==="movimientos"&&(
+          <div style={S.sec} onTouchMove={drag.tm} onTouchEnd={drag.commit}>
+            {/* Período */}
+            <div style={S.perBar} onClick={()=>setShowPeriod(v=>!v)}>
+              {!showPeriod&&<button style={S.perBtn} onClick={e=>{e.stopPropagation();period.prev();}}>‹</button>}
+              <span style={S.perLbl}>📅 {period.label()}</span>
+              {!showPeriod&&<button style={S.perBtn} onClick={e=>{e.stopPropagation();period.next();}}>›</button>}
+              <span style={{padding:"7px 10px",color:"#475569",fontSize:10}}>{showPeriod?"▲":"▼"}</span>
+            </div>
+            {showPeriod&&(
+              <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:13,padding:14,marginBottom:7}}>
+                <div style={S.perModes}>{[["mes","Mensual"],["anio","Anual"],["custom","Personalizado"]].map(([m,l])=><button key={m} style={S.perMode(period.mode===m)} onClick={()=>period.setMode(m)}>{l}</button>)}</div>
+                {period.mode==="mes"&&<div style={S.perBar}><button style={S.perBtn} onClick={period.prev}>‹</button><span style={S.perLbl}>{MESES_FULL[period.sm]} {period.sy}</span><button style={S.perBtn} onClick={period.next}>›</button></div>}
+                {period.mode==="anio"&&<div style={S.perBar}><button style={S.perBtn} onClick={period.prev}>‹</button><span style={S.perLbl}>{period.sy}</span><button style={S.perBtn} onClick={period.next}>›</button></div>}
+                {period.mode==="custom"&&<div style={{...S.r2,gap:9}}><div><label style={S.fl}>Desde</label><input style={S.inp} type="date" value={period.fr} onChange={e=>period.setFr(e.target.value)}/></div><div><label style={S.fl}>Hasta</label><input style={S.inp} type="date" value={period.to} onChange={e=>period.setTo(e.target.value)}/></div></div>}
+                <button style={S.cancB} onClick={()=>setShowPeriod(false)}>Cerrar</button>
+              </div>
+            )}
+            {/* Filtros */}
+            <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
+              <button style={S.prioTag(prioI<3||prioE<3)} onClick={()=>setShowPrioPanel(v=>!v)}>⚙ {PrioILabel}/{PrioELabel}</button>
+              <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>
+                {retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados
+              </button>
+              <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>
+                📂 Categoría{hasCatFilterActive?" ✓":""}
+              </button>
+              <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
+            </div>
+            {showPrioPanel&&(
+              <div style={S.prioPanel}>
+                <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↑ Probabilidad Ingresos</div>
+                <div style={S.prioRow}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioI===v,c)} onClick={()=>setPrioI(v)}>{l}</button>)}</div>
+                <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos</div>
+                <div style={S.prioRow}>{[[1,"Alta","#f87171"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioE===v,c)} onClick={()=>setPrioE(v)}>{l}</button>)}</div>
+                <button style={S.cancB} onClick={()=>setShowPrioPanel(false)}>Cerrar</button>
+              </div>
+            )}
+            <input style={S.srch} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar concepto, notas o monto…"/>
+            <div style={S.chips}>{["TODOS",...TIPO_OP].map(t=><button key={t} style={S.chip(filterTipo===t)} onClick={()=>setFilterTipo(t)}>{t}</button>)}</div>
+            <div style={S.chips}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
+
+            {/* Totales filtrados — Reales + Proyectados */}
+            <div style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:10,padding:"9px 13px",marginBottom:9}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <div>
+                  <div style={{fontSize:8,color:"#475569",marginBottom:1}}>↑ ING REALES</div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#22c55e"}}>{fmt(filteredTotals.ingReal)}</div>
+                  {filteredTotals.ingProy>0&&<div style={{fontSize:9,color:"#22c55e",opacity:.6}}>+{fmt(filteredTotals.ingProy)} proy.</div>}
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:8,color:"#475569",marginBottom:1}}>↓ EG REALES</div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#f87171"}}>{fmt(filteredTotals.egReal)}</div>
+                  {filteredTotals.egProy>0&&<div style={{fontSize:9,color:"#f87171",opacity:.6}}>+{fmt(filteredTotals.egProy)} proy.</div>}
+                </div>
+              </div>
+              {/* Indicador PENDIENTES */}
+              {movs.filter(r=>r.estatus==="PENDIENTE").length>0&&filterEst!=="PENDIENTE"&&(
+                <div style={{borderTop:"1px solid #1e293b22",paddingTop:5,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontSize:9,color:"#fbbf24"}}>
+                    📋 {movs.filter(r=>r.estatus==="PENDIENTE").length} pendiente{movs.filter(r=>r.estatus==="PENDIENTE").length>1?"s":""} sin programar
+                  </span>
+                  <button style={{fontSize:9,padding:"3px 8px",borderRadius:7,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",fontWeight:700}}
+                    onClick={()=>setFilterEst("PENDIENTE")}>Ver →</button>
+                </div>
+              )}
+            </div>
+
+            <div style={{fontSize:9,color:"#334155",marginBottom:9,display:"flex",gap:5}}>
+              {multiMode?<span style={{color:"#C9A84C"}}>{selected.size} selec.</span>:<span>☰ arrastra para reordenar</span>}
+              <span style={{marginLeft:"auto"}}>{filtered.length} movimientos</span>
+            </div>
+            {filtered.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin movimientos en este período</div>}
+            {filtered.map(row=>{
+              const isActive=drag.aId===row.id,isOver=drag.oViz===row.id;
+              const isRet=retrasados.some(x=>x.id===row.id);
+              const isSel=selected.has(row.id);
+              const isNeg=row.saldoConsolidado<0&&row.enProyeccion;
+              const cNom=cuentas.find(c=>c.id===row.cuentaId)?.nombre;
+              const cDest=cuentas.find(c=>c.id===row.cuentaDestinoId)?.nombre;
+              const tcNom=tarjetas.find(t=>t.id===row.tarjetaId)?.nombre;
+              const esProg=["PENDIENTE","PROGRAMADO"].includes(row.estatus);
+              const prioColor=row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8";
+              const catNom=(row.tipoOp==="Ingreso"?catIng:catEg).find(c=>c.id===row.cat)?.nombre;
+              return(
+                <div key={row.id} data-movid={row.id}
+                  style={{...S.movWrap(isActive,isOver,isRet,isNeg),outline:isSel?"2px solid #C9A84C":"none"}}
+                  onDragOver={e=>{e.preventDefault();drag.enter(row.id);}} onDrop={drag.commit}
+                  onClick={multiMode?()=>toggleSelect(row.id):undefined}>
+                  {multiMode
+                    ?<div style={{...S.handle,color:isSel?"#C9A84C":"#334155",fontSize:16}}>{isSel?"☑":"☐"}</div>
+                    :<div style={S.handle} draggable onDragStart={()=>drag.start(row.id,withSaldos)} onDragEnd={drag.commit} onTouchStart={e=>{e.stopPropagation();drag.start(row.id,withSaldos);}}>☰</div>
+                  }
+                  <div style={S.movBody(row.estatus)}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:2}}>
+                      <span style={{fontSize:12,fontWeight:600,flex:1,marginRight:7,lineHeight:1.3}}>
+                        {isRet&&<span style={{fontSize:9,color:"#fbbf24",marginRight:3}} title="Movimiento retrasado: fecha vencida sin ejecutar">⚠</span>}
+                        {row.concepto}{row.serieId&&<span style={{fontSize:8,color:"#475569",marginLeft:3}}>↻</span>}
+                      </span>
+                      <span style={{fontSize:13,fontWeight:800,color:OP_COLORS[row.tipoOp]||"#94a3b8",whiteSpace:"nowrap"}}>
+                        {row.tipoOp==="Ingreso"?"+":row.tipoOp==="Egreso"?"−":""}{fmt(row.monto)}
+                      </span>
+                    </div>
+                    <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
+                      <span style={{fontSize:10,color:isRet?"#fbbf24":"#475569"}}>{row.fecha?fmtDate(row.fecha):"Sin fecha"}</span>
+                      {catNom&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,color:"#64748b"}}>{catNom}</span></>}
+                      {esProg&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,fontWeight:700,color:prioColor}}>{row.tipoOp==="Ingreso"?"Prob":"Prior"} {PRIO_LBL[row.prioridad]}</span></>}
+                      {tcNom&&<span style={{fontSize:8,color:"#f472b6",background:"#f472b611",padding:"1px 5px",borderRadius:4}}>💳 {tcNom}</span>}
+                      {cNom&&!tcNom&&<span style={{fontSize:8,color:"#475569",background:"#1a1a2e",padding:"1px 5px",borderRadius:4}}>{cNom}{cDest?` → ${cDest}`:""}</span>}
+                      <span style={{marginLeft:"auto"}}><span style={S.badge(row.estatus)}>{row.estatus}</span></span>
+                    </div>
+                    {row.obs&&<div style={{fontSize:9,color:"#475569",fontStyle:"italic",marginBottom:2}}>{row.obs}</div>}
+                    {/* Sin botón ⟳ — solo editar y eliminar */}
+                    {!multiMode&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:2}}>
+                      <div style={{display:"flex",gap:4}}>
+                        <button style={S.acBtn(isRet?"#fbbf24":"#C9A84C")} onClick={()=>openEditMov(row)}>{isRet?"📅 Reasignar":"✏ Editar"}</button>
+                        <button style={S.acBtn("#f87171")} onClick={()=>setConfirmDel({type:"mov",id:row.id})}>✕</button>
+                      </div>
+                      <span style={{fontSize:9,color:isNeg?"#f87171":"#334155",fontWeight:isNeg?700:400}}>{isNeg?"⚠ ":""}{fmt(row.saldoConsolidado)}</span>
+                    </div>}
+                  </div>
+                </div>
+              );
+            })}
+            <div style={{height:18}}/>
+          </div>
+        )}
+
+        {/* ── ESTADÍSTICAS ── */}
+        {view==="estadisticas"&&(
+          <div style={S.sec}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:11}}>
+              <button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button>
+            </div>
+            <div style={S.perBar}>
+              <button style={S.perBtn} onClick={statPeriod.prev}>‹</button>
+              <span style={S.perLbl}>📅 {statPeriod.label()}</span>
+              <button style={S.perBtn} onClick={statPeriod.next}>›</button>
+            </div>
+            <div style={{display:"flex",borderBottom:"1px solid #1e293b",marginBottom:13}}>
+              {[["gastos","↓ Gastos"],["ingresos","↑ Ingresos"],["evolucion","~ Evolución"]].map(([k,l])=>(
+                <button key={k} style={S.statTab(statTab===k)} onClick={()=>{setStatTab(k);setStatOpenCat(null);}}>{l}</button>
+              ))}
+            </div>
+            {statTab==="gastos"&&(
+              statData.egArr.length===0
+                ?<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin gastos en este período</div>
+                :<>
+                  <div style={{textAlign:"center",marginBottom:4}}><span style={{fontSize:10,color:"#475569"}}>Total egresos</span><br/><span style={{fontSize:20,fontWeight:800,color:"#f87171"}}>{fmt(statData.totalEg)}</span></div>
+                  <div style={{height:175,marginBottom:6}}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart><Pie data={statData.egArr.map((c,i)=>({name:c.nombre,value:c.total,color:PIE_PALETTE[i%PIE_PALETTE.length]}))} dataKey="value" nameKey="name" innerRadius={50} outerRadius={78} paddingAngle={2}>
+                        {statData.egArr.map((_,i)=><Cell key={i} fill={PIE_PALETTE[i%PIE_PALETTE.length]}/>)}
+                      </Pie><Tooltip formatter={v=>fmt(v)} contentStyle={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,fontSize:10}}/></PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {statData.egArr.map((cat,i)=>{
+                    const color=PIE_PALETTE[i%PIE_PALETTE.length];
+                    const pct=statData.totalEg?Math.round(cat.total/statData.totalEg*100):0;
+                    const isOpen=statOpenCat===cat.id;
+                    const subs=Object.values(cat.subs).sort((a,b)=>b.total-a.total);
+                    return(
+                      <div key={cat.id} style={{marginBottom:7}}>
+                        <div style={{background:"#10101e",border:`1px solid ${color}33`,borderLeft:`3px solid ${color}`,borderRadius:11,padding:"11px 13px",cursor:"pointer"}} onClick={()=>setStatOpenCat(isOpen?null:cat.id)}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:7}}>
+                              <div style={{width:27,height:18,borderRadius:5,background:`${color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color}}>{pct}%</div>
+                              <span style={{fontSize:12,fontWeight:700}}>{cat.nombre}</span>
+                            </div>
+                            <div style={{textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:"#f87171"}}>{fmt(cat.total)}</span><span style={{fontSize:9,color:"#475569",marginLeft:5}}>{isOpen?"▲":"▼"}</span></div>
+                          </div>
+                          <div style={{marginTop:5,height:4,borderRadius:2,background:"#1e293b",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:color,width:`${pct}%`}}/></div>
+                        </div>
+                        {isOpen&&subs.length>0&&(
+                          <div style={{background:"#0d0d1a",border:`1px solid ${color}22`,borderRadius:"0 0 11px 11px",padding:"7px 13px",marginTop:-4}}>
+                            {subs.map(sub=>{const sp=cat.total?Math.round(sub.total/cat.total*100):0;return(
+                              <div key={sub.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #1e293b22"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:3,height:14,borderRadius:2,background:color,opacity:.6}}/><span style={{fontSize:11,color:"#94a3b8"}}>{sub.nombre}</span><span style={{fontSize:8,color:"#475569"}}>{sp}%</span></div>
+                                <span style={{fontSize:12,fontWeight:700,color:"#f87171"}}>{fmt(sub.total)}</span>
+                              </div>
+                            );})}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+            )}
+            {statTab==="ingresos"&&(
+              statData.ingArr.length===0
+                ?<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin ingresos en este período</div>
+                :<>
+                  <div style={{textAlign:"center",marginBottom:4}}><span style={{fontSize:10,color:"#475569"}}>Total ingresos</span><br/><span style={{fontSize:20,fontWeight:800,color:"#22c55e"}}>{fmt(statData.totalIng)}</span></div>
+                  <div style={{height:175,marginBottom:6}}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart><Pie data={statData.ingArr.map((c,i)=>({name:c.nombre,value:c.total,color:PIE_PALETTE[i%PIE_PALETTE.length]}))} dataKey="value" nameKey="name" innerRadius={50} outerRadius={78} paddingAngle={2}>
+                        {statData.ingArr.map((_,i)=><Cell key={i} fill={PIE_PALETTE[i%PIE_PALETTE.length]}/>)}
+                      </Pie><Tooltip formatter={v=>fmt(v)} contentStyle={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,fontSize:10}}/></PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {statData.ingArr.map((cat,i)=>{
+                    const color=PIE_PALETTE[i%PIE_PALETTE.length];
+                    const pct=statData.totalIng?Math.round(cat.total/statData.totalIng*100):0;
+                    const isOpen=statOpenCat===cat.id;
+                    const subs=Object.values(cat.subs).sort((a,b)=>b.total-a.total);
+                    return(
+                      <div key={cat.id} style={{marginBottom:7}}>
+                        <div style={{background:"#10101e",border:`1px solid ${color}33`,borderLeft:`3px solid ${color}`,borderRadius:11,padding:"11px 13px",cursor:"pointer"}} onClick={()=>setStatOpenCat(isOpen?null:cat.id)}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:7}}>
+                              <div style={{width:27,height:18,borderRadius:5,background:`${color}22`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color}}>{pct}%</div>
+                              <span style={{fontSize:12,fontWeight:700}}>{cat.nombre}</span>
+                            </div>
+                            <div style={{textAlign:"right"}}><span style={{fontSize:13,fontWeight:800,color:"#22c55e"}}>{fmt(cat.total)}</span><span style={{fontSize:9,color:"#475569",marginLeft:5}}>{isOpen?"▲":"▼"}</span></div>
+                          </div>
+                          <div style={{marginTop:5,height:4,borderRadius:2,background:"#1e293b",overflow:"hidden"}}><div style={{height:"100%",borderRadius:2,background:color,width:`${pct}%`}}/></div>
+                        </div>
+                        {isOpen&&subs.length>0&&(
+                          <div style={{background:"#0d0d1a",border:`1px solid ${color}22`,borderRadius:"0 0 11px 11px",padding:"7px 13px",marginTop:-4}}>
+                            {subs.map(sub=>{const sp=cat.total?Math.round(sub.total/cat.total*100):0;return(
+                              <div key={sub.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid #1e293b22"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:3,height:14,borderRadius:2,background:color,opacity:.6}}/><span style={{fontSize:11,color:"#94a3b8"}}>{sub.nombre}</span><span style={{fontSize:8,color:"#475569"}}>{sp}%</span></div>
+                                <span style={{fontSize:12,fontWeight:700,color:"#22c55e"}}>{fmt(sub.total)}</span>
+                              </div>
+                            );})}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+            )}
+            {statTab==="evolucion"&&(
+              <div>
+                <div style={{fontSize:10,color:"#475569",marginBottom:10}}>Ingresos vs Egresos — últimos 8 meses</div>
+                <div style={{height:170,marginBottom:13}}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={evolucionData} barCategoryGap="30%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b"/>
+                      <XAxis dataKey="name" tick={{fill:"#475569",fontSize:9}}/>
+                      <YAxis tickFormatter={v=>fmtShort(v)} tick={{fill:"#475569",fontSize:8}} width={36}/>
+                      <Tooltip formatter={v=>fmt(v)} contentStyle={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,fontSize:10}}/>
+                      <Bar dataKey="ing" name="Ingresos" fill="#22c55e" radius={[3,3,0,0]}/>
+                      <Bar dataKey="eg"  name="Egresos"  fill="#f87171" radius={[3,3,0,0]}/>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                {evolucionData.map((d,i)=>(
+                  <div key={i} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:10,padding:"9px 13px",marginBottom:5}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <span style={{fontSize:11,fontWeight:700}}>{d.name}</span>
+                      <span style={{fontSize:10,fontWeight:700,color:d.ing-d.eg>=0?"#22c55e":"#f87171"}}>{d.ing-d.eg>=0?"+":""}{fmt(d.ing-d.eg)}</span>
+                    </div>
+                    <div style={{display:"flex",gap:13}}><span style={{fontSize:10,color:"#22c55e"}}>↑ {fmt(d.ing)}</span><span style={{fontSize:10,color:"#f87171"}}>↓ {fmt(d.eg)}</span></div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{height:18}}/>
+          </div>
+        )}
+
+        {/* ── PRESUPUESTOS ── */}
+        {view==="presupuestos"&&(
+          <div style={S.sec}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:11}}>
+              <button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button>
+            </div>
+            <div style={S.perBar}>
+              <button style={S.perBtn} onClick={budgetPeriod.prev}>‹</button>
+              <span style={S.perLbl}>📅 {budgetPeriod.label()}</span>
+              <button style={S.perBtn} onClick={budgetPeriod.next}>›</button>
+            </div>
+            {/* Tab Egresos / Ingresos */}
+            <div style={{display:"flex",borderBottom:"1px solid #1e293b",marginBottom:11}}>
+              {[["eg","↓ Egresos"],["ing","↑ Ingresos"]].map(([k,l])=>(
+                <button key={k} style={S.statTab(budgetTab===k)} onClick={()=>setBudgetTab(k)}>{l}</button>
+              ))}
+            </div>
+            <div style={{fontSize:9,color:"#475569",marginBottom:9}}>
+              Toca la categoría para ver subcuentas · Toca el presupuesto para editar o proyectar meses
+            </div>
+            {(budgetTab==="eg"?catEg:catIng).map((cat,ci)=>{
+              const color=PIE_PALETTE[ci%PIE_PALETTE.length];
+              const gastos=budgetTab==="eg"?budgetData.gastosEg:budgetData.gastosIng;
+              const gasto=gastos[cat.id]||0;
+              const hasSubs=cat.subs.length>0;
+              const presSubs=cat.subs.reduce((s,sub)=>s+budgetData.getPres(sub.id),0);
+              const pres=hasSubs?presSubs:budgetData.getPres(cat.id);
+              const isOpen=budgetOpenCat===cat.id;
+              const over=pres>0&&gasto>pres;
+              return(
+                <div key={cat.id} style={{marginBottom:8}}>
+                  <div style={{background:"#10101e",border:`1px solid ${color}33`,borderLeft:`3px solid ${color}`,borderRadius:11,padding:"12px 14px",cursor:"pointer"}} onClick={()=>setBudgetOpenCat(isOpen?null:cat.id)}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:12,fontWeight:700}}>{cat.nombre}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:9}}>
+                        {!hasSubs?(
+                          <button style={{...S.smBtn("#C9A84C"),fontSize:9}} onClick={e=>{e.stopPropagation();setPresModalData({catId:cat.id,subId:null,nombre:cat.nombre,getPres:budgetData.getPres});setShowPresModal(true);}}>
+                            {pres?fmt(pres):"+ Pres."}
+                          </button>
+                        ):(
+                          <span style={{fontSize:9,color:"#C9A84C",fontWeight:700}}>{pres?fmt(pres):"Sin pres."}</span>
+                        )}
+                        <span style={{fontSize:13,fontWeight:800,color:over?"#f87171":"#e2e8f0"}}>{fmt(gasto)}</span>
+                        <span style={{fontSize:10,color:"#475569"}}>{isOpen?"▲":"▼"}</span>
+                      </div>
+                    </div>
+                    {pres>0&&<BudgetBar gasto={gasto} presupuesto={pres} color={color} esIngreso={budgetTab==="ing"}/>}
+                  </div>
+                  {isOpen&&cat.subs.length>0&&(
+                    <div style={{background:"#0d0d1a",border:`1px solid ${color}22`,borderRadius:"0 0 11px 11px",padding:"8px 14px",marginTop:-4}}>
+                      {cat.subs.map(sub=>{
+                        const sgasto=gastos[sub.id]||0;const spres=budgetData.getPres(sub.id);const sover=spres>0&&sgasto>spres;
+                        return(
+                          <div key={sub.id} style={{padding:"8px 0",borderBottom:"1px solid #1e293b22"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:spres?3:0}}>
+                              <div style={{display:"flex",alignItems:"center",gap:7}}><div style={{width:3,height:14,borderRadius:2,background:color,opacity:.6}}/><span style={{fontSize:11,color:"#94a3b8"}}>{sub.nombre}</span></div>
+                              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                                <button style={{...S.smBtn("#C9A84C"),fontSize:8}} onClick={()=>{setPresModalData({catId:cat.id,subId:sub.id,nombre:`${cat.nombre} › ${sub.nombre}`,getPres:budgetData.getPres});setShowPresModal(true);}}>
+                                  {spres?fmt(spres):"+ Pres."}
+                                </button>
+                                <span style={{fontSize:12,fontWeight:700,color:sover?"#f87171":"#e2e8f0"}}>{fmt(sgasto)}</span>
+                              </div>
+                            </div>
+                            {spres>0&&<BudgetBar gasto={sgasto} presupuesto={spres} color={color} esIngreso={budgetTab==="ing"}/>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div style={{height:18}}/>
+          </div>
+        )}
+
+        {/* ── PROYECCIÓN PRESUPUESTAL ── */}
+        {view==="proyeccion"&&(
+          <div style={S.sec}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:11}}>
+              <button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button>
+            </div>
+            {/* Header con controles */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+              <div>
+                <div style={{fontSize:12,fontWeight:800,color:"#C9A84C"}}>Proyección Presupuestal</div>
+                <div style={{fontSize:9,color:"#475569"}}>Saldo inicial: {fmt(proyData.saldoInicial)}</div>
+              </div>
+              <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                {/* Toggle vista */}
+                <div style={{display:"flex",background:"#10101e",border:"1px solid #1e293b",borderRadius:8,overflow:"hidden"}}>
+                  <button style={{padding:"5px 9px",border:"none",background:proyVistaMode==="acordeon"?"#C9A84C22":"transparent",color:proyVistaMode==="acordeon"?"#C9A84C":"#475569",fontSize:9,fontWeight:700,cursor:"pointer"}} onClick={()=>setProyVistaMode("acordeon")}>≡ Lista</button>
+                  <button style={{padding:"5px 9px",border:"none",background:proyVistaMode==="swipe"?"#C9A84C22":"transparent",color:proyVistaMode==="swipe"?"#C9A84C":"#475569",fontSize:9,fontWeight:700,cursor:"pointer"}} onClick={()=>setProyVistaMode("swipe")}>◫ Tarjeta</button>
+                </div>
+                {/* Selector meses */}
+                <select style={{...S.sel,width:"auto",padding:"5px 8px",fontSize:10}} value={proyMeses} onChange={e=>setProyMeses(parseInt(e.target.value))}>
+                  {[6,12,18,24].map(n=><option key={n} value={n}>{n} meses</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Vista ACORDEÓN */}
+            {proyVistaMode==="acordeon"&&(
+              <div>
+                {proyData.meses.map((mes,idx)=>{
+                  const isOpen=proyOpenMes===idx;
+                  const sc=semColor(mes.semaforo);
+                  return(
+                    <div key={idx} style={{marginBottom:7}}>
+                      <div style={{background:"#10101e",border:`1px solid ${sc}44`,borderLeft:`3px solid ${sc}`,borderRadius:11,padding:"12px 14px",cursor:"pointer"}}
+                        onClick={()=>setProyOpenMes(isOpen?null:idx)}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <div style={{width:8,height:8,borderRadius:4,background:sc,flexShrink:0}}/>
+                            <span style={{fontSize:12,fontWeight:800}}>{mes.label}</span>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontSize:12,fontWeight:800,color:mes.resultado>=0?"#22c55e":"#f87171"}}>{mes.resultado>=0?"+":""}{fmtShort(mes.resultado)}</span>
+                            <span style={{fontSize:10,color:"#475569"}}>{isOpen?"▲":"▼"}</span>
+                          </div>
+                        </div>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4,fontSize:9}}>
+                          <div><div style={{color:"#64748b"}}>Saldo ini.</div><div style={{fontWeight:700,color:mes.saldoInicial<0?"#f87171":"#e2e8f0"}}>{mes.saldoInicial<0?"−":""}{fmtShort(Math.abs(mes.saldoInicial))}</div></div>
+                          <div><div style={{color:"#64748b"}}>+ Ingresos</div><div style={{fontWeight:700,color:"#22c55e"}}>{fmtShort(mes.totalIng)}</div></div>
+                          <div><div style={{color:"#64748b"}}>− Egresos</div><div style={{fontWeight:700,color:"#f87171"}}>{fmtShort(mes.totalEg)}</div></div>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",marginTop:5,fontSize:9,borderTop:"1px solid #1e293b",paddingTop:4,cursor:"pointer"}}
+                          onClick={e=>{e.stopPropagation();setProyTooltipIdx(proyTooltipIdx===idx?null:idx);}}>
+                          <span style={{color:"#64748b"}}>Saldo final acumulado ⓘ</span>
+                          <span style={{fontWeight:800,color:mes.saldoFin>=0?"#C9A84C":"#f87171"}}>{mes.saldoFin<0?"-":""}{fmt(Math.abs(mes.saldoFin))}</span>
+                        </div>
+                        {proyTooltipIdx===idx&&(
+                          <div style={{background:"#13131f",border:"1px solid #C9A84C44",borderRadius:8,padding:"8px 11px",marginTop:5,fontSize:9}}>
+                            <div style={{color:"#C9A84C",fontWeight:700,marginBottom:4}}>Acumulado hasta {mes.label}</div>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><span style={{color:"#64748b"}}>Saldo inicial proyección</span><span style={{fontWeight:700}}>{fmt(proyData.saldoInicial)}</span></div>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><span style={{color:"#22c55e"}}>+ Ingresos acumulados</span><span style={{fontWeight:700,color:"#22c55e"}}>{fmt(proyData.meses.slice(0,idx+1).reduce((s,m)=>s+m.totalIng,0))}</span></div>
+                            <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}><span style={{color:"#f87171"}}>− Egresos acumulados</span><span style={{fontWeight:700,color:"#f87171"}}>{fmt(proyData.meses.slice(0,idx+1).reduce((s,m)=>s+m.totalEg,0))}</span></div>
+                            <div style={{display:"flex",justifyContent:"space-between",borderTop:"1px solid #1e293b",paddingTop:4,marginTop:2}}><span style={{color:"#C9A84C",fontWeight:700}}>= Saldo final</span><span style={{fontWeight:800,color:mes.saldoFin>=0?"#C9A84C":"#f87171"}}>{fmt(mes.saldoFin)}</span></div>
+                          </div>
+                        )}
+                      </div>
+                      {isOpen&&(
+                        <div style={{background:"#0d0d1a",border:`1px solid ${sc}22`,borderRadius:"0 0 11px 11px",padding:"10px 14px",marginTop:-4}}>
+                          {mes.detalleIng.length>0&&(<>
+                            <div style={{fontSize:9,color:"#22c55e",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>↑ Ingresos</div>
+                            {mes.detalleIng.map((c,i)=>(
+                              <div key={c.id} style={{marginBottom:5}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:c.subs.length?2:0}}>
+                                  <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
+                                  <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(c.pres)}</span>
+                                </div>
+                                {c.subs.map(s=>(
+                                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #22c55e33"}}>
+                                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
+                                    <span style={{fontSize:10,fontWeight:700,color:"#22c55e"}}>{fmt(s.pres)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </>)}
+                          {mes.detalleEg.length>0&&(<>
+                            <div style={{fontSize:9,color:"#f87171",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6,marginTop:mes.detalleIng.length?8:0}}>↓ Egresos</div>
+                            {mes.detalleEg.map((c,i)=>(
+                              <div key={c.id} style={{marginBottom:5}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:c.subs.length?2:0}}>
+                                  <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
+                                  <span style={{fontSize:11,fontWeight:700,color:"#f87171"}}>{fmt(c.pres)}</span>
+                                </div>
+                                {c.subs.map(s=>(
+                                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #f8717133"}}>
+                                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
+                                    <span style={{fontSize:10,fontWeight:700,color:"#f87171"}}>{fmt(s.pres)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </>)}
+                          {mes.detalleIng.length===0&&mes.detalleEg.length===0&&(
+                            <div style={{textAlign:"center",padding:"12px 0",fontSize:11,color:"#334155"}}>Sin presupuesto definido</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Vista SWIPE / TARJETA */}
+            {proyVistaMode==="swipe"&&(
+              <div>
+                {/* Timeline dots */}
+                <div style={{display:"flex",overflowX:"auto",gap:0,marginBottom:11,paddingBottom:4,scrollbarWidth:"none"}}>
+                  {proyData.meses.map((mes,idx)=>{
+                    const sc=semColor(mes.semaforo);
+                    const isActive=idx===proySwipeIdx;
+                    return(
+                      <button key={idx} onClick={()=>setProySwipeIdx(idx)}
+                        style={{flex:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"4px 6px",background:"none",border:"none",cursor:"pointer"}}>
+                        <div style={{width:isActive?10:7,height:isActive?10:7,borderRadius:"50%",background:isActive?sc:"#1e293b",border:`2px solid ${sc}`,transition:"all 0.2s"}}/>
+                        <span style={{fontSize:7,color:isActive?"#e2e8f0":"#334155",fontWeight:isActive?700:400,whiteSpace:"nowrap"}}>{MESES[mes.sm]}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Tarjeta activa */}
+                {proyData.meses[proySwipeIdx]&&(
+                  <ProySwipeCard
+                    mes={proyData.meses[proySwipeIdx]}
+                    total={proyData.meses.length}
+                    idx={proySwipeIdx}
+                    setIdx={setProySwipeIdx}
+                    semColor={semColor}
+                    fmt={fmt}
+                    fmtShort={fmtShort}
+                  />
+                )}
+              </div>
+            )}
+            <div style={{height:18}}/>
+          </div>
+        )}
+
+        {/* ── MENÚ ── */}
+        {view==="menu"&&(
+          <div style={S.sec}>
+            <div style={{marginBottom:16}}>
+              <div style={S.sTit}>ANÁLISIS</div>
+              {[
+                {ico:"📊",label:"Estadísticas",sub:"Gastos, ingresos y evolución",target:"estadisticas",color:"#a78bfa"},
+                {ico:"🎯",label:"Presupuestos",sub:"Control de gasto por categoría",target:"presupuestos",color:"#22c55e"},
+                {ico:"📈",label:"Proyección Presupuestal",sub:"Panorama financiero mes a mes",target:"proyeccion",color:"#60a5fa"},
+              ].map(it=>(
+                <div key={it.target} style={S.menuRow} onClick={()=>setView(it.target)}>
+                  <div style={{...S.menuIco,background:`${it.color}18`}}><span>{it.ico}</span></div>
+                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{it.label}</div><div style={{fontSize:10,color:"#475569"}}>{it.sub}</div></div>
+                  <span style={{color:"#334155",fontSize:14}}>›</span>
+                </div>
+              ))}
+            </div>
+            <div style={{marginBottom:16}}>
+              <div style={S.sTit}>CONFIGURACIÓN</div>
+              {[
+                {ico:"🏦",label:"Cuentas",sub:"Débito, efectivo y tarjetas",target:"cuentas",color:"#60a5fa"},
+                {ico:"📂",label:"Catálogos",sub:"Categorías de ingresos y egresos",target:"catalogos",color:"#C9A84C"},
+                {ico:"⚙",label:"Configuración",sub:"Exportar y eliminar datos",target:"configuracion",color:"#f87171"},
+              ].map(it=>(
+                <div key={it.target} style={S.menuRow} onClick={()=>setView(it.target)}>
+                  <div style={{...S.menuIco,background:`${it.color}18`}}><span>{it.ico}</span></div>
+                  <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{it.label}</div><div style={{fontSize:10,color:"#475569"}}>{it.sub}</div></div>
+                  <span style={{color:"#334155",fontSize:14}}>›</span>
+                </div>
+              ))}
+            </div>
+            <div style={{...S.card(),marginTop:4}}>
+              <div style={S.sTit}>RESUMEN RÁPIDO</div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:10}}><span style={{color:"#64748b"}}>Saldo Real</span><span style={{fontWeight:700,color:"#C9A84C"}}>{fmt(stats.saldoReal)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:10}}><span style={{color:"#64748b"}}>Ingresos reales</span><span style={{fontWeight:700,color:"#22c55e"}}>{fmt(stats.totalIngresos)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:10}}><span style={{color:"#64748b"}}>Egresos reales</span><span style={{fontWeight:700,color:"#f87171"}}>{fmt(stats.totalEgresos)}</span></div>
+            </div>
+          </div>
+        )}
+
+        {/* ── CUENTAS ── */}
+        {view==="cuentas"&&(
+          <div style={S.sec}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CUENTAS & TARJETAS</span></div>
+            <div style={S.sTit}>CUENTAS DÉBITO</div>
+            {cuentas.map(c=>(
+              <div key={c.id} style={S.cCard(c.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span></div><div style={{fontSize:9,color:"#475569"}}>Inicial: {fmt(c.saldoInicial)}</div></div>
+                <div style={{textAlign:"right"}}><div style={{fontSize:17,fontWeight:800,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</div>
+                  <div style={{display:"flex",gap:5,marginTop:4,justifyContent:"flex-end"}}><button style={S.acBtn("#C9A84C")} onClick={()=>openEditCuenta(c)}>✏</button><button style={S.acBtn("#f87171")} onClick={()=>setConfirmDel({type:"cuenta",id:c.id})}>✕</button></div></div>
+              </div></div>
+            ))}
+            <div style={{...S.sTit,marginTop:9}}>TARJETAS DE CRÉDITO</div>
+            {tarjetas.map(t=>{const sd=tarjetaSaldos[t.id]||0;return(
+              <div key={t.id} style={S.cCard(t.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2}}><div style={{width:8,height:8,borderRadius:4,background:t.color}}/><span style={{fontSize:12,fontWeight:700}}>{t.nombre}</span></div>
+                  <div style={{fontSize:9,color:"#475569"}}>{t.banco} · Corte:{t.fechaCorte} · Pago:{t.fechaLimPago}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>Límite:{fmt(t.limite)} · Disp:<span style={{color:"#22c55e"}}>{fmt((t.limite||0)-sd)}</span></div></div>
+                <div style={{textAlign:"right"}}><div style={{fontSize:9,color:"#64748b"}}>Saldo deudor</div><div style={{fontSize:16,fontWeight:800,color:sd>0?"#f87171":"#22c55e"}}>{fmt(sd)}</div>
+                  <div style={{display:"flex",gap:5,marginTop:4,justifyContent:"flex-end"}}><button style={S.acBtn("#C9A84C")} onClick={()=>openEditTC(t)}>✏</button><button style={S.acBtn("#f87171")} onClick={()=>setConfirmDel({type:"tc",id:t.id})}>✕</button></div></div>
+              </div></div>
+            );})}
+            <button style={{...S.saveB,background:"linear-gradient(135deg,#60a5fa,#3b82f6)",marginTop:7}} onClick={openNewTC}>+ Nueva Tarjeta de Crédito</button>
+          </div>
+        )}
+
+        {/* ── CATÁLOGOS ── */}
+        {view==="catalogos"&&(
+          <div style={S.sec}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CATÁLOGOS</span></div>
+            <div style={{display:"flex",gap:7,marginBottom:13}}>
+              <button style={{...S.prioB2(catMode==="eg","#f87171"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("eg")}>↓ Egresos</button>
+              <button style={{...S.prioB2(catMode==="ing","#22c55e"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("ing")}>↑ Ingresos</button>
+            </div>
+            <div style={{fontSize:9,color:"#475569",marginBottom:9}}>☰ arrastra para reordenar · toca el nombre para editar</div>
+            {cats_.map(cat=>(
+              <div key={cat.id} draggable onDragStart={()=>catDrag.start(cat.id)} onDragOver={e=>{e.preventDefault();catDrag.enter(cat.id);}} onDrop={catDrag.commit}
+                style={{background:catDrag.aId===cat.id?"#1e2a1e":catDrag.oViz===cat.id?"#1a2030":"#13131f",border:"1px solid #1e293b",borderRadius:11,padding:"11px 13px",marginBottom:7,cursor:"grab",transition:"background 0.15s"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                  <div style={{flex:1,marginRight:7}}>
+                    {editingCatId===cat.id
+                      ?<div style={{display:"flex",gap:5}}><input style={{...S.inp,flex:1,padding:"4px 8px",fontSize:12}} value={editingCatName} onChange={e=>setEditingCatName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEditCat(cat.id);if(e.key==="Escape")setEditingCatId(null);}} autoFocus/><button style={S.smBtn("#22c55e")} onClick={()=>saveEditCat(cat.id)}>✓</button><button style={S.smBtn("#475569")} onClick={()=>setEditingCatId(null)}>✕</button></div>
+                      :<span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>
+                    }
+                  </div>
+                  {editingCatId!==cat.id&&<div style={{display:"flex",gap:5}}><button style={S.smBtn("#C9A84C")} onClick={()=>setAddingSubTo(cat.id===addingSubTo?null:cat.id)}>+ Sub</button><button style={S.smBtn("#f87171")} onClick={()=>delCat(cat.id)}>✕</button></div>}
+                </div>
+                {cat.subs.map(sub=>(
+                  <div key={sub.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0 4px 11px",borderLeft:"2px solid #1e293b",marginBottom:2}}>
+                    {editingSubId===sub.id
+                      ?<div style={{display:"flex",gap:5,flex:1}}><input style={{...S.inp,flex:1,padding:"3px 7px",fontSize:11}} value={editingSubName} onChange={e=>setEditingSubName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEditSub(cat.id,sub.id);if(e.key==="Escape")setEditingSubId(null);}} autoFocus/><button style={S.smBtn("#22c55e")} onClick={()=>saveEditSub(cat.id,sub.id)}>✓</button><button style={S.smBtn("#475569")} onClick={()=>setEditingSubId(null)}>✕</button></div>
+                      :<><span style={{fontSize:11,color:"#94a3b8",cursor:"pointer",flex:1}} onClick={()=>{setEditingSubId(sub.id);setEditingSubName(sub.nombre);}}>{sub.nombre}</span><button style={S.smBtn("#f87171")} onClick={()=>delSub(cat.id,sub.id)}>✕</button></>
+                    }
+                  </div>
+                ))}
+                {addingSubTo===cat.id&&<div style={{display:"flex",gap:5,marginTop:7}}><input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:11}} value={newSubName} onChange={e=>setNewSubName(e.target.value)} placeholder="Nombre subcategoría" onKeyDown={e=>{if(e.key==="Enter")addSub(cat.id);}}/><button style={S.smBtn("#22c55e")} onClick={()=>addSub(cat.id)}>✓</button></div>}
+              </div>
+            ))}
+            <div style={{display:"flex",gap:7,marginTop:7}}>
+              <input style={{...S.inp,flex:1,padding:"8px 11px",fontSize:11}} value={newCatName} onChange={e=>setNewCatName(e.target.value)} placeholder="Nueva categoría…" onKeyDown={e=>{if(e.key==="Enter")addCat();}}/>
+              <button style={{...S.saveB,width:"auto",padding:"8px 14px",marginTop:0,fontSize:11}} onClick={addCat}>+ Agregar</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── CONFIGURACIÓN ── */}
+        {view==="configuracion"&&(
+          <div style={S.sec}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CONFIGURACIÓN</span></div>
+            <div style={S.sTit}>EXPORTAR</div>
+            <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setShowExportModal(true)}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(34,197,94,0.12)"}}><span>📥</span></div><div><div style={{fontSize:12,fontWeight:700}}>Exportar a Excel</div><div style={{fontSize:10,color:"#475569"}}>Selecciona el período a exportar</div></div></div>
+            </div>
+            <div style={S.sTit}>DATOS</div>
+            <div style={{...S.card(),cursor:"pointer"}} onClick={()=>{setShowReset(true);setResetPhase(1);setResetInput("");}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(248,113,113,0.12)"}}><span>🗑</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#f87171"}}>Eliminar movimientos</div><div style={{fontSize:10,color:"#475569"}}>Borra todos los movimientos registrados</div></div></div>
+            </div>
+
+            <div style={S.sTit}>RESPALDO JSON</div>
+            <div style={{...S.card(),cursor:"pointer"}} onClick={exportJSON}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(201,168,76,0.12)"}}><span>💾</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#C9A84C"}}>Exportar datos (JSON)</div><div style={{fontSize:10,color:"#475569"}}>Descarga un respaldo de todos tus datos</div></div></div>
+            </div>
+            <div style={{...S.card()}} onClick={()=>{setShowJsonModal(true);setJsonImportError("");}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}><div style={{...S.menuIco,background:"rgba(96,165,250,0.12)"}}><span>📂</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#60a5fa"}}>Importar datos (JSON)</div><div style={{fontSize:10,color:"#475569"}}>Restaura un respaldo previo</div></div></div>
+            </div>
+            <div style={{...S.infoBx("#475569"),marginTop:7}}><span>ℹ</span><span>El filtro de proyección (prioridades) se configura en la vista de Movimientos con el botón ⚙.</span></div>
+          </div>
+        )}
+
+        {/* ── MODALES ── */}
+        {showMov&&(
+          <ModalMov formMov={formMov} setFormMov={handleSetFormMov}
+            editMovId={editMovId} isEditReal={isEditReal}
+            recForm={recForm} setRecForm={setRecForm}
+            cuentas={cuentas} cuentaSaldos={cuentaSaldos}
+            tarjetas={tarjetas} tarjetaSaldos={tarjetaSaldos}
+            catIng={catIng} catEg={catEg}
+            onSave={saveMov} onClose={()=>{setShowMov(false);setEditMovId(null);setSaveError("");setFieldErrors(null);}}
+            saveError={saveError} fieldErrors={fieldErrors}/>
+        )}
+
+        {showCuenta&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowCuenta(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>{editCuentaId?"✏ EDITAR CUENTA":"+ NUEVA CUENTA"}</div>
+              <div style={S.fg}><label style={S.fl}>Nombre</label><input style={S.inp} value={formCuenta.nombre} onChange={e=>setFormCuenta(f=>({...f,nombre:e.target.value}))} placeholder="ej. BBVA Débito"/></div>
+              <div style={S.fg}><label style={S.fl}>Saldo inicial $</label><input style={S.inp} type="number" value={formCuenta.saldoInicial} onChange={e=>setFormCuenta(f=>({...f,saldoInicial:e.target.value}))} placeholder="0.00"/></div>
+              <div style={S.fg}><label style={S.fl}>Color</label><div style={{display:"flex",gap:9,flexWrap:"wrap",marginTop:3}}>{CUENTA_COLORS.map(c=><div key={c} style={S.dotS(c,formCuenta.color===c)} onClick={()=>setFormCuenta(f=>({...f,color:c}))}/>)}</div></div>
+              <button style={S.saveB} onClick={saveCuenta}>GUARDAR CUENTA</button>
+              <button style={S.cancB} onClick={()=>setShowCuenta(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {showTC&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowTC(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>{editTCId?"✏ EDITAR TARJETA":"+ NUEVA TARJETA"}</div>
+              <div style={{...S.r2,marginBottom:11}}>
+                <div><label style={S.fl}>Nombre</label><input style={S.inp} value={formTC.nombre} onChange={e=>setFormTC(f=>({...f,nombre:e.target.value}))} placeholder="Visa Oro"/></div>
+                <div><label style={S.fl}>Banco</label><input style={S.inp} value={formTC.banco} onChange={e=>setFormTC(f=>({...f,banco:e.target.value}))} placeholder="BBVA"/></div>
+              </div>
+              <div style={S.fg}><label style={S.fl}>Límite $</label><input style={S.inp} type="number" value={formTC.limite} onChange={e=>setFormTC(f=>({...f,limite:e.target.value}))}/></div>
+              <div style={S.fg}><label style={S.fl}>Saldo deudor actual $</label><input style={S.inp} type="number" value={formTC.saldoDeudorInicial} onChange={e=>setFormTC(f=>({...f,saldoDeudorInicial:e.target.value}))}/></div>
+              <div style={{...S.r2,marginBottom:11}}>
+                <div><label style={S.fl}>Día corte</label><input style={S.inp} type="number" value={formTC.fechaCorte} onChange={e=>setFormTC(f=>({...f,fechaCorte:e.target.value}))} placeholder="15"/></div>
+                <div><label style={S.fl}>Día límite pago</label><input style={S.inp} type="number" value={formTC.fechaLimPago} onChange={e=>setFormTC(f=>({...f,fechaLimPago:e.target.value}))} placeholder="5"/></div>
+              </div>
+              <div style={S.fg}><label style={S.fl}>Color</label><div style={{display:"flex",gap:9,flexWrap:"wrap",marginTop:3}}>{CUENTA_COLORS.map(c=><div key={c} style={S.dotS(c,formTC.color===c)} onClick={()=>setFormTC(f=>({...f,color:c}))}/>)}</div></div>
+              <button style={S.saveB} onClick={saveTC}>GUARDAR TARJETA</button>
+              <button style={S.cancB} onClick={()=>setShowTC(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal presupuesto */}
+        {showPresModal&&presModalData&&(
+          <ModalPresupuesto
+            data={presModalData}
+            presupuestos={presupuestos}
+            setPresupuestos={setPresupuestos}
+            sm={budgetPeriod.sm}
+            sy={budgetPeriod.sy}
+            onClose={()=>{setShowPresModal(false);setPresModalData(null);}}
+          />
+        )}
+
+        {/* Modal filtro categoría */}
+        {showCatFilter&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowCatFilter(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>📂 FILTRAR POR CATEGORÍA</div>
+              {showIngCatFilter&&(<>
+                <div style={{fontSize:10,color:"#22c55e",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:7}}>↑ Ingresos</div>
+                <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                  <button style={S.smBtn(filterCatIng===null?"#22c55e":"#475569")} onClick={()=>setFilterCatIng(null)}>Todas</button>
+                  <button style={S.smBtn(filterCatIng?.size===0?"#f87171":"#475569")} onClick={()=>setFilterCatIng(new Set())}>Ninguna</button>
+                </div>
+                {catIng.map(cat=>{
+                  const sel=filterCatIng===null||filterCatIng.has(cat.id);
+                  return(
+                    <div key={cat.id} style={{marginBottom:5}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:sel?"rgba(34,197,94,0.06)":"#13131f",border:`1px solid ${sel?"#22c55e33":"#1e293b"}`,borderRadius:9,cursor:"pointer"}}
+                        onClick={()=>setFilterCatIng(prev=>{
+                          if(prev===null){const n=new Set(catIng.map(c=>c.id));n.delete(cat.id);return n;}
+                          const n=new Set(prev);n.has(cat.id)?n.delete(cat.id):n.add(cat.id);return n;
+                        })}>
+                        <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${sel?"#22c55e":"#334155"}`,background:sel?"#22c55e":"transparent",flexShrink:0}}/>
+                        <span style={{fontSize:12,fontWeight:600}}>{cat.nombre}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>)}
+              {showEgCatFilter&&(<>
+                <div style={{fontSize:10,color:"#f87171",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:7,marginTop:showIngCatFilter?14:0}}>↓ Egresos</div>
+                <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+                  <button style={S.smBtn(filterCatEg===null?"#f87171":"#475569")} onClick={()=>setFilterCatEg(null)}>Todas</button>
+                  <button style={S.smBtn(filterCatEg?.size===0?"#f87171":"#475569")} onClick={()=>setFilterCatEg(new Set())}>Ninguna</button>
+                </div>
+                {catEg.map(cat=>{
+                  const sel=filterCatEg===null||filterCatEg.has(cat.id);
+                  return(
+                    <div key={cat.id} style={{marginBottom:5}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:sel?"rgba(248,113,113,0.06)":"#13131f",border:`1px solid ${sel?"#f8717133":"#1e293b"}`,borderRadius:9,cursor:"pointer"}}
+                        onClick={()=>setFilterCatEg(prev=>{
+                          if(prev===null){const n=new Set(catEg.map(c=>c.id));n.delete(cat.id);return n;}
+                          const n=new Set(prev);n.has(cat.id)?n.delete(cat.id):n.add(cat.id);return n;
+                        })}>
+                        <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${sel?"#f87171":"#334155"}`,background:sel?"#f87171":"transparent",flexShrink:0}}/>
+                        <span style={{fontSize:12,fontWeight:600}}>{cat.nombre}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>)}
+              <button style={{...S.saveB,marginTop:13}} onClick={()=>setShowCatFilter(false)}>Aplicar filtros</button>
+              <button style={S.cancB} onClick={()=>{setFilterCatIng(null);setFilterCatEg(null);setShowCatFilter(false);}}>Limpiar todos</button>
+            </div>
+          </div>
+        )}
+
+        {showMultiEdit&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowMultiEdit(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>✏ EDICIÓN MÚLTIPLE — {selected.size} mov.</div>
+              <div style={{fontSize:10,color:"#475569",marginBottom:14}}>Deja vacío lo que no quieras cambiar.</div>
+              <div style={S.fg}><label style={S.fl}>Estatus</label><select style={S.sel} value={multiForm.estatus} onChange={e=>setMultiForm(f=>({...f,estatus:e.target.value}))}><option value="">— Sin cambio —</option>{ESTATUS_LIST.map(e=><option key={e} value={e}>{e}</option>)}</select></div>
+              <div style={S.fg}><label style={S.fl}>Prioridad</label><select style={S.sel} value={multiForm.prioridad} onChange={e=>setMultiForm(f=>({...f,prioridad:e.target.value}))}><option value="">— Sin cambio —</option><option value="1">Alta</option><option value="2">Media</option><option value="3">Baja</option></select></div>
+              <div style={S.fg}><label style={S.fl}>Fecha</label><input style={S.inp} type="date" value={multiForm.fecha} onChange={e=>setMultiForm(f=>({...f,fecha:e.target.value}))}/></div>
+              <button style={S.saveB} onClick={applyMultiEdit}>APLICAR</button>
+              <button style={S.cancB} onClick={()=>setShowMultiEdit(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {confirmDel&&(
+          <div style={S.delCon}>
+            <div style={S.delBox}>
+              <div style={{fontSize:13,fontWeight:700,color:"#f87171",marginBottom:7}}>{confirmDel.type==="multi"?`¿Eliminar ${selected.size} movimientos?`:"¿Eliminar registro?"}</div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:18}}>Esta acción no se puede deshacer.</div>
+              <button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>{
+                if(confirmDel.type==="multi"){setMovs(p=>p.filter(r=>!selected.has(r.id)));setSelected(new Set());setMultiMode(false);}
+                else if(confirmDel.type==="mov")doDelete(confirmDel.id);
+                else if(confirmDel.type==="cuenta")setCuentas(p=>p.filter(c=>c.id!==confirmDel.id));
+                else if(confirmDel.type==="tc")setTarjetas(p=>p.filter(t=>t.id!==confirmDel.id));
+                setConfirmDel(null);
+              }}>Sí, eliminar</button>
+              <button style={S.cancB} onClick={()=>setConfirmDel(null)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {serieConfirm&&(
+          <div style={S.delCon}>
+            <div style={{...S.delBox,border:"1px solid #a78bfa44"}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#a78bfa",marginBottom:7}}>↻ Movimiento en serie</div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:18}}>{serieConfirm.action==="edit"?"¿Editar solo este o toda la serie?":"¿Eliminar solo este o toda la serie?"}</div>
+              <button style={{...S.saveB,background:"linear-gradient(135deg,#a78bfa,#7c3aed)",marginBottom:7}} onClick={()=>applySerieConfirm("one")}>Solo este</button>
+              <button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>applySerieConfirm("all")}>Toda la serie</button>
+              <button style={S.cancB} onClick={()=>setSerieConfirm(null)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {showReset&&(
+          <div style={S.delCon}>
+            <div style={S.delBox}>
+              {resetPhase===1&&<><div style={{fontSize:13,fontWeight:700,color:"#f87171",marginBottom:7}}>⚠ Eliminar movimientos</div><div style={{fontSize:11,color:"#94a3b8",marginBottom:14}}>Cuentas y tarjetas se conservan.</div><button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>setResetPhase(2)}>Continuar</button><button style={S.cancB} onClick={()=>{setShowReset(false);setResetPhase(0);}}>Cancelar</button></>}
+              {resetPhase===2&&<><div style={{fontSize:13,fontWeight:700,color:"#f87171",marginBottom:7}}>⛔ Confirmación final</div><div style={{fontSize:11,color:"#94a3b8",marginBottom:11}}>Escribe <span style={{color:"#f87171",fontWeight:700}}>CONFIRMAR</span></div><input style={{...S.inp,marginBottom:11,borderColor:"#f8717144"}} value={resetInput} onChange={e=>setResetInput(e.target.value)} placeholder="CONFIRMAR"/><button style={{...S.saveB,background:resetInput==="CONFIRMAR"?"linear-gradient(135deg,#f87171,#b91c1c)":"#1e293b",color:resetInput==="CONFIRMAR"?"#fff":"#475569"}} onClick={()=>{if(resetInput==="CONFIRMAR"){setMovs([]);setShowReset(false);setResetPhase(0);setResetInput("");}}}>Borrar todo</button><button style={S.cancB} onClick={()=>{setShowReset(false);setResetPhase(0);setResetInput("");}}>Cancelar</button></>}
+            </div>
+          </div>
+        )}
+
+        {showExportModal&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowExportModal(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>📥 EXPORTAR A EXCEL</div>
+              <div style={S.fg}><label style={S.fl}>Período</label>
+                <div style={{display:"flex",gap:7,marginBottom:9}}>
+                  <button style={{...S.prioB2(exportPeriod.mode==="mes"),flex:1,padding:"8px 0",fontSize:11}} onClick={()=>setExportPeriod(p=>({...p,mode:"mes"}))}>Mensual</button>
+                  <button style={{...S.prioB2(exportPeriod.mode==="anio"),flex:1,padding:"8px 0",fontSize:11}} onClick={()=>setExportPeriod(p=>({...p,mode:"anio"}))}>Anual</button>
+                </div>
+                {exportPeriod.mode==="mes"&&<div style={S.perBar}><button style={S.perBtn} onClick={()=>setExportPeriod(p=>{const sm=p.sm===0?11:p.sm-1;const sy=p.sm===0?p.sy-1:p.sy;return{...p,sm,sy};})}>‹</button><span style={S.perLbl}>{MESES_FULL[exportPeriod.sm]} {exportPeriod.sy}</span><button style={S.perBtn} onClick={()=>setExportPeriod(p=>{const sm=p.sm===11?0:p.sm+1;const sy=p.sm===11?p.sy+1:p.sy;return{...p,sm,sy};})}>›</button></div>}
+                {exportPeriod.mode==="anio"&&<div style={S.perBar}><button style={S.perBtn} onClick={()=>setExportPeriod(p=>({...p,sy:p.sy-1}))}>‹</button><span style={S.perLbl}>{exportPeriod.sy}</span><button style={S.perBtn} onClick={()=>setExportPeriod(p=>({...p,sy:p.sy+1}))}>›</button></div>}
+              </div>
+              <button style={S.saveB} onClick={()=>exportExcel(exportPeriod.sm,exportPeriod.sy,exportPeriod.mode)}>📥 DESCARGAR EXCEL</button>
+              <button style={S.cancB} onClick={()=>setShowExportModal(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+
+        {showJsonModal&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowJsonModal(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>📂 IMPORTAR DATOS</div>
+              <div style={{...S.infoBx("#fbbf24"),marginBottom:13}}><span>⚠</span><span>Esto reemplazará TODOS los datos actuales. Asegúrate de exportar primero si tienes información importante.</span></div>
+              <div style={{background:"#13131f",border:"2px dashed #1e293b",borderRadius:11,padding:"22px 14px",textAlign:"center",marginBottom:11}}>
+                <div style={{fontSize:22,marginBottom:7}}>📄</div>
+                <div style={{fontSize:11,color:"#94a3b8",marginBottom:11}}>Selecciona el archivo JSON exportado desde Nexus Finanzas</div>
+                <label style={{...S.saveB,display:"inline-block",cursor:"pointer",textAlign:"center",marginTop:0}}>
+                  SELECCIONAR ARCHIVO
+                  <input type="file" accept=".json" style={{display:"none"}} onChange={importJSON}/>
+                </label>
+              </div>
+              {jsonImportError&&<div style={S.errBox}><span>⛔</span><span>{jsonImportError}</span></div>}
+              <button style={S.cancB} onClick={()=>setShowJsonModal(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+
+        {multiMode&&selected.size>0&&(
+          <div style={S.multiBar}>
+            <span style={{fontSize:10,color:"#C9A84C",fontWeight:700,flex:1}}>{selected.size} selec.</span>
+            <button style={S.acBtn("#C9A84C")} onClick={()=>setShowMultiEdit(true)}>✏ Editar</button>
+            <button style={S.acBtn("#f87171")} onClick={()=>setConfirmDel({type:"multi"})}>✕ Eliminar</button>
+            <button style={S.acBtn("#475569")} onClick={()=>{setMultiMode(false);setSelected(new Set());}}>Salir</button>
+          </div>
+        )}
+
+        {view==="movimientos"&&!multiMode&&<button style={S.fab} onClick={openNewMov}>+</button>}
+        {view==="cuentas"&&<button style={S.fab} onClick={openNewCuenta}>+</button>}
+
+        <nav style={S.nav}>
+          {[{id:"dashboard",icon:"◈",label:"Resumen"},{id:"movimientos",icon:"≡",label:"Movimientos"},{id:"menu",icon:"···",label:"Menú"}].map(n=>(
+            <button key={n.id} style={S.navB(view===n.id||(inMenuViews.includes(view)&&n.id==="menu"))} onClick={()=>setView(n.id)}>
+              <span style={{fontSize:16}}>{n.icon}</span>{n.label}
+            </button>
+          ))}
+        </nav>
+      </div>
+    </>
+  );
+}
+
+
+ReactDOM.render(React.createElement(App), document.getElementById('root'));
+
+  </script>
+  <script>
+    // Ocultar loading cuando React haya renderizado
+    window.addEventListener('load', function() {
+      setTimeout(function(){
+        var l = document.getElementById('loading');
+        if(l) l.style.display='none';
+      }, 800);
+    });
+  </script>
+</body>
+</html>
