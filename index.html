@@ -719,12 +719,32 @@ function ProySwipeCard({mes,total,idx,setIdx,semColor,fmt,fmtShort}){
 // ─── APP ─────────────────────────────────────────────────────
 function App(){
   const[view,setView]=useState("dashboard");
-  const[movs,setMovs]=useState(INIT_MOVS);
-  const[cuentas,setCuentas]=useState(INIT_CUENTAS);
-  const[tarjetas,setTarjetas]=useState(INIT_TARJETAS);
-  const[catIng,setCatIng]=useState(INIT_CAT_ING);
-  const[catEg,setCatEg]=useState(INIT_CAT_EG);
-  const[presupuestos,setPresupuestos]=useState(INIT_PRESUPUESTOS);
+  // ── localStorage helpers ──
+  function loadLS(key, fallback) {
+    try {
+      const v = localStorage.getItem('nexus_' + key);
+      return v ? JSON.parse(v) : fallback;
+    } catch(e) { return fallback; }
+  }
+  function saveLS(key, val) {
+    try { localStorage.setItem('nexus_' + key, JSON.stringify(val)); } catch(e) {}
+  }
+
+  const[movs,setMovs]=useState(()=>loadLS('movs', INIT_MOVS));
+  const[cuentas,setCuentas]=useState(()=>loadLS('cuentas', INIT_CUENTAS));
+  const[tarjetas,setTarjetas]=useState(()=>loadLS('tarjetas', INIT_TARJETAS));
+  const[catIng,setCatIng]=useState(()=>loadLS('catIng', INIT_CAT_ING));
+  const[catEg,setCatEg]=useState(()=>loadLS('catEg', INIT_CAT_EG));
+  const[presupuestos,setPresupuestos]=useState(()=>loadLS('presupuestos', INIT_PRESUPUESTOS));
+
+
+  // ── Auto-guardado en localStorage ──
+  useEffect(()=>{ saveLS('movs', movs); }, [movs]);
+  useEffect(()=>{ saveLS('cuentas', cuentas); }, [cuentas]);
+  useEffect(()=>{ saveLS('tarjetas', tarjetas); }, [tarjetas]);
+  useEffect(()=>{ saveLS('catIng', catIng); }, [catIng]);
+  useEffect(()=>{ saveLS('catEg', catEg); }, [catEg]);
+  useEffect(()=>{ saveLS('presupuestos', presupuestos); }, [presupuestos]);
 
   // modales
   const[showMov,setShowMov]=useState(false);
@@ -767,6 +787,9 @@ function App(){
   const[confirmDel,setConfirmDel]=useState(null);
   const[serieConfirm,setSerieConfirm]=useState(null);
   const[showReset,setShowReset]=useState(false);
+  const clearLocalStorage=useCallback(()=>{
+    ['movs','cuentas','tarjetas','catIng','catEg','presupuestos'].forEach(k=>localStorage.removeItem('nexus_'+k));
+  },[]);
   const[resetPhase,setResetPhase]=useState(0);
   const[resetInput,setResetInput]=useState("");
   const[newCatName,setNewCatName]=useState("");
@@ -1097,12 +1120,12 @@ function App(){
       try{
         const data=JSON.parse(ev.target.result);
         if(!data.movs||!data.cuentas)throw new Error("Formato inválido");
-        if(data.movs)setMovs(data.movs);
-        if(data.cuentas)setCuentas(data.cuentas);
-        if(data.tarjetas)setTarjetas(data.tarjetas);
-        if(data.catIng)setCatIng(data.catIng);
-        if(data.catEg)setCatEg(data.catEg);
-        if(data.presupuestos)setPresupuestos(data.presupuestos);
+        if(data.movs){setMovs(data.movs);saveLS('movs',data.movs);}
+        if(data.cuentas){setCuentas(data.cuentas);saveLS('cuentas',data.cuentas);}
+        if(data.tarjetas){setTarjetas(data.tarjetas);saveLS('tarjetas',data.tarjetas);}
+        if(data.catIng){setCatIng(data.catIng);saveLS('catIng',data.catIng);}
+        if(data.catEg){setCatEg(data.catEg);saveLS('catEg',data.catEg);}
+        if(data.presupuestos){setPresupuestos(data.presupuestos);saveLS('presupuestos',data.presupuestos);}
         setShowJsonModal(false);
         setView("dashboard");
       }catch(err){setJsonImportError("Archivo inválido. Usa un JSON exportado desde esta app.");}
@@ -1802,6 +1825,7 @@ function App(){
             </div>
 
             <div style={S.sTit}>RESPALDO JSON</div>
+            <div style={{...S.infoBx("#22c55e"),marginBottom:9}}><span>✓</span><span>Guardado automático activo — tus datos se guardan instantáneamente en este dispositivo.</span></div>
             <div style={{...S.card(),cursor:"pointer"}} onClick={exportJSON}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(201,168,76,0.12)"}}><span>💾</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#C9A84C"}}>Exportar datos (JSON)</div><div style={{fontSize:10,color:"#475569"}}>Descarga un respaldo de todos tus datos</div></div></div>
             </div>
