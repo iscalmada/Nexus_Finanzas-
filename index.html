@@ -860,8 +860,7 @@ function App(){
     const hasCatIng=filterCatIng!==null&&filterCatIng.size>0;
     const hasCatEg=filterCatEg!==null&&filterCatEg.size>0;
     const hasCatFilter=hasCatIng||hasCatEg;
-    const subIng=subIdsOf(filterCatIng,catIng);
-    const subEg=subIdsOf(filterCatEg,catEg);
+    // subIng/subEg ya no se usan — el filtro checa cat y subcat directamente
 
     // Pendientes sin fecha viven en movs directamente (no en withSaldos que requiere fecha)
     const pendientes = filterEst==="PENDIENTE"
@@ -880,12 +879,18 @@ function App(){
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
       .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
       .filter(r=>{
-        if(!hasCatFilter)return true;
-        if(r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return !hasCatFilter;
-        if(r.tipoOp==="Ingreso"&&hasCatIng) return filterCatIng.has(r.cat)||(subIng&&subIng.has(r.subcat));
-        if(r.tipoOp==="Egreso"&&hasCatEg)  return filterCatEg.has(r.cat)||(subEg&&subEg.has(r.subcat));
-        if(r.tipoOp==="Ingreso"&&!hasCatIng) return true;
-        if(r.tipoOp==="Egreso"&&!hasCatEg)   return true;
+        // Transferencias y Pagos de Tarjeta no tienen categoría — siempre pasan
+        if(r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return true;
+        // Ingresos
+        if(r.tipoOp==="Ingreso"){
+          if(filterCatIng===null) return true; // null = todas
+          return filterCatIng.has(r.cat)||filterCatIng.has(r.subcat);
+        }
+        // Egresos
+        if(r.tipoOp==="Egreso"){
+          if(filterCatEg===null) return true; // null = todas
+          return filterCatEg.has(r.cat)||filterCatEg.has(r.subcat);
+        }
         return true;
       });
   },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf]);
@@ -1948,7 +1953,8 @@ function App(){
                   const sel=filterCatIng===null||filterCatIng.has(cat.id);
                   return(
                     <div key={cat.id} style={{marginBottom:5}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:sel?"rgba(34,197,94,0.06)":"#13131f",border:`1px solid ${sel?"#22c55e33":"#1e293b"}`,borderRadius:9,cursor:"pointer"}}
+                      <div style={{background:sel?"rgba(34,197,94,0.06)":"#13131f",border:`1px solid ${sel?"#22c55e33":"#1e293b"}`,borderRadius:9,overflow:"hidden"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer"}}
                         onClick={()=>setFilterCatIng(prev=>{
                           if(prev===null){const n=new Set(catIng.map(c=>c.id));n.delete(cat.id);return n;}
                           const n=new Set(prev);n.has(cat.id)?n.delete(cat.id):n.add(cat.id);return n;
@@ -1956,6 +1962,17 @@ function App(){
                         <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${sel?"#22c55e":"#334155"}`,background:sel?"#22c55e":"transparent",flexShrink:0}}/>
                         <span style={{fontSize:12,fontWeight:600}}>{cat.nombre}</span>
                       </div>
+                      {cat.subs&&cat.subs.map(sub=>{const selS=filterCatIng===null||filterCatIng.has(sub.id);return(
+                        <div key={sub.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px 5px 30px",cursor:"pointer",borderTop:"1px solid #1e293b22"}}
+                          onClick={()=>setFilterCatIng(prev=>{
+                            if(prev===null){const n=new Set([...catIng.map(c=>c.id),...catIng.flatMap(c=>c.subs.map(s=>s.id))]);n.delete(sub.id);return n;}
+                            const n=new Set(prev);n.has(sub.id)?n.delete(sub.id):n.add(sub.id);return n;
+                          })}>
+                          <div style={{width:11,height:11,borderRadius:2,border:`2px solid ${selS?"#22c55e":"#334155"}`,background:selS?"#22c55e":"transparent",flexShrink:0}}/>
+                          <span style={{fontSize:10,color:"#94a3b8"}}>{sub.nombre}</span>
+                        </div>
+                      );})}
+                    </div>
                     </div>
                   );
                 })}
@@ -1970,7 +1987,8 @@ function App(){
                   const sel=filterCatEg===null||filterCatEg.has(cat.id);
                   return(
                     <div key={cat.id} style={{marginBottom:5}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:sel?"rgba(248,113,113,0.06)":"#13131f",border:`1px solid ${sel?"#f8717133":"#1e293b"}`,borderRadius:9,cursor:"pointer"}}
+                      <div style={{background:sel?"rgba(248,113,113,0.06)":"#13131f",border:`1px solid ${sel?"#f8717133":"#1e293b"}`,borderRadius:9,overflow:"hidden"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",cursor:"pointer"}}
                         onClick={()=>setFilterCatEg(prev=>{
                           if(prev===null){const n=new Set(catEg.map(c=>c.id));n.delete(cat.id);return n;}
                           const n=new Set(prev);n.has(cat.id)?n.delete(cat.id):n.add(cat.id);return n;
@@ -1978,6 +1996,17 @@ function App(){
                         <div style={{width:14,height:14,borderRadius:3,border:`2px solid ${sel?"#f87171":"#334155"}`,background:sel?"#f87171":"transparent",flexShrink:0}}/>
                         <span style={{fontSize:12,fontWeight:600}}>{cat.nombre}</span>
                       </div>
+                      {cat.subs&&cat.subs.map(sub=>{const selS=filterCatEg===null||filterCatEg.has(sub.id);return(
+                        <div key={sub.id} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 10px 5px 30px",cursor:"pointer",borderTop:"1px solid #1e293b22"}}
+                          onClick={()=>setFilterCatEg(prev=>{
+                            if(prev===null){const n=new Set([...catEg.map(c=>c.id),...catEg.flatMap(c=>c.subs.map(s=>s.id))]);n.delete(sub.id);return n;}
+                            const n=new Set(prev);n.has(sub.id)?n.delete(sub.id):n.add(sub.id);return n;
+                          })}>
+                          <div style={{width:11,height:11,borderRadius:2,border:`2px solid ${selS?"#f87171":"#334155"}`,background:selS?"#f87171":"transparent",flexShrink:0}}/>
+                          <span style={{fontSize:10,color:"#94a3b8"}}>{sub.nombre}</span>
+                        </div>
+                      );})}
+                    </div>
                     </div>
                   );
                 })}
