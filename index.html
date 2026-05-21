@@ -115,7 +115,13 @@ const INIT_PRESUPUESTOS = {};
 const fmt      = n=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN",minimumFractionDigits:2}).format(n||0);
 const fmtShort = n=>{const v=Math.abs(n||0);if(v>=1000000)return`$${(v/1e6).toFixed(1)}M`;if(v>=1000)return`$${(v/1000).toFixed(1)}k`;return fmt(n);};
 const fmtDate  = d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
-const todayStr = ()=>new Date().toISOString().split("T")[0];
+const todayStr = ()=>{
+  const d=new Date();
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,"0");
+  const day=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+};
 const addD     = (d,n)=>{const dt=new Date(d+"T12:00:00");dt.setDate(dt.getDate()+n);return dt.toISOString().split("T")[0];};
 const addM_    = (d,n)=>{const dt=new Date(d+"T12:00:00");dt.setMonth(dt.getMonth()+n);return dt.toISOString().split("T")[0];};
 const addY_    = (d,n)=>{const dt=new Date(d+"T12:00:00");dt.setFullYear(dt.getFullYear()+n);return dt.toISOString().split("T")[0];};
@@ -1860,9 +1866,19 @@ function App(){
               <div style={S.mTit}>{editCuentaId?"✏ EDITAR CUENTA":"+ NUEVA CUENTA"}</div>
               <div style={S.fg}><label style={S.fl}>Nombre</label><input style={S.inp} value={formCuenta.nombre} onChange={e=>setFormCuenta(f=>({...f,nombre:e.target.value}))} placeholder="ej. BBVA Débito"/></div>
               <div style={S.fg}>
-                <label style={S.fl}>Saldo inicial $</label>
+                <label style={S.fl}>{editCuentaId?"Saldo de arranque $":"Saldo inicial $"}</label>
                 <input style={S.inp} type="number" value={formCuenta.saldoInicial} onChange={e=>setFormCuenta(f=>({...f,saldoInicial:e.target.value}))} placeholder="0.00"/>
-                {editCuentaId&&<div style={{...S.infoBx("#fbbf24"),marginTop:6}}><span>⚠</span><span>Modificar el saldo inicial recalcula el saldo actual de esta cuenta. Úsalo solo para corregir el punto de partida.</span></div>}
+                {editCuentaId&&(
+                  <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid #C9A84C44",borderRadius:9,padding:"10px 12px",marginTop:7}}>
+                    <div style={{fontSize:10,color:"#C9A84C",fontWeight:700,marginBottom:4}}>⚙ Saldo de arranque</div>
+                    <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.5}}>
+                      Registra aquí el saldo real actual que muestra tu banco. La app calculará el saldo futuro sumando y restando los movimientos que captures a partir de este punto.
+                    </div>
+                    <div style={{fontSize:9,color:"#fbbf24",marginTop:6,fontWeight:700}}>
+                      ⚠ Esto reemplaza el punto de partida — no afecta los movimientos ya registrados.
+                    </div>
+                  </div>
+                )}
               </div>
               <div style={S.fg}><label style={S.fl}>Color</label><div style={{display:"flex",gap:9,flexWrap:"wrap",marginTop:3}}>{CUENTA_COLORS.map(c=><div key={c} style={S.dotS(c,formCuenta.color===c)} onClick={()=>setFormCuenta(f=>({...f,color:c}))}/>)}</div></div>
               <button style={S.saveB} onClick={saveCuenta}>GUARDAR CUENTA</button>
