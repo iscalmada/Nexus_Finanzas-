@@ -52,18 +52,18 @@
   <script type="text/babel" data-presets="react">
 
 const { useState, useMemo, useRef, useCallback, memo, useEffect } = React;
-// Recharts se obtiene de forma lazy para garantizar disponibilidad
-function getRC() { return window.Recharts || {}; }
-const PieChart = (...a) => { const C=getRC().PieChart; return C?React.createElement(C,...a):null; };
-const Pie = (...a) => { const C=getRC().Pie; return C?React.createElement(C,...a):null; };
-const Cell = (...a) => { const C=getRC().Cell; return C?React.createElement(C,...a):null; };
-const BarChart = (...a) => { const C=getRC().BarChart; return C?React.createElement(C,...a):null; };
-const Bar = (...a) => { const C=getRC().Bar; return C?React.createElement(C,...a):null; };
-const XAxis = (...a) => { const C=getRC().XAxis; return C?React.createElement(C,...a):null; };
-const YAxis = (...a) => { const C=getRC().YAxis; return C?React.createElement(C,...a):null; };
-const Tooltip = (...a) => { const C=getRC().Tooltip; return C?React.createElement(C,...a):null; };
-const CartesianGrid = (...a) => { const C=getRC().CartesianGrid; return C?React.createElement(C,...a):null; };
-const ResponsiveContainer = (...a) => { const C=getRC().ResponsiveContainer; return C?React.createElement(C,...a):React.createElement('div',{style:{width:'100%',height:(a[0]&&a[0].height)||200}},a[0]&&a[0].children); };
+// Recharts: desestructurar después de que los scripts cargaron
+const _RC = window.Recharts || {};
+const PieChart = _RC.PieChart || 'div';
+const Pie = _RC.Pie || (()=>null);
+const Cell = _RC.Cell || (()=>null);
+const BarChart = _RC.BarChart || 'div';
+const Bar = _RC.Bar || (()=>null);
+const XAxis = _RC.XAxis || (()=>null);
+const YAxis = _RC.YAxis || (()=>null);
+const Tooltip = _RC.Tooltip || (()=>null);
+const CartesianGrid = _RC.CartesianGrid || (()=>null);
+const ResponsiveContainer = _RC.ResponsiveContainer || (({children,height})=>React.createElement('div',{style:{width:'100%',height:height||200}},children));
 
 // ─── CONSTANTES ───────────────────────────────────────────────
 const CUENTA_COLORS = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8"];
@@ -152,9 +152,10 @@ function generarFechas(rec){
 }
 
 // ─── SALDOS ──────────────────────────────────────────────────
-function calcConsolidado(movs,pI,pE){
+function calcConsolidado(movs,pI,pE,cuentasRef){
   const sorted=[...movs].filter(r=>r.fecha).sort((a,b)=>a.fecha!==b.fecha?a.fecha.localeCompare(b.fecha):a.orden-b.orden);
-  let s=0;
+  // Sumar saldoInicial de cuentas de referencia como arranque del consolidado
+  let s=(cuentasRef||[]).filter(c=>c.esReferencia).reduce((acc,c)=>acc+(c.saldoInicial||0),0);
   return sorted.map(r=>{
     const real=["INGRESADO","PAGADO"].includes(r.estatus);
     const prog=r.estatus==="PROGRAMADO";
@@ -199,7 +200,7 @@ function calcSaldoCuentaAntesDe(cuentaId,movId,movs,cuentas){
 
 // Saldo proyectado al cierre de un mes (para saldo inicial de Proyección Presupuestal)
 function calcSaldoProyFin(movs,cuentas,pI,pE,sm,sy){
-  const withS=calcConsolidado(movs,pI,pE);
+  const withS=calcConsolidado(movs,pI,pE,cuentas);
   const endDate=`${sy}-${String(sm+1).padStart(2,"0")}-31`;
   const relevant=withS.filter(r=>r.fecha&&r.fecha<=endDate&&r.enProyeccion);
   if(!relevant.length){
@@ -841,7 +842,7 @@ function App(){
   const tdStr=todayStr();
 
   const retrasados=useMemo(()=>movs.filter(r=>r.fecha&&r.fecha<tdStr&&r.estatus==="PROGRAMADO"),[movs,tdStr]);
-  const withSaldos=useMemo(()=>calcConsolidado(movs,prioI,prioE),[movs,prioI,prioE]);
+  const withSaldos=useMemo(()=>calcConsolidado(movs,prioI,prioE,cuentas),[movs,prioI,prioE,cuentas]);
   const cuentaSaldos=useMemo(()=>calcCuentaSaldos(cuentas,movs),[cuentas,movs]);
   const tarjetaSaldos=useMemo(()=>calcTarjetaSaldos(tarjetas,movs),[tarjetas,movs]);
 
@@ -862,13 +863,19 @@ function App(){
     const subIng=subIdsOf(filterCatIng,catIng);
     const subEg=subIdsOf(filterCatEg,catEg);
 
-    return withSaldos
+    // Pendientes sin fecha viven en movs directamente (no en withSaldos que requiere fecha)
+    const pendientes = filterEst==="PENDIENTE"
+      ? movs.filter(r=>r.estatus==="PENDIENTE").map(r=>({...r,saldoConsolidado:0,enProyeccion:false}))
+      : [];
+
+    const conSaldo = withSaldos
       .filter(r=>{
-        // PENDIENTES: solo visibles cuando filterEst es explícitamente "PENDIENTE"
-        if(r.estatus==="PENDIENTE") return filterEst==="PENDIENTE";
+        if(r.estatus==="PENDIENTE") return false; // pendientes se manejan arriba
         if(filterRetrasados) return retSet.has(r.id);
         return retSet.has(r.id)||period.inP(r.fecha);
-      })
+      });
+
+    return [...pendientes, ...conSaldo]
       .filter(r=>filterTipo==="TODOS"||r.tipoOp===filterTipo)
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
       .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
@@ -1212,8 +1219,8 @@ function App(){
               <div style={{fontSize:9,color:"#475569",marginTop:7}}>Prob.ing: <span style={{color:"#22c55e",fontWeight:700}}>{PrioILabel}</span> · Prior.eg: <span style={{color:"#f87171",fontWeight:700}}>{PrioELabel}</span></div>
             </div>
             <div style={S.sTit}>CUENTAS DÉBITO</div>
-            {cuentas.filter(c=>!c.esReferencia).map(c=>(
-              <div key={c.id} style={S.cCard(c.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            {cuentas.map(c=>(
+              <div key={c.id} style={{...S.cCard(c.color),opacity:c.esReferencia?0.7:1}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{display:"flex",alignItems:"center",gap:7}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span></div>
                 <span style={{fontSize:16,fontWeight:800,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</span>
               </div></div>
@@ -1761,8 +1768,8 @@ function App(){
           <div style={S.sec}>
             <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CUENTAS & TARJETAS</span></div>
             <div style={S.sTit}>CUENTAS DÉBITO</div>
-            {cuentas.filter(c=>!c.esReferencia).map(c=>(
-              <div key={c.id} style={S.cCard(c.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            {cuentas.map(c=>(
+              <div key={c.id} style={{...S.cCard(c.color),opacity:c.esReferencia?0.7:1}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span>{c.esReferencia&&<span style={{fontSize:8,color:"#C9A84C",background:"rgba(201,168,76,0.1)",padding:"1px 5px",borderRadius:4}}>REF</span>}</div><div style={{fontSize:9,color:"#475569"}}>Inicial: {fmt(c.saldoInicial)}</div></div>
                 <div style={{textAlign:"right"}}><div style={{fontSize:17,fontWeight:800,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</div>
                   <div style={{display:"flex",gap:5,marginTop:4,justifyContent:"flex-end"}}><button style={S.acBtn("#C9A84C")} onClick={()=>openEditCuenta(c)}>✏</button><button style={S.acBtn("#f87171")} onClick={()=>setConfirmDel({type:"cuenta",id:c.id})}>✕</button></div></div>
