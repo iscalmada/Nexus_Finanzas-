@@ -40,26 +40,30 @@
 
   <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <script src="https://unpkg.com/recharts@2.9.0/umd/Recharts.js"></script>
   <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
 
   <script>
-    // Normalizar Recharts global - diferentes builds lo exponen diferente
-    if(typeof Recharts === 'undefined' && typeof window.Recharts !== 'undefined') {
-      window.Recharts = window.Recharts;
+    // Normalizar Recharts global
+    window.addEventListener('DOMContentLoaded', function() {});
+    if(typeof window.Recharts === 'undefined') {
+      // intentar cargar desde variable global alternativa
+      if(typeof Recharts !== 'undefined') window.Recharts = Recharts;
     }
-    // Fallback: si Recharts no carga, crear stubs para que la app no crashee
-    if(typeof Recharts === 'undefined') {
-      window.Recharts = {
-        PieChart: ({children})=>React.createElement('div',null,children),
-        Pie: ()=>null, Cell: ()=>null,
-        BarChart: ({children})=>React.createElement('div',null,children),
-        Bar: ()=>null, XAxis: ()=>null, YAxis: ()=>null,
-        Tooltip: ()=>null, CartesianGrid: ()=>null,
-        ResponsiveContainer: ({children,width,height})=>React.createElement('div',{style:{width:'100%',height:height||200}},children)
-      };
-    }
+    // Fallback robusto si Recharts no carga
+    setTimeout(function(){
+      if(typeof window.Recharts === 'undefined' || !window.Recharts.PieChart) {
+        window.Recharts = {
+          PieChart: function(p){return React.createElement('div',{style:{textAlign:'center',color:'#475569',fontSize:10,padding:20}},'Gráfica no disponible — recarga la página');},
+          Pie: function(){return null;}, Cell: function(){return null;},
+          BarChart: function(p){return React.createElement('div',{style:{textAlign:'center',color:'#475569',fontSize:10,padding:20}},'Gráfica no disponible — recarga la página');},
+          Bar: function(){return null;}, XAxis: function(){return null;}, YAxis: function(){return null;},
+          Tooltip: function(){return null;}, CartesianGrid: function(){return null;},
+          ResponsiveContainer: function(p){return React.createElement('div',{style:{width:'100%',height:p.height||200}},p.children);}
+        };
+      }
+    }, 100);
   </script>
 
   <script type="text/babel" data-presets="react">
@@ -131,7 +135,7 @@ const presKey  = (id,sm,sy)=>`${id}${mesKey(sm,sy)}`;
 function estatusParaTipo(tipoOp){
   if(tipoOp==="Ingreso")      return ESTATUS_LIST.filter(e=>e!=="PAGADO");
   if(tipoOp==="Egreso")       return ESTATUS_LIST.filter(e=>e!=="INGRESADO");
-  if(tipoOp==="Pago Tarjeta") return ESTATUS_LIST.filter(e=>e!=="INGRESADO");
+  if(tipoOp==="Pago Tarjeta") return ESTATUS_LIST.filter(e=>e!=="INGRESADO"&&e!=="PENDIENTE");
   return ESTATUS_LIST;
 }
 
@@ -830,7 +834,7 @@ function App(){
   const BLANK_REC={activo:false,recurrencia:"Mensual",diasSemana:[],fechaInicio:todayStr(),finTipo:"repeticiones",finReps:6,finFecha:addM_(todayStr(),6)};
 
   const[formMov,setFormMov]=useState(BLANK_MOV);
-  const[formCuenta,setFormCuenta]=useState({nombre:"",saldoInicial:"",color:CUENTA_COLORS[0]});
+  const[formCuenta,setFormCuenta]=useState({nombre:"",saldoInicial:"",color:CUENTA_COLORS[0],esReferencia:false});
   const[formTC,setFormTC]=useState({nombre:"",banco:"",limite:"",fechaCorte:"",fechaLimPago:"",saldoDeudorInicial:"",color:"#f472b6"});
   const[recForm,setRecForm]=useState(BLANK_REC);
 
@@ -904,7 +908,7 @@ function App(){
     const retSet=new Set(retrasados.map(r=>r.id));
     const progAll=withSaldos.filter(r=>r.estatus==="PROGRAMADO"&&r.enProyeccion);
     const progPer=withSaldos.filter(r=>r.enProyeccion&&r.estatus==="PROGRAMADO"&&(period.inP(r.fecha)||retSet.has(r.id)));
-    const saldoReal=Object.values(cuentaSaldos).reduce((s,v)=>s+v,0);
+    const saldoReal=cuentas.filter(c=>!c.esReferencia).reduce((s,c)=>s+(cuentaSaldos[c.id]||0),0);
     const ig=x=>x.filter(r=>r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0);
     const eg=x=>x.filter(r=>r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0);
     return{totalIngresos:real.filter(r=>r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0),totalEgresos:real.filter(r=>r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0),saldoReal,ingEspPer:ig(progPer),egEspPer:eg(progPer),saldoProy_per:saldoReal+ig(progPer)-eg(progPer),saldoProy_total:saldoReal+ig(progAll)-eg(progAll),ingEspTotal:ig(progAll),egEspTotal:eg(progAll)};
@@ -1012,7 +1016,7 @@ function App(){
     setFormMov(copia);setRecForm({...BLANK_REC,activo:false,fechaInicio:todayStr()});
     setEditMovId(null);setSaveError("");setFieldErrors(null);setViewMov(null);setShowMov(true);
   },[]);
-  const openNewCuenta=useCallback(()=>{setFormCuenta({nombre:"",saldoInicial:"",color:CUENTA_COLORS[0]});setEditCuentaId(null);setShowCuenta(true);},[]);
+  const openNewCuenta=useCallback(()=>{setFormCuenta({nombre:"",saldoInicial:"",color:CUENTA_COLORS[0],esReferencia:false});setEditCuentaId(null);setShowCuenta(true);},[]);
   const openEditCuenta=useCallback(c=>{setFormCuenta({...c});setEditCuentaId(c.id);setShowCuenta(true);},[]);
   const openNewTC=useCallback(()=>{setFormTC({nombre:"",banco:"",limite:"",fechaCorte:"",fechaLimPago:"",saldoDeudorInicial:"",color:"#f472b6"});setEditTCId(null);setShowTC(true);},[]);
   const openEditTC=useCallback(t=>{setFormTC({...t});setEditTCId(t.id);setShowTC(true);},[]);
@@ -1214,7 +1218,7 @@ function App(){
               <div style={{fontSize:9,color:"#475569",marginTop:7}}>Prob.ing: <span style={{color:"#22c55e",fontWeight:700}}>{PrioILabel}</span> · Prior.eg: <span style={{color:"#f87171",fontWeight:700}}>{PrioELabel}</span></div>
             </div>
             <div style={S.sTit}>CUENTAS DÉBITO</div>
-            {cuentas.map(c=>(
+            {cuentas.filter(c=>!c.esReferencia).map(c=>(
               <div key={c.id} style={S.cCard(c.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{display:"flex",alignItems:"center",gap:7}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span></div>
                 <span style={{fontSize:16,fontWeight:800,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</span>
@@ -1296,7 +1300,7 @@ function App(){
                     📋 {movs.filter(r=>r.estatus==="PENDIENTE").length} pendiente{movs.filter(r=>r.estatus==="PENDIENTE").length>1?"s":""} sin programar
                   </span>
                   <button style={{fontSize:9,padding:"3px 8px",borderRadius:7,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",fontWeight:700}}
-                    onClick={()=>setFilterEst("PENDIENTE")}>Ver →</button>
+                    onClick={()=>{setFilterEst("PENDIENTE");setFilterRetrasados(false);setFilterTipo("TODOS");setSearch("");}}>Ver →</button>
                 </div>
               )}
             </div>
@@ -1763,9 +1767,9 @@ function App(){
           <div style={S.sec}>
             <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CUENTAS & TARJETAS</span></div>
             <div style={S.sTit}>CUENTAS DÉBITO</div>
-            {cuentas.map(c=>(
+            {cuentas.filter(c=>!c.esReferencia).map(c=>(
               <div key={c.id} style={S.cCard(c.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span></div><div style={{fontSize:9,color:"#475569"}}>Inicial: {fmt(c.saldoInicial)}</div></div>
+                <div><div style={{display:"flex",alignItems:"center",gap:7,marginBottom:2}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span>{c.esReferencia&&<span style={{fontSize:8,color:"#C9A84C",background:"rgba(201,168,76,0.1)",padding:"1px 5px",borderRadius:4}}>REF</span>}</div><div style={{fontSize:9,color:"#475569"}}>Inicial: {fmt(c.saldoInicial)}</div></div>
                 <div style={{textAlign:"right"}}><div style={{fontSize:17,fontWeight:800,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</div>
                   <div style={{display:"flex",gap:5,marginTop:4,justifyContent:"flex-end"}}><button style={S.acBtn("#C9A84C")} onClick={()=>openEditCuenta(c)}>✏</button><button style={S.acBtn("#f87171")} onClick={()=>setConfirmDel({type:"cuenta",id:c.id})}>✕</button></div></div>
               </div></div>
@@ -1881,6 +1885,16 @@ function App(){
                 )}
               </div>
               <div style={S.fg}><label style={S.fl}>Color</label><div style={{display:"flex",gap:9,flexWrap:"wrap",marginTop:3}}>{CUENTA_COLORS.map(c=><div key={c} style={S.dotS(c,formCuenta.color===c)} onClick={()=>setFormCuenta(f=>({...f,color:c}))}/>)}</div></div>
+              <div style={{border:"1px solid #1e293b",borderRadius:11,padding:13,marginBottom:11}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:700,color:formCuenta.esReferencia?"#C9A84C":"#475569"}}>Cuenta de referencia</div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:2}}>No afecta el saldo real — solo el saldo consolidado</div>
+                  </div>
+                  <button style={{...S.prioB2(formCuenta.esReferencia),width:42,flex:"none",padding:"4px 0",fontSize:10}} onClick={()=>setFormCuenta(f=>({...f,esReferencia:!f.esReferencia}))}>{formCuenta.esReferencia?"ON":"OFF"}</button>
+                </div>
+                {formCuenta.esReferencia&&<div style={{...S.infoBx("#C9A84C"),marginTop:9}}><span>💡</span><span>Ideal para registrar saldos históricos de períodos anteriores sin alterar las cuentas reales.</span></div>}
+              </div>
               <button style={S.saveB} onClick={saveCuenta}>GUARDAR CUENTA</button>
               <button style={S.cancB} onClick={()=>setShowCuenta(false)}>Cancelar</button>
             </div>
@@ -1996,7 +2010,7 @@ function App(){
               <div style={{fontSize:11,color:"#94a3b8",marginBottom:18}}>Esta acción no se puede deshacer.</div>
               <button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>{
                 if(confirmDel.type==="multi"){setMovs(p=>p.filter(r=>!selected.has(r.id)));setSelected(new Set());setMultiMode(false);}
-                else if(confirmDel.type==="mov")doDelete(confirmDel.id);
+                else if(confirmDel.type==="mov"){doDelete(confirmDel.id);setViewMov(null);setShowMov(false);}
                 else if(confirmDel.type==="cuenta")setCuentas(p=>p.filter(c=>c.id!==confirmDel.id));
                 else if(confirmDel.type==="tc")setTarjetas(p=>p.filter(t=>t.id!==confirmDel.id));
                 setConfirmDel(null);
