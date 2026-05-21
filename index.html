@@ -45,31 +45,25 @@
   <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
 
   <script>
-    // Normalizar Recharts global
-    window.addEventListener('DOMContentLoaded', function() {});
-    if(typeof window.Recharts === 'undefined') {
-      // intentar cargar desde variable global alternativa
-      if(typeof Recharts !== 'undefined') window.Recharts = Recharts;
-    }
-    // Fallback robusto si Recharts no carga
-    setTimeout(function(){
-      if(typeof window.Recharts === 'undefined' || !window.Recharts.PieChart) {
-        window.Recharts = {
-          PieChart: function(p){return React.createElement('div',{style:{textAlign:'center',color:'#475569',fontSize:10,padding:20}},'Gráfica no disponible — recarga la página');},
-          Pie: function(){return null;}, Cell: function(){return null;},
-          BarChart: function(p){return React.createElement('div',{style:{textAlign:'center',color:'#475569',fontSize:10,padding:20}},'Gráfica no disponible — recarga la página');},
-          Bar: function(){return null;}, XAxis: function(){return null;}, YAxis: function(){return null;},
-          Tooltip: function(){return null;}, CartesianGrid: function(){return null;},
-          ResponsiveContainer: function(p){return React.createElement('div',{style:{width:'100%',height:p.height||200}},p.children);}
-        };
-      }
-    }, 100);
+    // Recharts: normalizar global (el wrapper lazy en JSX maneja el resto)
+    if(typeof Recharts !== 'undefined') window.Recharts = Recharts;
   </script>
 
   <script type="text/babel" data-presets="react">
 
 const { useState, useMemo, useRef, useCallback, memo, useEffect } = React;
-const { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } = Recharts;
+// Recharts se obtiene de forma lazy para garantizar disponibilidad
+function getRC() { return window.Recharts || {}; }
+const PieChart = (...a) => { const C=getRC().PieChart; return C?React.createElement(C,...a):null; };
+const Pie = (...a) => { const C=getRC().Pie; return C?React.createElement(C,...a):null; };
+const Cell = (...a) => { const C=getRC().Cell; return C?React.createElement(C,...a):null; };
+const BarChart = (...a) => { const C=getRC().BarChart; return C?React.createElement(C,...a):null; };
+const Bar = (...a) => { const C=getRC().Bar; return C?React.createElement(C,...a):null; };
+const XAxis = (...a) => { const C=getRC().XAxis; return C?React.createElement(C,...a):null; };
+const YAxis = (...a) => { const C=getRC().YAxis; return C?React.createElement(C,...a):null; };
+const Tooltip = (...a) => { const C=getRC().Tooltip; return C?React.createElement(C,...a):null; };
+const CartesianGrid = (...a) => { const C=getRC().CartesianGrid; return C?React.createElement(C,...a):null; };
+const ResponsiveContainer = (...a) => { const C=getRC().ResponsiveContainer; return C?React.createElement(C,...a):React.createElement('div',{style:{width:'100%',height:(a[0]&&a[0].height)||200}},a[0]&&a[0].children); };
 
 // ─── CONSTANTES ───────────────────────────────────────────────
 const CUENTA_COLORS = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8"];
