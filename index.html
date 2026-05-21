@@ -435,7 +435,7 @@ const ModalMov=memo(function ModalMov({
           </div>
           <div style={S.fg} ref={cuentaRef}><label style={S.fl}>Cuenta Origen</label>
             <select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}>
-              <option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} ({fmt(cuentaSaldos[c.id])})</option>)}
+              <option value="">— Seleccionar —</option>{cuentas.filter(c=>!c.esReferencia).map(c=><option key={c.id} value={c.id}>{c.nombre} ({fmt(cuentaSaldos[c.id])})</option>)}
             </select>
           </div>
           <div style={S.fg}><label style={S.fl}>Cuenta Destino</label>
@@ -465,7 +465,7 @@ const ModalMov=memo(function ModalMov({
             </div>
             <div style={S.fg} ref={cuentaRef}><label style={S.fl}>Cuenta débito origen</label>
               <select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}>
-                <option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}
+                <option value="">— Seleccionar —</option>{cuentas.filter(c=>!c.esReferencia).map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}
               </select>
             </div>
           </>)}
@@ -510,7 +510,7 @@ const ModalMov=memo(function ModalMov({
                   <button style={S.prioB2(!formMov.usaTarjeta,"#60a5fa")} onClick={()=>setFormMov(f=>({...f,usaTarjeta:false,tarjetaId:null}))}>🏦 Cuenta Débito</button>
                   <button style={S.prioB2(formMov.usaTarjeta,"#f472b6")} onClick={()=>setFormMov(f=>({...f,usaTarjeta:true,cuentaId:null}))}>💳 Tarjeta TC</button>
                 </div>
-                {!formMov.usaTarjeta&&<select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}><option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}</select>}
+                {!formMov.usaTarjeta&&<select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}><option value="">— Seleccionar —</option>{cuentas.filter(c=>!c.esReferencia).map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}</select>}
                 {formMov.usaTarjeta&&<select style={fieldErrors?.tarjetaId?S.selErr:S.sel} value={formMov.tarjetaId||""} onChange={e=>set("tarjetaId",parseInt(e.target.value)||null)}><option value="">— Seleccionar —</option>{tarjetas.map(t=><option key={t.id} value={t.id}>{t.nombre} · Disp:{fmt((t.limite||0)-tarjetaSaldos[t.id])}</option>)}</select>}
                 {(fieldErrors?.cuentaId||fieldErrors?.tarjetaId)&&<div style={{fontSize:9,color:"#f87171",marginTop:3}}>⚠ Selecciona cuenta o tarjeta</div>}
               </div>
@@ -518,7 +518,7 @@ const ModalMov=memo(function ModalMov({
             {formMov.tipoOp==="Ingreso"&&(
               <div style={S.fg} ref={cuentaRef}><label style={S.fl}>Depositar en</label>
                 <select style={fieldErrors?.cuentaId?S.selErr:S.sel} value={formMov.cuentaId||""} onChange={e=>set("cuentaId",parseInt(e.target.value)||null)}>
-                  <option value="">— Seleccionar —</option>{cuentas.map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}
+                  <option value="">— Seleccionar —</option>{cuentas.filter(c=>!c.esReferencia).map(c=><option key={c.id} value={c.id}>{c.nombre} · {fmt(cuentaSaldos[c.id])}</option>)}
                 </select>
                 {fieldErrors?.cuentaId&&<div style={{fontSize:9,color:"#f87171",marginTop:3}}>⚠ Selecciona cuenta de depósito</div>}
               </div>
@@ -1219,8 +1219,8 @@ function App(){
               <div style={{fontSize:9,color:"#475569",marginTop:7}}>Prob.ing: <span style={{color:"#22c55e",fontWeight:700}}>{PrioILabel}</span> · Prior.eg: <span style={{color:"#f87171",fontWeight:700}}>{PrioELabel}</span></div>
             </div>
             <div style={S.sTit}>CUENTAS DÉBITO</div>
-            {cuentas.map(c=>(
-              <div key={c.id} style={{...S.cCard(c.color),opacity:c.esReferencia?0.7:1}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            {cuentas.filter(c=>!c.esReferencia).map(c=>(
+              <div key={c.id} style={S.cCard(c.color)}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <div style={{display:"flex",alignItems:"center",gap:7}}><div style={{width:8,height:8,borderRadius:4,background:c.color}}/><span style={{fontSize:12,fontWeight:700}}>{c.nombre}</span></div>
                 <span style={{fontSize:16,fontWeight:800,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</span>
               </div></div>
@@ -1387,13 +1387,7 @@ function App(){
                 ?<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin gastos en este período</div>
                 :<>
                   <div style={{textAlign:"center",marginBottom:4}}><span style={{fontSize:10,color:"#475569"}}>Total egresos</span><br/><span style={{fontSize:20,fontWeight:800,color:"#f87171"}}>{fmt(statData.totalEg)}</span></div>
-                  <div style={{height:175,marginBottom:6}}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart><Pie data={statData.egArr.map((c,i)=>({name:c.nombre,value:c.total,color:PIE_PALETTE[i%PIE_PALETTE.length]}))} dataKey="value" nameKey="name" innerRadius={50} outerRadius={78} paddingAngle={2}>
-                        {statData.egArr.map((_,i)=><Cell key={i} fill={PIE_PALETTE[i%PIE_PALETTE.length]}/>)}
-                      </Pie><Tooltip formatter={v=>fmt(v)} contentStyle={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,fontSize:10}}/></PieChart>
-                    </ResponsiveContainer>
-                  </div>
+
                   {statData.egArr.map((cat,i)=>{
                     const color=PIE_PALETTE[i%PIE_PALETTE.length];
                     const pct=statData.totalEg?Math.round(cat.total/statData.totalEg*100):0;
@@ -1431,13 +1425,7 @@ function App(){
                 ?<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin ingresos en este período</div>
                 :<>
                   <div style={{textAlign:"center",marginBottom:4}}><span style={{fontSize:10,color:"#475569"}}>Total ingresos</span><br/><span style={{fontSize:20,fontWeight:800,color:"#22c55e"}}>{fmt(statData.totalIng)}</span></div>
-                  <div style={{height:175,marginBottom:6}}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart><Pie data={statData.ingArr.map((c,i)=>({name:c.nombre,value:c.total,color:PIE_PALETTE[i%PIE_PALETTE.length]}))} dataKey="value" nameKey="name" innerRadius={50} outerRadius={78} paddingAngle={2}>
-                        {statData.ingArr.map((_,i)=><Cell key={i} fill={PIE_PALETTE[i%PIE_PALETTE.length]}/>)}
-                      </Pie><Tooltip formatter={v=>fmt(v)} contentStyle={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,fontSize:10}}/></PieChart>
-                    </ResponsiveContainer>
-                  </div>
+
                   {statData.ingArr.map((cat,i)=>{
                     const color=PIE_PALETTE[i%PIE_PALETTE.length];
                     const pct=statData.totalIng?Math.round(cat.total/statData.totalIng*100):0;
@@ -1473,17 +1461,27 @@ function App(){
             {statTab==="evolucion"&&(
               <div>
                 <div style={{fontSize:10,color:"#475569",marginBottom:10}}>Ingresos vs Egresos — últimos 8 meses</div>
-                <div style={{height:170,marginBottom:13}}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={evolucionData} barCategoryGap="30%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b"/>
-                      <XAxis dataKey="name" tick={{fill:"#475569",fontSize:9}}/>
-                      <YAxis tickFormatter={v=>fmtShort(v)} tick={{fill:"#475569",fontSize:8}} width={36}/>
-                      <Tooltip formatter={v=>fmt(v)} contentStyle={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,fontSize:10}}/>
-                      <Bar dataKey="ing" name="Ingresos" fill="#22c55e" radius={[3,3,0,0]}/>
-                      <Bar dataKey="eg"  name="Egresos"  fill="#f87171" radius={[3,3,0,0]}/>
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"10px 13px",marginBottom:13}}>
+                  {evolucionData.map((d,i)=>{
+                    const maxVal=Math.max(...evolucionData.map(x=>Math.max(x.ing,x.eg)),1);
+                    return(
+                      <div key={i} style={{marginBottom:8}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                          <span style={{fontSize:10,color:"#94a3b8",fontWeight:600}}>{d.name}</span>
+                          <div style={{display:"flex",gap:10}}>
+                            <span style={{fontSize:9,color:"#22c55e"}}>↑{fmtShort(d.ing)}</span>
+                            <span style={{fontSize:9,color:"#f87171"}}>↓{fmtShort(d.eg)}</span>
+                          </div>
+                        </div>
+                        <div style={{height:6,borderRadius:3,background:"#1e293b",overflow:"hidden",marginBottom:2}}>
+                          <div style={{height:"100%",borderRadius:3,background:"#22c55e",width:`${d.ing/maxVal*100}%`}}/>
+                        </div>
+                        <div style={{height:6,borderRadius:3,background:"#1e293b",overflow:"hidden"}}>
+                          <div style={{height:"100%",borderRadius:3,background:"#f87171",width:`${d.eg/maxVal*100}%`}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
                 {evolucionData.map((d,i)=>(
                   <div key={i} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:10,padding:"9px 13px",marginBottom:5}}>
