@@ -224,12 +224,25 @@ function useDrag(setMovs){
       if(fi!==-1&&ti!==-1){
         // Reordenar el array snap moviendo el elemento arrastrado a la posición destino
         const arr=[...snap];
+        const targetFecha = arr[ti].fecha; // fecha del elemento destino
         const [moved]=arr.splice(fi,1);
         arr.splice(ti,0,moved);
-        // Reasignar órdenes secuenciales manteniendo fechas originales
+        // Reasignar órdenes secuenciales; si el destino tiene fecha distinta, adoptarla
         const ordenMap={};
-        arr.forEach((r,i)=>{ ordenMap[r.id]=i+1; });
-        setMovs(p=>p.map(r=>ordenMap[r.id]!==undefined?{...r,orden:ordenMap[r.id]}:r));
+        const fechaMap={};
+        arr.forEach((r,i)=>{
+          ordenMap[r.id]=i+1;
+          // Solo actualizar fecha del elemento arrastrado si la fecha destino es distinta
+          if(r.id===dragId && targetFecha && targetFecha!==r.fecha){
+            fechaMap[r.id]=targetFecha;
+          }
+        });
+        setMovs(p=>p.map(r=>{
+          const updates={};
+          if(ordenMap[r.id]!==undefined) updates.orden=ordenMap[r.id];
+          if(fechaMap[r.id]) updates.fecha=fechaMap[r.id];
+          return Object.keys(updates).length?{...r,...updates}:r;
+        }));
       }
     }
     dR.current=null;oR.current=null;snR.current=null;setAId(null);setOViz(null);
