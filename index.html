@@ -74,6 +74,11 @@ const DIAS_SEM      = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const MESES         = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MESES_FULL    = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const PRIO_LBL      = {1:"Alta",2:"Media",3:"Baja"};
+const ORIG_ACREEDOR = ["Sicresa","Familia","Terceros"];
+const ORIG_DEUDOR   = ["Sicresa","Terceros"];
+const ORIG_ING_EXT  = ["Patrimonio","Sicresa"];
+const EST_ING_EXT   = ["Pendiente","Programado","Recuperado"];
+const COLOR_ING_EXT = {Pendiente:"#fbbf24",Programado:"#a78bfa",Recuperado:"#22c55e"};
 const OP_COLORS     = {Ingreso:"#22c55e",Egreso:"#f87171",Transferencia:"#a78bfa","Pago Tarjeta":"#60a5fa"};
 const COLOR_EST     = {
   INGRESADO:{bg:"rgba(34,197,94,0.12)",  text:"#22c55e",dot:"#22c55e"},
@@ -557,6 +562,20 @@ const ModalMov=memo(function ModalMov({
             <div style={S.prioR}>{[[1,"Alta"],[2,"Media"],[3,"Baja"]].map(([v,l])=><button key={v} style={S.prioB2(formMov.prioridad===v)} onClick={()=>set("prioridad",v)}>{l}</button>)}</div>
           </div>
           <div style={S.fg}><label style={S.fl}>Observaciones</label><textarea style={{...S.inp,minHeight:60,resize:"vertical",lineHeight:1.5}} value={formMov.obs} onChange={e=>set("obs",e.target.value)}/></div>
+          {/* Vinculación a Cartera */}
+          <div style={S.fg}>
+            <label style={S.fl}>Vincular a Cartera (opcional)</label>
+            <select style={S.sel} value={formMov.vinculoTipo?`${formMov.vinculoTipo}:${formMov.vinculoId}`:""}
+              onChange={e=>{
+                if(!e.target.value){set("vinculoTipo",null);set("vinculoId",null);}
+                else{const[t,i]=e.target.value.split(":");set("vinculoTipo",t);set("vinculoId",parseInt(i));}
+              }}>
+              <option value="">— Sin vincular —</option>
+              {acreedores.length>0&&<optgroup label="Acreedores">{acreedores.map(x=><option key={x.id} value={`acreedores:${x.id}`}>{x.nombre||x.concepto}</option>)}</optgroup>}
+              {deudores.length>0&&<optgroup label="Deudores">{deudores.map(x=><option key={x.id} value={`deudores:${x.id}`}>{x.nombre||x.concepto}</option>)}</optgroup>}
+              {ingresosExt.length>0&&<optgroup label="Ing. Extraordinarios">{ingresosExt.map(x=><option key={x.id} value={`ingresosExt:${x.id}`}>{x.concepto}</option>)}</optgroup>}
+            </select>
+          </div>
           {!editMovId&&(
             <div style={{border:"1px solid #1e293b",borderRadius:11,padding:13,marginBottom:11}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:recForm.activo?11:0}}>
@@ -782,6 +801,9 @@ function App(){
   const[catIng,setCatIng]=useState(()=>loadLS('catIng', INIT_CAT_ING));
   const[catEg,setCatEg]=useState(()=>loadLS('catEg', INIT_CAT_EG));
   const[presupuestos,setPresupuestos]=useState(()=>loadLS('presupuestos', INIT_PRESUPUESTOS));
+  const[acreedores,setAcreedores]=useState(()=>loadLS('acreedores', []));
+  const[deudores,setDeudores]=useState(()=>loadLS('deudores', []));
+  const[ingresosExt,setIngresosExt]=useState(()=>loadLS('ingresosExt', []));
 
 
   // ── Auto-guardado en localStorage ──
@@ -791,6 +813,9 @@ function App(){
   useEffect(()=>{ saveLS('catIng', catIng); }, [catIng]);
   useEffect(()=>{ saveLS('catEg', catEg); }, [catEg]);
   useEffect(()=>{ saveLS('presupuestos', presupuestos); }, [presupuestos]);
+  useEffect(()=>{ saveLS('acreedores', acreedores); }, [acreedores]);
+  useEffect(()=>{ saveLS('deudores', deudores); }, [deudores]);
+  useEffect(()=>{ saveLS('ingresosExt', ingresosExt); }, [ingresosExt]);
 
   // modales
   const[showMov,setShowMov]=useState(false);
@@ -860,13 +885,21 @@ function App(){
 
   // exportar
   const[showExportModal,setShowExportModal]=useState(false);
+  const[carteraTab,setCarteraTab]=useState("acreedores"); // acreedores|deudores|ingresosExt
+  const[showCarteraForm,setShowCarteraForm]=useState(false);
+  const[editCarteraId,setEditCarteraId]=useState(null);
+  const[formCartera,setFormCartera]=useState({});
+  const[viewCartera,setViewCartera]=useState(null); // detalle abierto
+  const[showAbonoForm,setShowAbonoForm]=useState(false);
+  const[abonoTarget,setAbonoTarget]=useState(null); // {tipo,id}
+  const[formAbono,setFormAbono]=useState({fecha:'',monto:'',concepto:''});
 
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[jsonImportError,setJsonImportError]=useState("");
 
   const[exportPeriod,setExportPeriod]=useState({sm:new Date().getMonth(),sy:new Date().getFullYear(),mode:"mes"});
 
-  const BLANK_MOV={fecha:todayStr(),estatus:"PENDIENTE",tipoOp:"Egreso",concepto:"",cat:"",subcat:"",prioridad:1,monto:"",cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false,obs:"",serieId:null};
+  const BLANK_MOV={fecha:todayStr(),estatus:"PENDIENTE",tipoOp:"Egreso",concepto:"",cat:"",subcat:"",prioridad:1,monto:"",cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false,obs:"",serieId:null,vinculoTipo:null,vinculoId:null};
   const BLANK_REC={activo:false,recurrencia:"Mensual",diasSemana:[],fechaInicio:todayStr(),finTipo:"repeticiones",finReps:6,finFecha:addM_(todayStr(),6)};
 
   const[formMov,setFormMov]=useState(BLANK_MOV);
@@ -1127,8 +1160,16 @@ function App(){
     } else {
       setMovs(p=>[...p,{...data,id:nextId(movs),orden:nextOrd()}]);
     }
+    // Vincular a cartera si se seleccionó
+    const movGuardado={...data,id:editMovId!==null?editMovId:nextId(movs),orden:editMovId!==null?(movs.find(r=>r.id===editMovId)?.orden||nextOrd()):nextOrd()};
+    if(data.vinculoTipo&&data.vinculoId){
+      const vinculaEn=(setter)=>setter(p=>p.map(x=>x.id===data.vinculoId&&!(x.movIdsVinculados||[]).includes(movGuardado.id)?{...x,movIdsVinculados:[...(x.movIdsVinculados||[]),movGuardado.id]}:x));
+      if(data.vinculoTipo==="acreedores") vinculaEn(setAcreedores);
+      else if(data.vinculoTipo==="deudores") vinculaEn(setDeudores);
+      else if(data.vinculoTipo==="ingresosExt") vinculaEn(setIngresosExt);
+    }
     setShowMov(false);setEditMovId(null);
-  },[formMov,editMovId,isEditReal,movs,recForm,cuentas]);
+  },[formMov,editMovId,isEditReal,movs,recForm,cuentas,acreedores,deudores,ingresosExt]);
 
   const saveCuenta=useCallback(()=>{
     if(!formCuenta.nombre)return;
@@ -1166,8 +1207,88 @@ function App(){
   },[movs,catIng,catEg]);
 
 
+  // ── Cartera helpers ──
+  const nextCarteraId = useCallback((arr)=>arr.length?Math.max(...arr.map(x=>x.id))+1:1,[]);
+
+  const abonado = useCallback((registro,movs)=>{
+    if(!registro.movIdsVinculados||!registro.movIdsVinculados.length) return 0;
+    return movs.filter(m=>registro.movIdsVinculados.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus)).reduce((s,m)=>s+m.monto,0);
+  },[]);
+
+  const programado = useCallback((registro,movs)=>{
+    if(!registro.movIdsVinculados||!registro.movIdsVinculados.length) return 0;
+    return movs.filter(m=>registro.movIdsVinculados.includes(m.id)&&m.estatus==="PROGRAMADO").reduce((s,m)=>s+m.monto,0);
+  },[]);
+
+  const saldoPendiente = useCallback((registro,movs)=>{
+    const abonosDirectos=(registro.abonos||[]).reduce((s,a)=>s+a.monto,0);
+    const abonosMov=abonado(registro,movs);
+    return (registro.montoActual||0)-(abonosDirectos+abonosMov);
+  },[abonado]);
+
+  const openCarteraForm = useCallback((tipo,item=null)=>{
+    setCarteraTab(tipo);
+    if(item){
+      setFormCartera({...item});
+      setEditCarteraId(item.id);
+    } else {
+      const blanks={
+        acreedores:{origen:"",nombre:"",concepto:"",montoActual:"",condiciones:"",abonos:[],movIdsVinculados:[]},
+        deudores:  {origen:"",nombre:"",concepto:"",montoActual:"",condiciones:"",abonos:[],movIdsVinculados:[]},
+        ingresosExt:{origen:"",concepto:"",monto:"",condiciones:"",estado:"Pendiente",movIdsVinculados:[]},
+      };
+      setFormCartera(blanks[tipo]);
+      setEditCarteraId(null);
+    }
+    setShowCarteraForm(true);
+  },[]);
+
+  const saveCartera = useCallback(()=>{
+    const data={...formCartera,
+      montoActual:parseFloat(formCartera.montoActual||formCartera.monto)||0,
+      monto:parseFloat(formCartera.monto||formCartera.montoActual)||0,
+    };
+    if(!data.concepto) return;
+    if(carteraTab==="acreedores"){
+      if(editCarteraId!==null) setAcreedores(p=>p.map(x=>x.id===editCarteraId?{...x,...data}:x));
+      else setAcreedores(p=>[...p,{...data,id:nextCarteraId(acreedores),abonos:[],movIdsVinculados:[]}]);
+    } else if(carteraTab==="deudores"){
+      if(editCarteraId!==null) setDeudores(p=>p.map(x=>x.id===editCarteraId?{...x,...data}:x));
+      else setDeudores(p=>[...p,{...data,id:nextCarteraId(deudores),abonos:[],movIdsVinculados:[]}]);
+    } else {
+      if(editCarteraId!==null) setIngresosExt(p=>p.map(x=>x.id===editCarteraId?{...x,...data}:x));
+      else setIngresosExt(p=>[...p,{...data,id:nextCarteraId(ingresosExt),movIdsVinculados:[]}]);
+    }
+    setShowCarteraForm(false);setEditCarteraId(null);
+  },[formCartera,carteraTab,editCarteraId,acreedores,deudores,ingresosExt,nextCarteraId]);
+
+  const saveAbono = useCallback(()=>{
+    if(!abonoTarget||!formAbono.monto) return;
+    const abono={id:Date.now(),fecha:formAbono.fecha||todayStr(),monto:parseFloat(formAbono.monto)||0,concepto:formAbono.concepto||""};
+    const updater = p=>p.map(x=>x.id===abonoTarget.id?{...x,abonos:[...(x.abonos||[]),abono]}:x);
+    if(abonoTarget.tipo==="acreedores") setAcreedores(updater);
+    else setDeudores(updater);
+    // Actualizar viewCartera
+    setViewCartera(prev=>prev?{...prev,abonos:[...(prev.abonos||[]),abono]}:prev);
+    setShowAbonoForm(false);setFormAbono({fecha:'',monto:'',concepto:''});
+  },[abonoTarget,formAbono]);
+
+  const delAbono = useCallback((tipo,registroId,abonoId)=>{
+    const updater=p=>p.map(x=>x.id===registroId?{...x,abonos:(x.abonos||[]).filter(a=>a.id!==abonoId)}:x);
+    if(tipo==="acreedores") setAcreedores(updater);
+    else setDeudores(updater);
+    setViewCartera(prev=>prev?{...prev,abonos:(prev.abonos||[]).filter(a=>a.id!==abonoId)}:prev);
+  },[]);
+
+  const delCartera = useCallback((tipo,id)=>{
+    if(tipo==="acreedores") setAcreedores(p=>p.filter(x=>x.id!==id));
+    else if(tipo==="deudores") setDeudores(p=>p.filter(x=>x.id!==id));
+    else setIngresosExt(p=>p.filter(x=>x.id!==id));
+    setViewCartera(null);
+  },[]);
+
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,exportedAt:new Date().toISOString(),version:"v7"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,exportedAt:new Date().toISOString(),version:"v7"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
@@ -1189,6 +1310,9 @@ function App(){
         if(data.catIng){setCatIng(data.catIng);saveLS('catIng',data.catIng);}
         if(data.catEg){setCatEg(data.catEg);saveLS('catEg',data.catEg);}
         if(data.presupuestos){setPresupuestos(data.presupuestos);saveLS('presupuestos',data.presupuestos);}
+        if(data.acreedores){setAcreedores(data.acreedores);saveLS('acreedores',data.acreedores);}
+        if(data.deudores){setDeudores(data.deudores);saveLS('deudores',data.deudores);}
+        if(data.ingresosExt){setIngresosExt(data.ingresosExt);saveLS('ingresosExt',data.ingresosExt);}
         setShowJsonModal(false);
         setView("dashboard");
       }catch(err){setJsonImportError("Archivo inválido. Usa un JSON exportado desde esta app.");}
@@ -1215,7 +1339,7 @@ function App(){
 
   const PrioILabel=prioI===3?"Todas":PRIO_LBL[prioI];
   const PrioELabel=prioE===3?"Todas":PRIO_LBL[prioE];
-  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","configuracion"];
+  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","configuracion","cartera"];
 
   // Semáforo color
   const semColor=s=>s==="verde"?"#22c55e":s==="amarillo"?"#fbbf24":"#f87171";
@@ -1776,6 +1900,7 @@ function App(){
                 {ico:"📊",label:"Estadísticas",sub:"Gastos, ingresos y evolución",target:"estadisticas",color:"#a78bfa"},
                 {ico:"🎯",label:"Presupuestos",sub:"Control de gasto por categoría",target:"presupuestos",color:"#22c55e"},
                 {ico:"📈",label:"Proyección Presupuestal",sub:"Panorama financiero mes a mes",target:"proyeccion",color:"#60a5fa"},
+                {ico:"🤝",label:"Cartera",sub:`Acreedores · Deudores · Ing. Extraordinarios`,target:"cartera",color:"#f472b6"},
               ].map(it=>(
                 <div key={it.target} style={S.menuRow} onClick={()=>setView(it.target)}>
                   <div style={{...S.menuIco,background:`${it.color}18`}}><span>{it.ico}</span></div>
@@ -1803,6 +1928,274 @@ function App(){
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:10}}><span style={{color:"#64748b"}}>Saldo Real</span><span style={{fontWeight:700,color:"#C9A84C"}}>{fmt(stats.saldoReal)}</span></div>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:10}}><span style={{color:"#64748b"}}>Ingresos reales</span><span style={{fontWeight:700,color:"#22c55e"}}>{fmt(stats.totalIngresos)}</span></div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:10}}><span style={{color:"#64748b"}}>Egresos reales</span><span style={{fontWeight:700,color:"#f87171"}}>{fmt(stats.totalEgresos)}</span></div>
+            </div>
+          </div>
+        )}
+
+
+        {/* ── CARTERA ── */}
+        {view==="cartera"&&(
+          <div style={S.sec}>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}>
+              <button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button>
+              <span style={{...S.sTit,margin:0}}>CARTERA</span>
+            </div>
+
+            {/* Tabs */}
+            <div style={{display:"flex",borderBottom:"1px solid #1e293b",marginBottom:13}}>
+              {[["acreedores","🔴 Acreedores"],["deudores","🟢 Deudores"],["ingresosExt","⭐ Ing. Ext."]].map(([k,l])=>(
+                <button key={k} style={{flex:1,padding:"8px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
+                  color:carteraTab===k?"#C9A84C":"#334155",borderBottom:carteraTab===k?"2px solid #C9A84C":"2px solid transparent"}}
+                  onClick={()=>setCarteraTab(k)}>{l}</button>
+              ))}
+            </div>
+
+            {/* ── ACREEDORES ── */}
+            {carteraTab==="acreedores"&&(()=>{
+              const total=acreedores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
+              return(<>
+                <div style={{...S.card("rgba(248,113,113,0.2)"),marginBottom:11}}>
+                  <div style={S.lbl}>Total por pagar</div>
+                  <div style={{fontSize:22,fontWeight:800,color:"#f87171"}}>{fmt(total)}</div>
+                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{acreedores.length} acreedor{acreedores.length!==1?"es":""}</div>
+                </div>
+                {acreedores.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin acreedores registrados</div>}
+                {acreedores.map(x=>{
+                  const sp=saldoPendiente(x,movs);
+                  const prog=programado(x,movs);
+                  const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
+                  return(
+                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #f87171",cursor:"pointer",marginBottom:8}} onClick={()=>setViewCartera({...x,tipo:"acreedores"})}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:8,color:"#f87171",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
+                          <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{x.nombre||x.concepto}</div>
+                          {x.nombre&&<div style={{fontSize:10,color:"#64748b"}}>{x.concepto}</div>}
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:9,color:"#64748b"}}>Saldo pendiente</div>
+                          <div style={{fontSize:16,fontWeight:800,color:sp>0?"#f87171":"#22c55e"}}>{fmt(sp)}</div>
+                        </div>
+                      </div>
+                      <div style={{height:4,borderRadius:2,background:"#1e293b",overflow:"hidden",marginBottom:4}}>
+                        <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${pct}%`,transition:"width 0.4s"}}/>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
+                        <span>Deuda actual: {fmt(x.montoActual)}</span>
+                        {prog>0&&<span style={{color:"#a78bfa"}}>Prog: {fmt(prog)}</span>}
+                        <span style={{color:"#22c55e"}}>{Math.round(pct)}% liquidado</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <button style={{...S.saveB,marginTop:7}} onClick={()=>openCarteraForm("acreedores")}>+ Nuevo Acreedor</button>
+              </>);
+            })()}
+
+            {/* ── DEUDORES ── */}
+            {carteraTab==="deudores"&&(()=>{
+              const total=deudores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
+              return(<>
+                <div style={{...S.card("rgba(34,197,94,0.2)"),marginBottom:11}}>
+                  <div style={S.lbl}>Total por cobrar</div>
+                  <div style={{fontSize:22,fontWeight:800,color:"#22c55e"}}>{fmt(total)}</div>
+                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{deudores.length} deudor{deudores.length!==1?"es":""}</div>
+                </div>
+                {deudores.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin deudores registrados</div>}
+                {deudores.map(x=>{
+                  const sp=saldoPendiente(x,movs);
+                  const prog=programado(x,movs);
+                  const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
+                  return(
+                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #22c55e",cursor:"pointer",marginBottom:8}} onClick={()=>setViewCartera({...x,tipo:"deudores"})}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:8,color:"#22c55e",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
+                          <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{x.nombre||x.concepto}</div>
+                          {x.nombre&&<div style={{fontSize:10,color:"#64748b"}}>{x.concepto}</div>}
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <div style={{fontSize:9,color:"#64748b"}}>Por cobrar</div>
+                          <div style={{fontSize:16,fontWeight:800,color:sp>0?"#22c55e":"#94a3b8"}}>{fmt(sp)}</div>
+                        </div>
+                      </div>
+                      <div style={{height:4,borderRadius:2,background:"#1e293b",overflow:"hidden",marginBottom:4}}>
+                        <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${pct}%`,transition:"width 0.4s"}}/>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
+                        <span>Deuda actual: {fmt(x.montoActual)}</span>
+                        {prog>0&&<span style={{color:"#a78bfa"}}>Prog: {fmt(prog)}</span>}
+                        <span style={{color:"#22c55e"}}>{Math.round(pct)}% recuperado</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                <button style={{...S.saveB,marginTop:7,background:"linear-gradient(135deg,#22c55e,#16a34a)",}} onClick={()=>openCarteraForm("deudores")}>+ Nuevo Deudor</button>
+              </>);
+            })()}
+
+            {/* ── INGRESOS EXTRAORDINARIOS ── */}
+            {carteraTab==="ingresosExt"&&(()=>{
+              const totalPend=ingresosExt.filter(x=>x.estado!=="Recuperado").reduce((s,x)=>s+(x.monto||0),0);
+              return(<>
+                <div style={{...S.card("rgba(251,191,36,0.15)"),marginBottom:11}}>
+                  <div style={S.lbl}>Potencial por recuperar</div>
+                  <div style={{fontSize:22,fontWeight:800,color:"#fbbf24"}}>{fmt(totalPend)}</div>
+                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{ingresosExt.filter(x=>x.estado!=="Recuperado").length} activos</div>
+                </div>
+                {ingresosExt.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin ingresos extraordinarios registrados</div>}
+                {ingresosExt.map(x=>{
+                  const cEst=COLOR_ING_EXT[x.estado]||"#94a3b8";
+                  return(
+                    <div key={x.id} style={{...S.card(),borderLeft:`3px solid ${cEst}`,cursor:"pointer",marginBottom:8}} onClick={()=>setViewCartera({...x,tipo:"ingresosExt"})}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:8,color:cEst,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
+                          <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{x.concepto}</div>
+                        </div>
+                        <div style={{textAlign:"right"}}>
+                          <span style={{fontSize:9,padding:"3px 8px",borderRadius:8,background:`${cEst}22`,color:cEst,fontWeight:700}}>{x.estado}</span>
+                          <div style={{fontSize:16,fontWeight:800,color:cEst,marginTop:3}}>{fmt(x.monto)}</div>
+                        </div>
+                      </div>
+                      {x.condiciones&&<div style={{fontSize:9,color:"#64748b",fontStyle:"italic"}}>{x.condiciones}</div>}
+                    </div>
+                  );
+                })}
+                <button style={{...S.saveB,marginTop:7,background:"linear-gradient(135deg,#fbbf24,#d97706)",color:"#080810"}} onClick={()=>openCarteraForm("ingresosExt")}>+ Nuevo Ingreso Extraordinario</button>
+              </>);
+            })()}
+          </div>
+        )}
+
+        {/* ── MODAL DETALLE CARTERA ── */}
+        {viewCartera&&(()=>{
+          const tipo=viewCartera.tipo;
+          const isIngExt=tipo==="ingresosExt";
+          const isAcr=tipo==="acreedores";
+          const sp=!isIngExt?saldoPendiente(viewCartera,movs):0;
+          const prog=!isIngExt?programado(viewCartera,movs):0;
+          const abonosDir=(viewCartera.abonos||[]);
+          const movVinc=movs.filter(m=>(viewCartera.movIdsVinculados||[]).includes(m.id));
+          const colorTipo=isIngExt?"#fbbf24":isAcr?"#f87171":"#22c55e";
+          return(
+            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setViewCartera(null);}}>
+              <div style={S.mBox}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                  <div style={S.mTit}>{isIngExt?"⭐":isAcr?"🔴":"🟢"} {isIngExt?"ING. EXTRAORDINARIO":isAcr?"ACREEDOR":"DEUDOR"}</div>
+                  <button style={{background:"none",border:"none",color:"#475569",fontSize:18,cursor:"pointer"}} onClick={()=>setViewCartera(null)}>✕</button>
+                </div>
+
+                {/* Header */}
+                <div style={{background:"#13131f",borderRadius:11,padding:"12px 14px",marginBottom:11}}>
+                  <div style={{fontSize:8,color:colorTipo,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>{viewCartera.origen}</div>
+                  {!isIngExt&&<div style={{fontSize:16,fontWeight:800,color:"#e2e8f0",marginBottom:2}}>{viewCartera.nombre}</div>}
+                  <div style={{fontSize:isIngExt?15:12,fontWeight:isIngExt?800:400,color:isIngExt?"#e2e8f0":"#94a3b8",marginBottom:isIngExt?4:0}}>{viewCartera.concepto}</div>
+                  {isIngExt&&<span style={{fontSize:10,padding:"3px 9px",borderRadius:8,background:`${COLOR_ING_EXT[viewCartera.estado]||"#94a3b8"}22`,color:COLOR_ING_EXT[viewCartera.estado]||"#94a3b8",fontWeight:700}}>{viewCartera.estado}</span>}
+                  {viewCartera.condiciones&&<div style={{fontSize:10,color:"#64748b",fontStyle:"italic",marginTop:6,borderTop:"1px solid #1e293b",paddingTop:6}}>{viewCartera.condiciones}</div>}
+                </div>
+
+                {/* Montos */}
+                {!isIngExt&&(
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
+                    {[["Deuda Actual",fmt(viewCartera.montoActual),colorTipo],["Programado",fmt(prog),"#a78bfa"],["Saldo Pend.",fmt(sp),sp>0?colorTipo:"#22c55e"]].map(([l,v,c])=>(
+                      <div key={l} style={{background:`${c}11`,border:`1px solid ${c}33`,borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
+                        <div style={{fontSize:8,color:c,fontWeight:700,marginBottom:3}}>{l}</div>
+                        <div style={{fontSize:11,fontWeight:800,color:c}}>{v}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {isIngExt&&<div style={{...S.card(),marginBottom:11,textAlign:"center"}}><div style={S.lbl}>Monto estimado</div><div style={{fontSize:22,fontWeight:800,color:"#fbbf24"}}>{fmt(viewCartera.monto)}</div></div>}
+
+                {/* Abonos directos */}
+                {!isIngExt&&(<>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
+                    <div style={{...S.sTit,margin:0}}>ABONOS DIRECTOS</div>
+                    <button style={S.smBtn(colorTipo)} onClick={()=>{setAbonoTarget({tipo,id:viewCartera.id});setFormAbono({fecha:todayStr(),monto:'',concepto:''});setShowAbonoForm(true);}}>+ Abono</button>
+                  </div>
+                  {abonosDir.length===0&&<div style={{fontSize:10,color:"#334155",marginBottom:9,textAlign:"center"}}>Sin abonos registrados</div>}
+                  {abonosDir.map(a=>(
+                    <div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1e293b"}}>
+                      <div><div style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{fmt(a.monto)}</div><div style={{fontSize:9,color:"#64748b"}}>{fmtDate(a.fecha)}{a.concepto?` · ${a.concepto}`:""}</div></div>
+                      <button style={S.acBtn("#f87171")} onClick={()=>delAbono(tipo,viewCartera.id,a.id)}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{marginTop:9}}/>
+                </>)}
+
+                {/* Movimientos vinculados */}
+                {movVinc.length>0&&(<>
+                  <div style={{...S.sTit,marginBottom:7}}>MOVIMIENTOS VINCULADOS</div>
+                  {movVinc.map(m=>(
+                    <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1e293b"}}>
+                      <div><div style={{fontSize:11,color:"#e2e8f0"}}>{m.concepto}</div><div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)} · <span style={S.badge(m.estatus)}>{m.estatus}</span></div></div>
+                      <span style={{fontSize:12,fontWeight:700,color:OP_COLORS[m.tipoOp]}}>{fmt(m.monto)}</span>
+                    </div>
+                  ))}
+                  <div style={{marginTop:9}}/>
+                </>)}
+
+                <div style={{display:"flex",gap:8,marginTop:4}}>
+                  <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(201,168,76,0.15)",color:"#C9A84C",border:"1px solid #C9A84C44"}}
+                    onClick={()=>{setViewCartera(null);openCarteraForm(tipo,viewCartera);}}>✏ Editar</button>
+                  <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(248,113,113,0.15)",color:"#f87171",border:"1px solid #f8717144"}}
+                    onClick={()=>{if(window.confirm("¿Eliminar este registro?"))delCartera(tipo,viewCartera.id);}}>🗑 Eliminar</button>
+                </div>
+                <button style={S.cancB} onClick={()=>setViewCartera(null)}>Cerrar</button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── MODAL FORMULARIO CARTERA ── */}
+        {showCarteraForm&&(()=>{
+          const isIngExt=carteraTab==="ingresosExt";
+          const isAcr=carteraTab==="acreedores";
+          const origenes=isIngExt?ORIG_ING_EXT:isAcr?ORIG_ACREEDOR:ORIG_DEUDOR;
+          const colorTipo=isIngExt?"#fbbf24":isAcr?"#f87171":"#22c55e";
+          const set=(k,v)=>setFormCartera(f=>({...f,[k]:v}));
+          return(
+            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowCarteraForm(false);}}>
+              <div style={S.mBox}>
+                <div style={S.mTit}>{editCarteraId?"✏ EDITAR":"+"} {isIngExt?"INGRESO EXTRAORDINARIO":isAcr?"ACREEDOR":"DEUDOR"}</div>
+                <div style={S.fg}><label style={S.fl}>Origen</label>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
+                    {origenes.map(o=><button key={o} style={{...S.prioB2(formCartera.origen===o,colorTipo),flex:"none",padding:"6px 12px",fontSize:10}} onClick={()=>set("origen",o)}>{o}</button>)}
+                  </div>
+                </div>
+                {!isIngExt&&<div style={S.fg}><label style={S.fl}>Nombre</label><input style={S.inp} value={formCartera.nombre||""} onChange={e=>set("nombre",e.target.value)} placeholder="Persona o empresa…"/></div>}
+                <div style={S.fg}><label style={S.fl}>Concepto</label><input style={S.inp} value={formCartera.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Descripción de la deuda…"/></div>
+                <div style={S.fg}><label style={S.fl}>{isIngExt?"Monto estimado $":"Saldo actual de la deuda $"}</label>
+                  <input style={S.inp} type="number" value={formCartera.montoActual||formCartera.monto||""} onChange={e=>set(isIngExt?"monto":"montoActual",e.target.value)} placeholder="0.00"/>
+                </div>
+                {isIngExt&&(
+                  <div style={S.fg}><label style={S.fl}>Estado</label>
+                    <div style={{display:"flex",gap:6}}>
+                      {EST_ING_EXT.map(e=><button key={e} style={{...S.prioB2(formCartera.estado===e,COLOR_ING_EXT[e]),flex:1,padding:"7px 0",fontSize:10}} onClick={()=>set("estado",e)}>{e}</button>)}
+                    </div>
+                  </div>
+                )}
+                <div style={S.fg}><label style={S.fl}>Condiciones actuales</label>
+                  <textarea style={{...S.inp,minHeight:60,resize:"vertical",lineHeight:1.5}} value={formCartera.condiciones||""} onChange={e=>set("condiciones",e.target.value)} placeholder="Acuerdos, tasas, plazos…"/>
+                </div>
+                <button style={S.saveB} onClick={saveCartera}>GUARDAR</button>
+                <button style={S.cancB} onClick={()=>setShowCarteraForm(false)}>Cancelar</button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── MODAL ABONO ── */}
+        {showAbonoForm&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowAbonoForm(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>+ REGISTRAR ABONO</div>
+              <div style={S.fg}><label style={S.fl}>Fecha</label><input style={S.inp} type="date" value={formAbono.fecha} onChange={e=>setFormAbono(f=>({...f,fecha:e.target.value}))}/></div>
+              <div style={S.fg}><label style={S.fl}>Monto $</label><input style={S.inp} type="number" value={formAbono.monto} onChange={e=>setFormAbono(f=>({...f,monto:e.target.value}))} placeholder="0.00"/></div>
+              <div style={S.fg}><label style={S.fl}>Concepto (opcional)</label><input style={S.inp} value={formAbono.concepto} onChange={e=>setFormAbono(f=>({...f,concepto:e.target.value}))} placeholder="Referencia del pago…"/></div>
+              <button style={S.saveB} onClick={saveAbono}>GUARDAR ABONO</button>
+              <button style={S.cancB} onClick={()=>setShowAbonoForm(false)}>Cancelar</button>
             </div>
           </div>
         )}
