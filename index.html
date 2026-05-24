@@ -1498,7 +1498,7 @@ function App(){
                 📂 Categoría{hasCatFilterActive?" ✓":""}
               </button>
               <button style={S.prioTag(filterCuentas!==null&&filterCuentas.size>0)} onClick={()=>setShowCuentaFilter(true)}>
-                🏦 Cuenta{filterCuentas!==null&&filterCuentas.size>0?` (${filterCuentas.size})":""}
+                🏦 Cuenta{filterCuentas!==null&&filterCuentas.size>0?" ("+filterCuentas.size+")":""}
               </button>
               <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
             </div>
