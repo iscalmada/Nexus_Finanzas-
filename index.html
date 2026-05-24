@@ -406,6 +406,7 @@ function BudgetBar({gasto,presupuesto,color="#C9A84C",esIngreso=false}){
 const ModalMov=memo(function ModalMov({
   formMov,setFormMov,editMovId,isEditReal,recForm,setRecForm,
   cuentas,cuentaSaldos,tarjetas,tarjetaSaldos,catIng,catEg,
+  acreedores,deudores,ingresosExt,
   onSave,onClose,saveError,fieldErrors
 }){
   const isT  = formMov.tipoOp==="Transferencia";
@@ -2375,6 +2376,7 @@ function App(){
             cuentas={cuentas} cuentaSaldos={cuentaSaldos}
             tarjetas={tarjetas} tarjetaSaldos={tarjetaSaldos}
             catIng={catIng} catEg={catEg}
+            acreedores={acreedores} deudores={deudores} ingresosExt={ingresosExt}
             onSave={saveMov} onClose={()=>{setShowMov(false);setEditMovId(null);setSaveError("");setFieldErrors(null);}}
             saveError={saveError} fieldErrors={fieldErrors}/>
         )}
