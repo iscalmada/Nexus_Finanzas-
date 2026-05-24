@@ -77,8 +77,8 @@ const PRIO_LBL      = {1:"Alta",2:"Media",3:"Baja"};
 const ORIG_ACREEDOR = ["Sicresa","Familia","Terceros"];
 const ORIG_DEUDOR   = ["Sicresa","Terceros"];
 const ORIG_ING_EXT  = ["Patrimonio","Sicresa"];
-const EST_ING_EXT   = ["Pendiente","Programado","Recuperado"];
-const COLOR_ING_EXT = {Pendiente:"#fbbf24",Programado:"#a78bfa",Recuperado:"#22c55e"};
+const EST_ING_EXT   = ["Pendiente","Programado","Parcial","Recuperado"];
+const COLOR_ING_EXT = {Pendiente:"#fbbf24",Programado:"#a78bfa",Parcial:"#60a5fa",Recuperado:"#22c55e"};
 const OP_COLORS     = {Ingreso:"#22c55e",Egreso:"#f87171",Transferencia:"#a78bfa","Pago Tarjeta":"#60a5fa"};
 const COLOR_EST     = {
   INGRESADO:{bg:"rgba(34,197,94,0.12)",  text:"#22c55e",dot:"#22c55e"},
@@ -868,7 +868,9 @@ function App(){
   const[search,setSearch]=useState("");
   const[filterRetrasados,setFilterRetrasados]=useState(false);
   // filtro categorías - sets de ids seleccionados (null = todas)
-  const[filterCatIng,setFilterCatIng]=useState(null); // null=todas
+  const[filterCatIng,setFilterCatIng]=useState(null);
+  const[filterCuentas,setFilterCuentas]=useState(null); // null=todas, Set=filtradas
+  const[showCuentaFilter,setShowCuentaFilter]=useState(false); // null=todas
   const[filterCatEg,setFilterCatEg]=useState(null);
   const[showCatFilter,setShowCatFilter]=useState(false); // modal selector
 
@@ -980,6 +982,14 @@ function App(){
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
       .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
       .filter(r=>{
+        // Filtro por cuenta
+        if(filterCuentas!==null&&filterCuentas.size>0){
+          if(r.cuentaId&&!filterCuentas.has(r.cuentaId)) return false;
+          if(!r.cuentaId) return false; // si tiene filtro de cuenta, ocultar sin cuenta asignada
+        }
+        return true;
+      })
+      .filter(r=>{
         // Transferencias y Pagos de Tarjeta no tienen categoría — siempre pasan
         if(r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return true;
         // Ingresos
@@ -994,7 +1004,7 @@ function App(){
         }
         return true;
       });
-  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf]);
+  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf,filterCuentas]);
 
   // Totales filtrados — respeta todos los filtros activos, divide Reales y Proyectados
   const filteredTotals=useMemo(()=>{
@@ -1262,9 +1272,20 @@ function App(){
     const vinc=(registro.movIdsVinculados||[]);
     if(vinc.length===0) return "Pendiente";
     const movs_vinc=movs.filter(m=>vinc.includes(m.id));
-    if(movs_vinc.some(m=>m.estatus==="INGRESADO")) return "Recuperado";
+    const totalIngresado=movs_vinc.filter(m=>m.estatus==="INGRESADO").reduce((s,m)=>s+m.monto,0);
+    const montoObj=registro.montoObjetivo||registro.monto||0;
+    if(totalIngresado>=montoObj&&totalIngresado>0) return "Recuperado";
+    if(movs_vinc.some(m=>m.estatus==="INGRESADO")) return "Parcial";
     if(movs_vinc.some(m=>m.estatus==="PROGRAMADO")) return "Programado";
     return "Pendiente";
+  },[]);
+
+  const saldoIngExt = useCallback((registro,movs)=>{
+    const vinc=(registro.movIdsVinculados||[]);
+    const recuperado=movs.filter(m=>vinc.includes(m.id)&&m.estatus==="INGRESADO").reduce((s,m)=>s+m.monto,0);
+    const programado_=movs.filter(m=>vinc.includes(m.id)&&m.estatus==="PROGRAMADO").reduce((s,m)=>s+m.monto,0);
+    const montoObj=registro.montoObjetivo||registro.monto||0;
+    return{recuperado,programado:programado_,pendiente:Math.max(0,montoObj-recuperado)};
   },[]);
 
   const openCarteraForm = useCallback((tipo,item=null)=>{
@@ -1475,6 +1496,9 @@ function App(){
               </button>
               <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>
                 📂 Categoría{hasCatFilterActive?" ✓":""}
+              </button>
+              <button style={S.prioTag(filterCuentas!==null&&filterCuentas.size>0)} onClick={()=>setShowCuentaFilter(true)}>
+                🏦 Cuenta{filterCuentas!==null&&filterCuentas.size>0?` (${filterCuentas.size})":""}
               </button>
               <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
             </div>
@@ -2089,19 +2113,30 @@ function App(){
                   const cEst=COLOR_ING_EXT[x.estado]||"#94a3b8";
                   const estadoCalc=estatusIngExt(x,movs);
                   const cEstCalc=COLOR_ING_EXT[estadoCalc]||"#94a3b8";
+                  const saldos=saldoIngExt(x,movs);
+                  const montoObj=x.montoObjetivo||x.monto||0;
+                  const pctRec=montoObj>0?Math.min(100,(saldos.recuperado/montoObj)*100):0;
                   return(
                     <div key={x.id} style={{...S.card(),borderLeft:`3px solid ${cEstCalc}`,cursor:"pointer",marginBottom:8}} onClick={()=>{setViewCartera({...x,tipo:"ingresosExt"});setCarteraDetalleModo("ejecutados");}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
                           <div style={{fontSize:8,color:cEstCalc,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
                           <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{x.concepto}</div>
                         </div>
                         <div style={{textAlign:"right"}}>
                           <span style={{fontSize:9,padding:"3px 8px",borderRadius:8,background:`${cEstCalc}22`,color:cEstCalc,fontWeight:700}}>{estadoCalc}</span>
-                          <div style={{fontSize:16,fontWeight:800,color:cEstCalc,marginTop:3}}>{fmt(x.monto)}</div>
+                          <div style={{fontSize:16,fontWeight:800,color:"#22c55e",marginTop:3}}>{fmt(montoObj)}</div>
                         </div>
                       </div>
-                      {x.condiciones&&<div style={{fontSize:9,color:"#64748b",fontStyle:"italic"}}>{x.condiciones}</div>}
+                      <div style={{height:4,borderRadius:2,background:"#1e293b",overflow:"hidden",marginBottom:4}}>
+                        <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${pctRec}%`,transition:"width 0.4s"}}/>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
+                        <span>Recuperado: <span style={{color:"#22c55e",fontWeight:700}}>{fmt(saldos.recuperado)}</span></span>
+                        {saldos.programado>0&&<span style={{color:"#a78bfa"}}>Prog: {fmt(saldos.programado)}</span>}
+                        <span>Pendiente: <span style={{color:cEstCalc,fontWeight:700}}>{fmt(saldos.pendiente)}</span></span>
+                      </div>
+                      {x.condiciones&&<div style={{fontSize:9,color:"#64748b",fontStyle:"italic",marginTop:4}}>{x.condiciones}</div>}
                     </div>
                   );
                 })}
@@ -2164,15 +2199,37 @@ function App(){
                     </div>
                   </div>
                 )}
-                {isIngExt&&(<>
-                  <div style={{...S.card(),marginBottom:9,textAlign:"center"}}>
-                    <div style={S.lbl}>Monto estimado</div>
-                    <div style={{fontSize:22,fontWeight:800,color:"#fbbf24"}}>{fmt(viewCartera.monto)}</div>
+                {isIngExt&&(()=>{
+                  const saldos=saldoIngExt(viewCartera,movs);
+                  const montoObj=viewCartera.montoObjetivo||viewCartera.monto||0;
+                  const pctRec=montoObj>0?Math.min(100,(saldos.recuperado/montoObj)*100):0;
+                  return(<>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:9}}>
+                    <div style={{background:"rgba(251,191,36,0.1)",border:"1px solid #fbbf2433",borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
+                      <div style={{fontSize:8,color:"#fbbf24",fontWeight:700,marginBottom:3}}>A Recuperar</div>
+                      <div style={{fontSize:11,fontWeight:800,color:"#fbbf24"}}>{fmt(montoObj)}</div>
+                    </div>
+                    <div style={{background:carteraDetalleModo==="programados"?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.08)",border:`1px solid ${carteraDetalleModo==="programados"?"#a78bfa":"#a78bfa33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
+                      onClick={()=>setCarteraDetalleModo(carteraDetalleModo==="programados"?"ejecutados":"programados")}>
+                      <div style={{fontSize:8,color:"#a78bfa",fontWeight:700,marginBottom:3}}>Programado {carteraDetalleModo==="programados"?"▲":"▼"}</div>
+                      <div style={{fontSize:11,fontWeight:800,color:"#a78bfa"}}>{fmt(saldos.programado)}</div>
+                    </div>
+                    <div style={{background:carteraDetalleModo==="ejecutados"?"rgba(34,197,94,0.18)":"rgba(34,197,94,0.08)",border:`1px solid #22c55e${carteraDetalleModo==="ejecutados"?"66":"33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
+                      onClick={()=>setCarteraDetalleModo("ejecutados")}>
+                      <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:3}}>Recuperado {carteraDetalleModo==="ejecutados"?"▲":""}</div>
+                      <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(saldos.recuperado)}</div>
+                    </div>
                   </div>
+                  <div style={{height:5,borderRadius:3,background:"#1e293b",overflow:"hidden",marginBottom:9}}>
+                    <div style={{height:"100%",borderRadius:3,background:"#22c55e",width:`${pctRec}%`,transition:"width 0.4s"}}/>
+                  </div>
+                  </>);
+                })()}
+                {isIngExt&&(<>
                   {(()=>{const est=estatusIngExt(viewCartera,movs);return est!=="Recuperado"&&(
                     <div style={{...S.infoBx("#22c55e"),marginBottom:11}}>
                       <span>💡</span>
-                      <span>{est==="Pendiente"?"Da de alta un movimiento de Ingreso y vincúlalo aquí para registrar la recuperación.":"Hay un movimiento vinculado programado. Cuando se ejecute, el estatus pasará a Recuperado automáticamente."}</span>
+                      <span>{est==="Pendiente"?"Da de alta un movimiento de Ingreso y vincúlalo aquí para registrar la recuperación parcial o total.":est==="Parcial"?"Recuperación parcial registrada. Vincula más movimientos para continuar.":"Hay un movimiento programado. Al ejecutarse se actualizará automáticamente."}</span>
                     </div>
                   );})()}
                 </>)}
@@ -2241,20 +2298,22 @@ function App(){
                 {/* Movimientos vinculados de Ingresos Extraordinarios */}
                 {isIngExt&&(<>
                   <div style={{...S.sTit,marginBottom:7}}>MOVIMIENTOS VINCULADOS</div>
-                  {movVinc.length===0&&<div style={{fontSize:10,color:"#334155",textAlign:"center",padding:"10px 0",marginBottom:9}}>Sin movimientos vinculados</div>}
-                  {movVinc.map(m=>{
-                    const cMov=COLOR_ING_EXT[m.estatus==="INGRESADO"?"Recuperado":m.estatus==="PROGRAMADO"?"Programado":"Pendiente"]||"#94a3b8";
-                    return(
-                      <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #1e293b"}}>
-                        <div>
-                          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}><span style={S.badge(m.estatus)}>{m.estatus}</span></div>
-                          <div style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{m.concepto}</div>
-                          <div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)}</div>
-                        </div>
-                        <span style={{fontSize:14,fontWeight:800,color:"#22c55e"}}>{fmt(m.monto)}</span>
+                  {movVinc.length===0&&(
+                    <div style={{...S.infoBx("#475569"),marginBottom:9}}><span>💡</span><span>Registra un movimiento de Ingreso y vincúlalo aquí para registrar recuperaciones parciales o totales.</span></div>
+                  )}
+                  {(carteraDetalleModo==="ejecutados"?movVinc.filter(m=>m.estatus==="INGRESADO"):movVinc.filter(m=>m.estatus==="PROGRAMADO")).map(m=>(
+                    <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #1e293b"}}>
+                      <div>
+                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}><span style={S.badge(m.estatus)}>{m.estatus}</span></div>
+                        <div style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{m.concepto}</div>
+                        <div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)}</div>
                       </div>
-                    );
-                  })}
+                      <span style={{fontSize:14,fontWeight:800,color:"#22c55e"}}>{fmt(m.monto)}</span>
+                    </div>
+                  ))}
+                  {(carteraDetalleModo==="ejecutados"?movVinc.filter(m=>m.estatus==="INGRESADO"):movVinc.filter(m=>m.estatus==="PROGRAMADO")).length===0&&movVinc.length>0&&(
+                    <div style={{fontSize:10,color:"#334155",textAlign:"center",padding:"10px 0"}}>{carteraDetalleModo==="programados"?"Sin recuperaciones programadas":"Sin recuperaciones ejecutadas aún"}</div>
+                  )}
                   <div style={{marginTop:9}}/>
                 </>)}
 
@@ -2288,8 +2347,8 @@ function App(){
                 </div>
                 {!isIngExt&&<div style={S.fg}><label style={S.fl}>Nombre</label><input style={S.inp} value={formCartera.nombre||""} onChange={e=>set("nombre",e.target.value)} placeholder="Persona o empresa…"/></div>}
                 <div style={S.fg}><label style={S.fl}>Concepto</label><input style={S.inp} value={formCartera.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Descripción de la deuda…"/></div>
-                <div style={S.fg}><label style={S.fl}>{isIngExt?"Monto estimado $":"Saldo actual de la deuda $"}</label>
-                  <input style={S.inp} type="number" value={formCartera.montoActual||formCartera.monto||""} onChange={e=>set(isIngExt?"monto":"montoActual",e.target.value)} placeholder="0.00"/>
+                <div style={S.fg}><label style={S.fl}>{isIngExt?"Monto a recuperar $":"Saldo actual de la deuda $"}</label>
+                  <input style={S.inp} type="number" value={formCartera.montoActual||formCartera.monto||formCartera.montoObjetivo||""} onChange={e=>set(isIngExt?"montoObjetivo":"montoActual",e.target.value)} placeholder="0.00"/>
                 </div>
                 {isAcr&&(
                   <div style={S.fg}>
@@ -2526,6 +2585,40 @@ function App(){
         )}
 
         {/* Modal filtro categoría */}
+        {showCuentaFilter&&(
+          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowCuentaFilter(false);}}>
+            <div style={S.mBox}>
+              <div style={S.mTit}>🏦 FILTRAR POR CUENTA</div>
+              <div style={{marginBottom:11}}>
+                {cuentas.filter(c=>!c.esReferencia).map(c=>{
+                  const sel=filterCuentas===null||filterCuentas.has(c.id);
+                  return(
+                    <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #1e293b",cursor:"pointer"}}
+                      onClick={()=>setFilterCuentas(prev=>{
+                        if(prev===null){
+                          const n=new Set(cuentas.filter(x=>!x.esReferencia).map(x=>x.id));
+                          n.delete(c.id); return n;
+                        }
+                        const n=new Set(prev);
+                        n.has(c.id)?n.delete(c.id):n.add(c.id);
+                        return n;
+                      })}>
+                      <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel?c.color:"#334155"}`,background:sel?c.color:"transparent",flexShrink:0}}/>
+                      <div style={{display:"flex",alignItems:"center",gap:7,flex:1}}>
+                        <div style={{width:8,height:8,borderRadius:4,background:c.color}}/>
+                        <span style={{fontSize:13,fontWeight:700}}>{c.nombre}</span>
+                      </div>
+                      <span style={{fontSize:12,fontWeight:700,color:cuentaSaldos[c.id]>=0?c.color:"#f87171"}}>{fmt(cuentaSaldos[c.id])}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button style={S.saveB} onClick={()=>{setFilterCuentas(null);setShowCuentaFilter(false);}}>Ver todas</button>
+              <button style={S.cancB} onClick={()=>setShowCuentaFilter(false)}>Cerrar</button>
+            </div>
+          </div>
+        )}
+
         {showCatFilter&&(
           <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowCatFilter(false);}}>
             <div style={S.mBox}>
