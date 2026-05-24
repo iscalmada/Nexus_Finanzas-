@@ -892,7 +892,7 @@ function App(){
   const[viewCartera,setViewCartera]=useState(null); // detalle abierto
   const[showAbonoForm,setShowAbonoForm]=useState(false);
   const[abonoTarget,setAbonoTarget]=useState(null); // {tipo,id}
-  const[formAbono,setFormAbono]=useState({fecha:'',monto:'',concepto:''});
+  const[formAbono,setFormAbono]=useState({fecha:'',monto:'',concepto:'',tipoAbono:''});
 
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[jsonImportError,setJsonImportError]=useState("");
@@ -1150,20 +1150,25 @@ function App(){
     }
 
     setFieldErrors(null);setSaveError("");
+
+    // Calcular ID antes de guardar para usarlo en vinculación
+    const newId = editMovId!==null ? editMovId : nextId(movs);
+    const newOrd = editMovId!==null ? (movs.find(r=>r.id===editMovId)?.orden||nextOrd()) : nextOrd();
+
     if(editMovId!==null){
       const orig=movs.find(r=>r.id===editMovId);
       if(orig?.serieId){setSerieConfirm({action:"edit",id:editMovId,serieId:orig.serieId,payload:data});setShowMov(false);return;}
       setMovs(p=>p.map(r=>r.id===editMovId?{...r,...data}:r));
     } else if(recForm.activo){
-      const fechas=generarFechas(recForm);const sid="s"+Date.now();let bid=nextId(movs),bord=nextOrd();
+      const fechas=generarFechas(recForm);const sid="s"+Date.now();let bid=newId,bord=newOrd;
       setMovs(p=>[...p,...fechas.map((f,i)=>({...data,id:bid+i,orden:bord+i,fecha:f,serieId:sid}))]);
     } else {
-      setMovs(p=>[...p,{...data,id:nextId(movs),orden:nextOrd()}]);
+      setMovs(p=>[...p,{...data,id:newId,orden:newOrd}]);
     }
-    // Vincular a cartera si se seleccionó
-    const movGuardado={...data,id:editMovId!==null?editMovId:nextId(movs),orden:editMovId!==null?(movs.find(r=>r.id===editMovId)?.orden||nextOrd()):nextOrd()};
+
+    // Vincular a cartera usando el ID calculado previamente
     if(data.vinculoTipo&&data.vinculoId){
-      const vinculaEn=(setter)=>setter(p=>p.map(x=>x.id===data.vinculoId&&!(x.movIdsVinculados||[]).includes(movGuardado.id)?{...x,movIdsVinculados:[...(x.movIdsVinculados||[]),movGuardado.id]}:x));
+      const vinculaEn=(setter)=>setter(p=>p.map(x=>x.id===data.vinculoId&&!(x.movIdsVinculados||[]).includes(newId)?{...x,movIdsVinculados:[...(x.movIdsVinculados||[]),newId]}:x));
       if(data.vinculoTipo==="acreedores") vinculaEn(setAcreedores);
       else if(data.vinculoTipo==="deudores") vinculaEn(setDeudores);
       else if(data.vinculoTipo==="ingresosExt") vinculaEn(setIngresosExt);
@@ -1221,7 +1226,8 @@ function App(){
   },[]);
 
   const saldoPendiente = useCallback((registro,movs)=>{
-    const abonosDirectos=(registro.abonos||[]).reduce((s,a)=>s+a.monto,0);
+    // Solo abonos a capital reducen el saldo de la deuda
+    const abonosDirectos=(registro.abonos||[]).filter(a=>!a.tipoAbono||a.tipoAbono==="capital").reduce((s,a)=>s+a.monto,0);
     const abonosMov=abonado(registro,movs);
     return (registro.montoActual||0)-(abonosDirectos+abonosMov);
   },[abonado]);
@@ -1264,7 +1270,7 @@ function App(){
 
   const saveAbono = useCallback(()=>{
     if(!abonoTarget||!formAbono.monto) return;
-    const abono={id:Date.now(),fecha:formAbono.fecha||todayStr(),monto:parseFloat(formAbono.monto)||0,concepto:formAbono.concepto||""};
+    const abono={id:Date.now(),fecha:formAbono.fecha||todayStr(),monto:parseFloat(formAbono.monto)||0,concepto:formAbono.concepto||"",tipoAbono:formAbono.tipoAbono||"capital"};
     const updater = p=>p.map(x=>x.id===abonoTarget.id?{...x,abonos:[...(x.abonos||[]),abono]}:x);
     if(abonoTarget.tipo==="acreedores") setAcreedores(updater);
     else setDeudores(updater);
@@ -2092,6 +2098,13 @@ function App(){
                   {!isIngExt&&<div style={{fontSize:16,fontWeight:800,color:"#e2e8f0",marginBottom:2}}>{viewCartera.nombre}</div>}
                   <div style={{fontSize:isIngExt?15:12,fontWeight:isIngExt?800:400,color:isIngExt?"#e2e8f0":"#94a3b8",marginBottom:isIngExt?4:0}}>{viewCartera.concepto}</div>
                   {isIngExt&&<span style={{fontSize:10,padding:"3px 9px",borderRadius:8,background:`${COLOR_ING_EXT[viewCartera.estado]||"#94a3b8"}22`,color:COLOR_ING_EXT[viewCartera.estado]||"#94a3b8",fontWeight:700}}>{viewCartera.estado}</span>}
+                  {isAcr&&viewCartera.condicionPago&&(
+                    <div style={{marginTop:5}}>
+                      <span style={{fontSize:9,padding:"2px 8px",borderRadius:6,fontWeight:700,background:viewCartera.condicionPago==="con_interes"?"rgba(248,113,113,0.15)":"rgba(96,165,250,0.15)",color:viewCartera.condicionPago==="con_interes"?"#f87171":"#60a5fa"}}>
+                        {viewCartera.condicionPago==="con_interes"?"💸 Paga interés":"❄ Deuda congelada"}
+                      </span>
+                    </div>
+                  )}
                   {viewCartera.condiciones&&<div style={{fontSize:10,color:"#64748b",fontStyle:"italic",marginTop:6,borderTop:"1px solid #1e293b",paddingTop:6}}>{viewCartera.condiciones}</div>}
                 </div>
 
@@ -2112,15 +2125,45 @@ function App(){
                 {!isIngExt&&(<>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
                     <div style={{...S.sTit,margin:0}}>ABONOS DIRECTOS</div>
-                    <button style={S.smBtn(colorTipo)} onClick={()=>{setAbonoTarget({tipo,id:viewCartera.id});setFormAbono({fecha:todayStr(),monto:'',concepto:''});setShowAbonoForm(true);}}>+ Abono</button>
+                    <button style={S.smBtn(colorTipo)} onClick={()=>{setAbonoTarget({tipo,id:viewCartera.id});setFormAbono({fecha:todayStr(),monto:'',concepto:'',tipoAbono:''});setShowAbonoForm(true);}}>+ Abono</button>
                   </div>
                   {abonosDir.length===0&&<div style={{fontSize:10,color:"#334155",marginBottom:9,textAlign:"center"}}>Sin abonos registrados</div>}
-                  {abonosDir.map(a=>(
-                    <div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1e293b"}}>
-                      <div><div style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{fmt(a.monto)}</div><div style={{fontSize:9,color:"#64748b"}}>{fmtDate(a.fecha)}{a.concepto?` · ${a.concepto}`:""}</div></div>
-                      <button style={S.acBtn("#f87171")} onClick={()=>delAbono(tipo,viewCartera.id,a.id)}>✕</button>
-                    </div>
-                  ))}
+                  {(()=>{
+                    const tieneInteres=viewCartera.condicionPago==="con_interes";
+                    const capital=abonosDir.filter(a=>!a.tipoAbono||a.tipoAbono==="capital");
+                    const interes=abonosDir.filter(a=>a.tipoAbono==="interes");
+                    const totalCap=capital.reduce((s,a)=>s+a.monto,0);
+                    const totalInt=interes.reduce((s,a)=>s+a.monto,0);
+                    return(<>
+                      {tieneInteres&&abonosDir.length>0&&(
+                        <div style={{display:"flex",gap:7,marginBottom:9}}>
+                          <div style={{flex:1,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:8,padding:"6px 10px",textAlign:"center"}}>
+                            <div style={{fontSize:8,color:"#22c55e",fontWeight:700}}>CAPITAL</div>
+                            <div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(totalCap)}</div>
+                          </div>
+                          <div style={{flex:1,background:"rgba(248,113,113,0.1)",border:"1px solid #f8717133",borderRadius:8,padding:"6px 10px",textAlign:"center"}}>
+                            <div style={{fontSize:8,color:"#f87171",fontWeight:700}}>INTERÉS</div>
+                            <div style={{fontSize:12,fontWeight:800,color:"#f87171"}}>{fmt(totalInt)}</div>
+                          </div>
+                        </div>
+                      )}
+                      {abonosDir.map(a=>{
+                        const esInt=a.tipoAbono==="interes";
+                        return(
+                          <div key={a.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1e293b"}}>
+                            <div>
+                              <div style={{display:"flex",alignItems:"center",gap:5}}>
+                                {tieneInteres&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:4,background:esInt?"rgba(248,113,113,0.15)":"rgba(34,197,94,0.15)",color:esInt?"#f87171":"#22c55e",fontWeight:700}}>{esInt?"INT":"CAP"}</span>}
+                                <span style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{fmt(a.monto)}</span>
+                              </div>
+                              <div style={{fontSize:9,color:"#64748b"}}>{fmtDate(a.fecha)}{a.concepto?` · ${a.concepto}`:""}</div>
+                            </div>
+                            <button style={S.acBtn("#f87171")} onClick={()=>delAbono(tipo,viewCartera.id,a.id)}>✕</button>
+                          </div>
+                        );
+                      })}
+                    </>);
+                  })()}
                   <div style={{marginTop:9}}/>
                 </>)}
 
@@ -2169,6 +2212,20 @@ function App(){
                 <div style={S.fg}><label style={S.fl}>{isIngExt?"Monto estimado $":"Saldo actual de la deuda $"}</label>
                   <input style={S.inp} type="number" value={formCartera.montoActual||formCartera.monto||""} onChange={e=>set(isIngExt?"monto":"montoActual",e.target.value)} placeholder="0.00"/>
                 </div>
+                {isAcr&&(
+                  <div style={S.fg}>
+                    <label style={S.fl}>Condición de la deuda</label>
+                    <div style={{display:"flex",gap:7,marginBottom:4}}>
+                      <button style={{...S.prioB2(formCartera.condicionPago==="congelada","#60a5fa"),flex:1,padding:"8px 0",fontSize:10}}
+                        onClick={()=>set("condicionPago","congelada")}>❄ Congelada</button>
+                      <button style={{...S.prioB2(formCartera.condicionPago==="con_interes","#f87171"),flex:1,padding:"8px 0",fontSize:10}}
+                        onClick={()=>set("condicionPago","con_interes")}>💸 Paga interés</button>
+                    </div>
+                    {formCartera.condicionPago==="con_interes"&&(
+                      <div style={{...S.infoBx("#fbbf24")}}><span>ℹ</span><span>Al registrar abonos se preguntará si es pago a capital o a interés.</span></div>
+                    )}
+                  </div>
+                )}
                 {isIngExt&&(
                   <div style={S.fg}><label style={S.fl}>Estado</label>
                     <div style={{display:"flex",gap:6}}>
@@ -2187,18 +2244,38 @@ function App(){
         })()}
 
         {/* ── MODAL ABONO ── */}
-        {showAbonoForm&&(
-          <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowAbonoForm(false);}}>
-            <div style={S.mBox}>
-              <div style={S.mTit}>+ REGISTRAR ABONO</div>
-              <div style={S.fg}><label style={S.fl}>Fecha</label><input style={S.inp} type="date" value={formAbono.fecha} onChange={e=>setFormAbono(f=>({...f,fecha:e.target.value}))}/></div>
-              <div style={S.fg}><label style={S.fl}>Monto $</label><input style={S.inp} type="number" value={formAbono.monto} onChange={e=>setFormAbono(f=>({...f,monto:e.target.value}))} placeholder="0.00"/></div>
-              <div style={S.fg}><label style={S.fl}>Concepto (opcional)</label><input style={S.inp} value={formAbono.concepto} onChange={e=>setFormAbono(f=>({...f,concepto:e.target.value}))} placeholder="Referencia del pago…"/></div>
-              <button style={S.saveB} onClick={saveAbono}>GUARDAR ABONO</button>
-              <button style={S.cancB} onClick={()=>setShowAbonoForm(false)}>Cancelar</button>
+        {showAbonoForm&&(()=>{
+          // Detectar si el acreedor objetivo tiene condición con_interes
+          const regObj=abonoTarget?.tipo==="acreedores"?acreedores.find(x=>x.id===abonoTarget?.id):null;
+          const conInteres=regObj?.condicionPago==="con_interes";
+          return(
+            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowAbonoForm(false);}}>
+              <div style={S.mBox}>
+                <div style={S.mTit}>+ REGISTRAR ABONO</div>
+                {conInteres&&(
+                  <div style={S.fg}>
+                    <label style={S.fl}>Tipo de abono</label>
+                    <div style={{display:"flex",gap:7,marginBottom:7}}>
+                      <button style={{...S.prioB2(formAbono.tipoAbono==="capital","#22c55e"),flex:1,padding:"9px 0",fontSize:11}}
+                        onClick={()=>setFormAbono(f=>({...f,tipoAbono:"capital"}))}>💰 Capital</button>
+                      <button style={{...S.prioB2(formAbono.tipoAbono==="interes","#f87171"),flex:1,padding:"9px 0",fontSize:11}}
+                        onClick={()=>setFormAbono(f=>({...f,tipoAbono:"interes"}))}>💸 Interés</button>
+                    </div>
+                    {!formAbono.tipoAbono&&<div style={{fontSize:9,color:"#f87171",marginBottom:7}}>⚠ Selecciona el tipo de abono</div>}
+                  </div>
+                )}
+                <div style={S.fg}><label style={S.fl}>Fecha</label><input style={S.inp} type="date" value={formAbono.fecha} onChange={e=>setFormAbono(f=>({...f,fecha:e.target.value}))}/></div>
+                <div style={S.fg}><label style={S.fl}>Monto $</label><input style={S.inp} type="number" value={formAbono.monto} onChange={e=>setFormAbono(f=>({...f,monto:e.target.value}))} placeholder="0.00"/></div>
+                <div style={S.fg}><label style={S.fl}>Concepto (opcional)</label><input style={S.inp} value={formAbono.concepto||""} onChange={e=>setFormAbono(f=>({...f,concepto:e.target.value}))} placeholder="Referencia del pago…"/></div>
+                <button style={S.saveB} onClick={()=>{
+                  if(conInteres&&!formAbono.tipoAbono) return;
+                  saveAbono();
+                }}>GUARDAR ABONO</button>
+                <button style={S.cancB} onClick={()=>setShowAbonoForm(false)}>Cancelar</button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── CUENTAS ── */}
         {view==="cuentas"&&(
