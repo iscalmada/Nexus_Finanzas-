@@ -587,22 +587,19 @@ const ModalMov=memo(function ModalMov({
               <div style={{fontSize:9,color:"#475569",marginTop:3}}>
                 {formMov.tipoOp==="Egreso"?"Vincula este pago a un acreedor para registrar el abono.":"Vincula este ingreso a un deudor o ingreso extraordinario para registrar el cobro."}
               </div>
-              {/* Si el acreedor vinculado paga interés, preguntar tipo de abono */}
-              {formMov.tipoOp==="Egreso"&&formMov.vinculoTipo==="acreedores"&&(()=>{
-                const acr=acreedores.find(x=>x.id===formMov.vinculoId);
-                if(!acr||acr.condicionPago!=="con_interes") return null;
-                return(
-                  <div style={{marginTop:9}}>
-                    <label style={S.fl}>Tipo de abono</label>
-                    <div style={{display:"flex",gap:7}}>
-                      <button style={{...S.prioB2(formMov.tipoAbono==="capital","#22c55e"),flex:1,padding:"8px 0",fontSize:10}}
-                        onClick={()=>set("tipoAbono","capital")}>💰 Capital</button>
-                      <button style={{...S.prioB2(formMov.tipoAbono==="interes","#f87171"),flex:1,padding:"8px 0",fontSize:10}}
-                        onClick={()=>set("tipoAbono","interes")}>💸 Interés</button>
-                    </div>
+              {/* Siempre preguntar capital/interés al vincular a acreedor */}
+              {formMov.tipoOp==="Egreso"&&formMov.vinculoTipo==="acreedores"&&formMov.vinculoId&&(
+                <div style={{marginTop:9}}>
+                  <label style={S.fl}>¿Este pago es a capital o interés?</label>
+                  <div style={{display:"flex",gap:7}}>
+                    <button style={{...S.prioB2(formMov.tipoAbono==="capital","#22c55e"),flex:1,padding:"8px 0",fontSize:10}}
+                      onClick={()=>set("tipoAbono","capital")}>💰 Capital</button>
+                    <button style={{...S.prioB2(formMov.tipoAbono==="interes","#f87171"),flex:1,padding:"8px 0",fontSize:10}}
+                      onClick={()=>set("tipoAbono","interes")}>💸 Interés</button>
                   </div>
-                );
-              })()}
+                  {!formMov.tipoAbono&&<div style={{fontSize:9,color:"#fbbf24",marginTop:3}}>⚠ Selecciona el tipo para registrar correctamente</div>}
+                </div>
+              )}
             </div>
           )}
           {!editMovId&&(
@@ -920,6 +917,7 @@ function App(){
   const[formCartera,setFormCartera]=useState({});
   const[viewCartera,setViewCartera]=useState(null); // detalle abierto
   const[showAbonoForm,setShowAbonoForm]=useState(false);
+  const[carteraDetalleModo,setCarteraDetalleModo]=useState("ejecutados"); // "ejecutados"|"programados" 
   const[abonoTarget,setAbonoTarget]=useState(null); // {tipo,id}
   const[formAbono,setFormAbono]=useState({fecha:'',monto:'',concepto:'',tipoAbono:''});
 
@@ -1255,10 +1253,18 @@ function App(){
   },[]);
 
   const saldoPendiente = useCallback((registro,movs)=>{
-    // Solo movimientos PAGADOS/INGRESADOS vinculados reducen el saldo
-    // Los de tipo interés no reducen capital
     const abonosMov=movs.filter(m=>(registro.movIdsVinculados||[]).includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus)&&m.tipoAbono!=="interes").reduce((s,m)=>s+m.monto,0);
     return (registro.montoActual||0)-abonosMov;
+  },[]);
+
+  // Estatus derivado para Ingresos Extraordinarios
+  const estatusIngExt = useCallback((registro,movs)=>{
+    const vinc=(registro.movIdsVinculados||[]);
+    if(vinc.length===0) return "Pendiente";
+    const movs_vinc=movs.filter(m=>vinc.includes(m.id));
+    if(movs_vinc.some(m=>m.estatus==="INGRESADO")) return "Recuperado";
+    if(movs_vinc.some(m=>m.estatus==="PROGRAMADO")) return "Programado";
+    return "Pendiente";
   },[]);
 
   const openCarteraForm = useCallback((tipo,item=null)=>{
@@ -2000,7 +2006,7 @@ function App(){
                   const prog=programado(x,movs);
                   const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
                   return(
-                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #f87171",cursor:"pointer",marginBottom:8}} onClick={()=>setViewCartera({...x,tipo:"acreedores"})}>
+                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #f87171",cursor:"pointer",marginBottom:8}} onClick={()=>{setViewCartera({...x,tipo:"acreedores"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
                           <div style={{fontSize:8,color:"#f87171",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
@@ -2042,7 +2048,7 @@ function App(){
                   const prog=programado(x,movs);
                   const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
                   return(
-                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #22c55e",cursor:"pointer",marginBottom:8}} onClick={()=>setViewCartera({...x,tipo:"deudores"})}>
+                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #22c55e",cursor:"pointer",marginBottom:8}} onClick={()=>{setViewCartera({...x,tipo:"deudores"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
                           <div style={{fontSize:8,color:"#22c55e",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
@@ -2076,21 +2082,23 @@ function App(){
                 <div style={{...S.card("rgba(251,191,36,0.15)"),marginBottom:11}}>
                   <div style={S.lbl}>Potencial por recuperar</div>
                   <div style={{fontSize:22,fontWeight:800,color:"#fbbf24"}}>{fmt(totalPend)}</div>
-                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{ingresosExt.filter(x=>x.estado!=="Recuperado").length} activos</div>
+                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{ingresosExt.filter(x=>estatusIngExt(x,movs)!=="Recuperado").length} activos</div>
                 </div>
                 {ingresosExt.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin ingresos extraordinarios registrados</div>}
                 {ingresosExt.map(x=>{
                   const cEst=COLOR_ING_EXT[x.estado]||"#94a3b8";
+                  const estadoCalc=estatusIngExt(x,movs);
+                  const cEstCalc=COLOR_ING_EXT[estadoCalc]||"#94a3b8";
                   return(
-                    <div key={x.id} style={{...S.card(),borderLeft:`3px solid ${cEst}`,cursor:"pointer",marginBottom:8}} onClick={()=>setViewCartera({...x,tipo:"ingresosExt"})}>
+                    <div key={x.id} style={{...S.card(),borderLeft:`3px solid ${cEstCalc}`,cursor:"pointer",marginBottom:8}} onClick={()=>{setViewCartera({...x,tipo:"ingresosExt"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
                         <div style={{flex:1}}>
-                          <div style={{fontSize:8,color:cEst,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
+                          <div style={{fontSize:8,color:cEstCalc,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
                           <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{x.concepto}</div>
                         </div>
                         <div style={{textAlign:"right"}}>
-                          <span style={{fontSize:9,padding:"3px 8px",borderRadius:8,background:`${cEst}22`,color:cEst,fontWeight:700}}>{x.estado}</span>
-                          <div style={{fontSize:16,fontWeight:800,color:cEst,marginTop:3}}>{fmt(x.monto)}</div>
+                          <span style={{fontSize:9,padding:"3px 8px",borderRadius:8,background:`${cEstCalc}22`,color:cEstCalc,fontWeight:700}}>{estadoCalc}</span>
+                          <div style={{fontSize:16,fontWeight:800,color:cEstCalc,marginTop:3}}>{fmt(x.monto)}</div>
                         </div>
                       </div>
                       {x.condiciones&&<div style={{fontSize:9,color:"#64748b",fontStyle:"italic"}}>{x.condiciones}</div>}
@@ -2126,7 +2134,7 @@ function App(){
                   <div style={{fontSize:8,color:colorTipo,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>{viewCartera.origen}</div>
                   {!isIngExt&&<div style={{fontSize:16,fontWeight:800,color:"#e2e8f0",marginBottom:2}}>{viewCartera.nombre}</div>}
                   <div style={{fontSize:isIngExt?15:12,fontWeight:isIngExt?800:400,color:isIngExt?"#e2e8f0":"#94a3b8",marginBottom:isIngExt?4:0}}>{viewCartera.concepto}</div>
-                  {isIngExt&&<span style={{fontSize:10,padding:"3px 9px",borderRadius:8,background:`${COLOR_ING_EXT[viewCartera.estado]||"#94a3b8"}22`,color:COLOR_ING_EXT[viewCartera.estado]||"#94a3b8",fontWeight:700}}>{viewCartera.estado}</span>}
+                  {isIngExt&&(()=>{const est=estatusIngExt(viewCartera,movs);const c=COLOR_ING_EXT[est]||"#94a3b8";return <span style={{fontSize:10,padding:"3px 9px",borderRadius:8,background:`${c}22`,color:c,fontWeight:700}}>{est}</span>;})()} 
                   {isAcr&&viewCartera.condicionPago&&(
                     <div style={{marginTop:5}}>
                       <span style={{fontSize:9,padding:"2px 8px",borderRadius:6,fontWeight:700,background:viewCartera.condicionPago==="con_interes"?"rgba(248,113,113,0.15)":"rgba(96,165,250,0.15)",color:viewCartera.condicionPago==="con_interes"?"#f87171":"#60a5fa"}}>
@@ -2140,12 +2148,20 @@ function App(){
                 {/* Montos */}
                 {!isIngExt&&(
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
-                    {[["Deuda Actual",fmt(viewCartera.montoActual),colorTipo],["Programado",fmt(prog),"#a78bfa"],["Saldo Pend.",fmt(sp),sp>0?colorTipo:"#22c55e"]].map(([l,v,c])=>(
-                      <div key={l} style={{background:`${c}11`,border:`1px solid ${c}33`,borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
-                        <div style={{fontSize:8,color:c,fontWeight:700,marginBottom:3}}>{l}</div>
-                        <div style={{fontSize:11,fontWeight:800,color:c}}>{v}</div>
-                      </div>
-                    ))}
+                    <div style={{background:`${colorTipo}11`,border:`1px solid ${colorTipo}33`,borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
+                      <div style={{fontSize:8,color:colorTipo,fontWeight:700,marginBottom:3}}>Deuda Actual</div>
+                      <div style={{fontSize:11,fontWeight:800,color:colorTipo}}>{fmt(viewCartera.montoActual)}</div>
+                    </div>
+                    <div style={{background:carteraDetalleModo==="programados"?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.08)",border:`1px solid ${carteraDetalleModo==="programados"?"#a78bfa":"#a78bfa33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
+                      onClick={()=>setCarteraDetalleModo(carteraDetalleModo==="programados"?"ejecutados":"programados")}>
+                      <div style={{fontSize:8,color:"#a78bfa",fontWeight:700,marginBottom:3}}>Programado {carteraDetalleModo==="programados"?"▲":"▼"}</div>
+                      <div style={{fontSize:11,fontWeight:800,color:"#a78bfa"}}>{fmt(prog)}</div>
+                    </div>
+                    <div style={{background:carteraDetalleModo==="ejecutados"?`${sp>0?colorTipo:"#22c55e"}22`:`${sp>0?colorTipo:"#22c55e"}08`,border:`1px solid ${sp>0?colorTipo:"#22c55e"}${carteraDetalleModo==="ejecutados"?"66":"33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
+                      onClick={()=>setCarteraDetalleModo("ejecutados")}>
+                      <div style={{fontSize:8,color:sp>0?colorTipo:"#22c55e",fontWeight:700,marginBottom:3}}>Saldo Pend. {carteraDetalleModo==="ejecutados"?"▲":""}</div>
+                      <div style={{fontSize:11,fontWeight:800,color:sp>0?colorTipo:"#22c55e"}}>{fmt(sp)}</div>
+                    </div>
                   </div>
                 )}
                 {isIngExt&&(<>
@@ -2153,12 +2169,12 @@ function App(){
                     <div style={S.lbl}>Monto estimado</div>
                     <div style={{fontSize:22,fontWeight:800,color:"#fbbf24"}}>{fmt(viewCartera.monto)}</div>
                   </div>
-                  {viewCartera.estado!=="Recuperado"&&(
+                  {(()=>{const est=estatusIngExt(viewCartera,movs);return est!=="Recuperado"&&(
                     <div style={{...S.infoBx("#22c55e"),marginBottom:11}}>
                       <span>💡</span>
-                      <span>Cuando se concrete este ingreso, da de alta un movimiento de <strong>Ingreso</strong> y vincúlalo aquí. Luego cambia el estado a <strong>Recuperado</strong>.</span>
+                      <span>{est==="Pendiente"?"Da de alta un movimiento de Ingreso y vincúlalo aquí para registrar la recuperación.":"Hay un movimiento vinculado programado. Cuando se ejecute, el estatus pasará a Recuperado automáticamente."}</span>
                     </div>
-                  )}
+                  );})()}
                 </>)}
 
                 {/* Movimientos vinculados como abonos */}
@@ -2192,25 +2208,30 @@ function App(){
                         <span>Registra un movimiento de {isAcr?"Egreso":"Ingreso"} y vincúlalo a este {isAcr?"acreedor":"deudor"} para registrar abonos.</span>
                       </div>
                     )}
-                    {movEjec.map(m=>{
+                    {/* Lista según modo seleccionado */}
+                    {(carteraDetalleModo==="ejecutados"?movEjec:movProg).map(m=>{
                       const esInt=m.tipoAbono==="interes";
                       return(
-                        <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1e293b"}}>
-                          <div>
-                            <div style={{display:"flex",alignItems:"center",gap:5}}>
-                              {tieneInteres&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:4,background:esInt?"rgba(248,113,113,0.15)":"rgba(34,197,94,0.15)",color:esInt?"#f87171":"#22c55e",fontWeight:700}}>{esInt?"INT":"CAP"}</span>}
-                              <span style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{fmt(m.monto)}</span>
+                        <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1e293b"}}>
+                          <div style={{flex:1}}>
+                            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
+                              <span style={{fontSize:9,padding:"2px 7px",borderRadius:5,fontWeight:800,
+                                background:esInt?"rgba(248,113,113,0.18)":"rgba(34,197,94,0.18)",
+                                color:esInt?"#f87171":"#22c55e"}}>
+                                {esInt?"💸 INTERÉS":"💰 CAPITAL"}
+                              </span>
                               <span style={S.badge(m.estatus)}>{m.estatus}</span>
                             </div>
-                            <div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)} · {m.concepto}</div>
+                            <div style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{m.concepto}</div>
+                            <div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)}</div>
                           </div>
+                          <span style={{fontSize:13,fontWeight:800,color:esInt?"#f87171":"#22c55e",marginLeft:8}}>{fmt(m.monto)}</span>
                         </div>
                       );
                     })}
-                    {movProg.length>0&&(
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderTop:"1px solid #1e293b",marginTop:4}}>
-                        <span style={{fontSize:9,color:"#a78bfa"}}>Programado pendiente</span>
-                        <span style={{fontSize:11,fontWeight:700,color:"#a78bfa"}}>{fmt(totalProg)}</span>
+                    {(carteraDetalleModo==="ejecutados"?movEjec:movProg).length===0&&movVinc.length>0&&(
+                      <div style={{fontSize:10,color:"#334155",textAlign:"center",padding:"12px 0"}}>
+                        {carteraDetalleModo==="programados"?"Sin abonos programados":"Sin abonos ejecutados aún"}
                       </div>
                     )}
                     <div style={{marginTop:9}}/>
@@ -2218,14 +2239,22 @@ function App(){
                 })()}
 
                 {/* Movimientos vinculados de Ingresos Extraordinarios */}
-                {isIngExt&&movVinc.length>0&&(<>
+                {isIngExt&&(<>
                   <div style={{...S.sTit,marginBottom:7}}>MOVIMIENTOS VINCULADOS</div>
-                  {movVinc.map(m=>(
-                    <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #1e293b"}}>
-                      <div><div style={{fontSize:11,color:"#e2e8f0"}}>{m.concepto}</div><div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)} · <span style={S.badge(m.estatus)}>{m.estatus}</span></div></div>
-                      <span style={{fontSize:12,fontWeight:700,color:OP_COLORS[m.tipoOp]}}>{fmt(m.monto)}</span>
-                    </div>
-                  ))}
+                  {movVinc.length===0&&<div style={{fontSize:10,color:"#334155",textAlign:"center",padding:"10px 0",marginBottom:9}}>Sin movimientos vinculados</div>}
+                  {movVinc.map(m=>{
+                    const cMov=COLOR_ING_EXT[m.estatus==="INGRESADO"?"Recuperado":m.estatus==="PROGRAMADO"?"Programado":"Pendiente"]||"#94a3b8";
+                    return(
+                      <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"9px 0",borderBottom:"1px solid #1e293b"}}>
+                        <div>
+                          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}><span style={S.badge(m.estatus)}>{m.estatus}</span></div>
+                          <div style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{m.concepto}</div>
+                          <div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)}</div>
+                        </div>
+                        <span style={{fontSize:14,fontWeight:800,color:"#22c55e"}}>{fmt(m.monto)}</span>
+                      </div>
+                    );
+                  })}
                   <div style={{marginTop:9}}/>
                 </>)}
 
@@ -2277,11 +2306,7 @@ function App(){
                   </div>
                 )}
                 {isIngExt&&(
-                  <div style={S.fg}><label style={S.fl}>Estado</label>
-                    <div style={{display:"flex",gap:6}}>
-                      {EST_ING_EXT.map(e=><button key={e} style={{...S.prioB2(formCartera.estado===e,COLOR_ING_EXT[e]),flex:1,padding:"7px 0",fontSize:10}} onClick={()=>set("estado",e)}>{e}</button>)}
-                    </div>
-                  </div>
+                  <div style={{...S.infoBx("#475569")}}><span>ℹ</span><span>El estado (Pendiente/Programado/Recuperado) se actualiza automáticamente al vincular movimientos de ingreso.</span></div>
                 )}
                 <div style={S.fg}><label style={S.fl}>Condiciones actuales</label>
                   <textarea style={{...S.inp,minHeight:60,resize:"vertical",lineHeight:1.5}} value={formCartera.condiciones||""} onChange={e=>set("condiciones",e.target.value)} placeholder="Acuerdos, tasas, plazos…"/>
