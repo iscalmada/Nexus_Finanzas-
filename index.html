@@ -1230,7 +1230,10 @@ function App(){
                  data.vinculoTipo==="deudores"?deudores.find(x=>x.id===data.vinculoId):
                  data.vinculoTipo==="ingresosExt"?ingresosExt.find(x=>x.id===data.vinculoId):null;
       if(regV){
-        const sp=data.vinculoTipo==="ingresosExt"?saldoIngExt(regV,movs).pendiente:saldoPendiente(regV,movs);
+        // Al editar, excluir el movimiento actual del cálculo para evitar
+        // que su propio monto se cuente como parte del saldo consumido
+        const movsParaCalculo=editMovId!==null?movs.filter(m=>m.id!==editMovId):movs;
+        const sp=data.vinculoTipo==="ingresosExt"?saldoIngExt(regV,movsParaCalculo).pendiente:saldoPendiente(regV,movsParaCalculo);
         if(data.monto>sp+0.01){
           setSaveError(`El monto excede el saldo pendiente de ${data.vinculoTipo==="acreedores"?"la deuda":"la cuenta por cobrar"} (${fmt(sp)}). Ajusta el monto.`);
           return;
