@@ -1000,24 +1000,32 @@ function App(){
       .filter(r=>{
         const hasFiltCuenta=filterCuentas!==null&&filterCuentas.size>0;
         const hasFiltTarjeta=filterTarjetasFiltro!==null&&filterTarjetasFiltro.size>0;
+        // Sin ningún filtro activo — mostrar todo
         if(!hasFiltCuenta&&!hasFiltTarjeta) return true;
-        // Movimiento con tarjeta de crédito
-        if(r.usaTarjeta&&r.tarjetaId){
-          if(hasFiltTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
-          return false; // tiene filtro de cuenta pero este mov es de tarjeta
+
+        const esMovTarjeta=r.usaTarjeta&&r.tarjetaId; // Egreso cargado a TC
+        const esPagoTC=r.tipoOp==="Pago Tarjeta"&&r.tarjetaId; // Pago a TC
+        const esCuentaDebito=!esMovTarjeta&&!esPagoTC; // Movimiento de cuenta débito
+
+        // Solo filtro de tarjeta activo (sin filtro de cuenta)
+        if(hasFiltTarjeta&&!hasFiltCuenta){
+          if(esMovTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
+          if(esPagoTC) return filterTarjetasFiltro.has(r.tarjetaId);
+          return false; // ocultar movimientos de cuenta débito
         }
-        // Pago a tarjeta
-        if(r.tipoOp==="Pago Tarjeta"&&r.tarjetaId){
-          if(hasFiltTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
-          if(hasFiltCuenta&&r.cuentaId) return filterCuentas.has(r.cuentaId);
-          return false;
+
+        // Solo filtro de cuenta activo (sin filtro de tarjeta)
+        if(hasFiltCuenta&&!hasFiltTarjeta){
+          if(esCuentaDebito) return r.cuentaId?filterCuentas.has(r.cuentaId):false;
+          if(esPagoTC) return r.cuentaId?filterCuentas.has(r.cuentaId):false;
+          return false; // ocultar movimientos de TC cuando solo hay filtro de cuenta
         }
-        // Movimiento con cuenta débito
-        if(hasFiltCuenta){
-          if(r.cuentaId) return filterCuentas.has(r.cuentaId);
-          return false;
-        }
-        return true;
+
+        // Ambos filtros activos — mostrar si pasa cualquiera
+        if(esMovTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
+        if(esPagoTC) return filterTarjetasFiltro.has(r.tarjetaId)||(r.cuentaId?filterCuentas.has(r.cuentaId):false);
+        if(esCuentaDebito) return r.cuentaId?filterCuentas.has(r.cuentaId):false;
+        return false;
       })
       .filter(r=>{
         // Transferencias y Pagos de Tarjeta no tienen categoría — siempre pasan
