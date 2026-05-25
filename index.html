@@ -587,6 +587,11 @@ const ModalMov=memo(function ModalMov({
               <div style={{fontSize:9,color:"#475569",marginTop:3}}>
                 {formMov.tipoOp==="Egreso"?"Vincula este pago a un acreedor para registrar el abono.":"Vincula este ingreso a un deudor o ingreso extraordinario para registrar el cobro."}
               </div>
+              {excedeSaldo&&(
+                <div style={{...S.errBox,marginTop:6}}><span>⛔</span>
+                  <span>El monto ({fmt(montoMov)}) excede el saldo pendiente ({fmt(saldoDisp)}). Ajusta el monto o vincula a otro registro.</span>
+                </div>
+              )}
               {/* Siempre preguntar capital/interés al vincular a acreedor */}
               {formMov.tipoOp==="Egreso"&&formMov.vinculoTipo==="acreedores"&&formMov.vinculoId&&(
                 <div style={{marginTop:9}}>
@@ -869,7 +874,8 @@ function App(){
   const[filterRetrasados,setFilterRetrasados]=useState(false);
   // filtro categorías - sets de ids seleccionados (null = todas)
   const[filterCatIng,setFilterCatIng]=useState(null);
-  const[filterCuentas,setFilterCuentas]=useState(null); // null=todas, Set=filtradas
+  const[filterCuentas,setFilterCuentas]=useState(null); // null=todas, Set de cuentaId
+  const[filterTarjetasFiltro,setFilterTarjetasFiltro]=useState(null); // null=todas, Set de tarjetaId
   const[showCuentaFilter,setShowCuentaFilter]=useState(false); // null=todas
   const[filterCatEg,setFilterCatEg]=useState(null);
   const[showCatFilter,setShowCatFilter]=useState(false); // modal selector
@@ -982,10 +988,24 @@ function App(){
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
       .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
       .filter(r=>{
-        // Filtro por cuenta
-        if(filterCuentas!==null&&filterCuentas.size>0){
-          if(r.cuentaId&&!filterCuentas.has(r.cuentaId)) return false;
-          if(!r.cuentaId) return false; // si tiene filtro de cuenta, ocultar sin cuenta asignada
+        const hasFiltCuenta=filterCuentas!==null&&filterCuentas.size>0;
+        const hasFiltTarjeta=filterTarjetasFiltro!==null&&filterTarjetasFiltro.size>0;
+        if(!hasFiltCuenta&&!hasFiltTarjeta) return true;
+        // Movimiento con tarjeta de crédito
+        if(r.usaTarjeta&&r.tarjetaId){
+          if(hasFiltTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
+          return false; // tiene filtro de cuenta pero este mov es de tarjeta
+        }
+        // Pago a tarjeta
+        if(r.tipoOp==="Pago Tarjeta"&&r.tarjetaId){
+          if(hasFiltTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
+          if(hasFiltCuenta&&r.cuentaId) return filterCuentas.has(r.cuentaId);
+          return false;
+        }
+        // Movimiento con cuenta débito
+        if(hasFiltCuenta){
+          if(r.cuentaId) return filterCuentas.has(r.cuentaId);
+          return false;
         }
         return true;
       })
@@ -1004,7 +1024,7 @@ function App(){
         }
         return true;
       });
-  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf,filterCuentas]);
+  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf,filterCuentas,filterTarjetasFiltro]);
 
   // Totales filtrados — respeta todos los filtros activos, divide Reales y Proyectados
   const filteredTotals=useMemo(()=>{
@@ -1186,6 +1206,19 @@ function App(){
       }
     }
 
+    // Validar que el monto no exceda saldo pendiente del registro vinculado
+    if(data.vinculoTipo&&data.vinculoId&&data.tipoAbono!=="interes"){
+      const regV=data.vinculoTipo==="acreedores"?acreedores.find(x=>x.id===data.vinculoId):
+                 data.vinculoTipo==="deudores"?deudores.find(x=>x.id===data.vinculoId):
+                 data.vinculoTipo==="ingresosExt"?ingresosExt.find(x=>x.id===data.vinculoId):null;
+      if(regV){
+        const sp=data.vinculoTipo==="ingresosExt"?saldoIngExt(regV,movs).pendiente:saldoPendiente(regV,movs);
+        if(data.monto>sp+0.01){
+          setSaveError(`El monto excede el saldo pendiente de ${data.vinculoTipo==="acreedores"?"la deuda":"la cuenta por cobrar"} (${fmt(sp)}). Ajusta el monto.`);
+          return;
+        }
+      }
+    }
     setFieldErrors(null);setSaveError("");
 
     // Calcular ID antes de guardar para usarlo en vinculación
@@ -1343,11 +1376,21 @@ function App(){
   },[]);
 
   const delCartera = useCallback((tipo,id)=>{
+    // Verificar que no tenga movimientos vinculados
+    const arr=tipo==="acreedores"?acreedores:tipo==="deudores"?deudores:ingresosExt;
+    const reg=arr.find(x=>x.id===id);
+    if(reg&&reg.movIdsVinculados&&reg.movIdsVinculados.length>0){
+      const count=movs.filter(m=>reg.movIdsVinculados.includes(m.id)).length;
+      if(count>0){
+        alert(`No se puede eliminar: tiene ${count} movimiento${count!==1?"s":""} vinculado${count!==1?"s":""}. Primero elimina o desvincula los movimientos.`);
+        return;
+      }
+    }
     if(tipo==="acreedores") setAcreedores(p=>p.filter(x=>x.id!==id));
     else if(tipo==="deudores") setDeudores(p=>p.filter(x=>x.id!==id));
     else setIngresosExt(p=>p.filter(x=>x.id!==id));
     setViewCartera(null);
-  },[]);
+  },[acreedores,deudores,ingresosExt,movs]);
 
   const exportJSON=useCallback(()=>{
     const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,exportedAt:new Date().toISOString(),version:"v7"};
@@ -1497,8 +1540,8 @@ function App(){
               <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>
                 📂 Categoría{hasCatFilterActive?" ✓":""}
               </button>
-              <button style={S.prioTag(filterCuentas!==null&&filterCuentas.size>0)} onClick={()=>setShowCuentaFilter(true)}>
-                🏦 Cuenta{filterCuentas!==null&&filterCuentas.size>0?" ("+filterCuentas.size+")":""}
+              <button style={S.prioTag((filterCuentas!==null&&filterCuentas.size>0)||(filterTarjetasFiltro!==null&&filterTarjetasFiltro.size>0))} onClick={()=>setShowCuentaFilter(true)}>
+                🏦 Cuentas{((filterCuentas?.size||0)+(filterTarjetasFiltro?.size||0))>0?" ("+(( filterCuentas?.size||0)+(filterTarjetasFiltro?.size||0))+")":""}
               </button>
               <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
             </div>
@@ -2019,11 +2062,24 @@ function App(){
             {carteraTab==="acreedores"&&(()=>{
               const total=acreedores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
-                <div style={{...S.card("rgba(248,113,113,0.2)"),marginBottom:11}}>
-                  <div style={S.lbl}>Total por pagar</div>
-                  <div style={{fontSize:22,fontWeight:800,color:"#f87171"}}>{fmt(total)}</div>
-                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{acreedores.length} acreedor{acreedores.length!==1?"es":""}</div>
-                </div>
+                {(()=>{
+                  const totalInicial=acreedores.reduce((s,x)=>s+(x.montoActual||0),0);
+                  return(
+                    <div style={{...S.card("rgba(248,113,113,0.2)"),marginBottom:11}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:5}}>
+                        <div>
+                          <div style={S.lbl}>Deuda inicial total</div>
+                          <div style={{fontSize:16,fontWeight:800,color:"#f8717188"}}>{fmt(totalInicial)}</div>
+                        </div>
+                        <div>
+                          <div style={S.lbl}>Saldo pendiente total</div>
+                          <div style={{fontSize:16,fontWeight:800,color:"#f87171"}}>{fmt(total)}</div>
+                        </div>
+                      </div>
+                      <div style={{fontSize:9,color:"#475569"}}>{acreedores.length} acreedor{acreedores.length!==1?"es":""} · Pagado: {fmt(totalInicial-total)}</div>
+                    </div>
+                  );
+                })()}
                 {acreedores.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin acreedores registrados</div>}
                 {acreedores.map(x=>{
                   const sp=saldoPendiente(x,movs);
@@ -2046,7 +2102,7 @@ function App(){
                         <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${pct}%`,transition:"width 0.4s"}}/>
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
-                        <span>Deuda actual: {fmt(x.montoActual)}</span>
+                        <span>Inicial: {fmt(x.montoActual)}</span>
                         {prog>0&&<span style={{color:"#a78bfa"}}>Prog: {fmt(prog)}</span>}
                         <span style={{color:"#22c55e"}}>{Math.round(pct)}% liquidado</span>
                       </div>
@@ -2061,11 +2117,25 @@ function App(){
             {carteraTab==="deudores"&&(()=>{
               const total=deudores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
-                <div style={{...S.card("rgba(34,197,94,0.2)"),marginBottom:11}}>
-                  <div style={S.lbl}>Total por cobrar</div>
-                  <div style={{fontSize:22,fontWeight:800,color:"#22c55e"}}>{fmt(total)}</div>
-                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{deudores.length} deudor{deudores.length!==1?"es":""}</div>
-                </div>
+                {(()=>{
+                  const totalInicial=deudores.reduce((s,x)=>s+(x.montoActual||0),0);
+                  const totalCobrado=deudores.reduce((s,x)=>s+abonado(x,movs),0);
+                  return(
+                    <div style={{...S.card("rgba(34,197,94,0.2)"),marginBottom:11}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:5}}>
+                        <div>
+                          <div style={S.lbl}>Total inicial a cobrar</div>
+                          <div style={{fontSize:16,fontWeight:800,color:"#22c55e88"}}>{fmt(totalInicial)}</div>
+                        </div>
+                        <div>
+                          <div style={S.lbl}>Efectivamente cobrado</div>
+                          <div style={{fontSize:16,fontWeight:800,color:"#22c55e"}}>{fmt(totalCobrado)}</div>
+                        </div>
+                      </div>
+                      <div style={{fontSize:9,color:"#475569"}}>{deudores.length} deudor{deudores.length!==1?"es":""} · Pendiente: {fmt(total)}</div>
+                    </div>
+                  );
+                })()}
                 {deudores.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin deudores registrados</div>}
                 {deudores.map(x=>{
                   const sp=saldoPendiente(x,movs);
@@ -2088,7 +2158,7 @@ function App(){
                         <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${pct}%`,transition:"width 0.4s"}}/>
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
-                        <span>Deuda actual: {fmt(x.montoActual)}</span>
+                        <span>Inicial: {fmt(x.montoActual)}</span>
                         {prog>0&&<span style={{color:"#a78bfa"}}>Prog: {fmt(prog)}</span>}
                         <span style={{color:"#22c55e"}}>{Math.round(pct)}% recuperado</span>
                       </div>
@@ -2103,11 +2173,30 @@ function App(){
             {carteraTab==="ingresosExt"&&(()=>{
               const totalPend=ingresosExt.filter(x=>x.estado!=="Recuperado").reduce((s,x)=>s+(x.monto||0),0);
               return(<>
-                <div style={{...S.card("rgba(251,191,36,0.15)"),marginBottom:11}}>
-                  <div style={S.lbl}>Potencial por recuperar</div>
-                  <div style={{fontSize:22,fontWeight:800,color:"#fbbf24"}}>{fmt(totalPend)}</div>
-                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{ingresosExt.filter(x=>estatusIngExt(x,movs)!=="Recuperado").length} activos</div>
-                </div>
+                {(()=>{
+                  const totalInicial=ingresosExt.reduce((s,x)=>s+(x.montoObjetivo||x.monto||0),0);
+                  const totalProg_=ingresosExt.reduce((s,x)=>s+saldoIngExt(x,movs).programado,0);
+                  const totalRec=ingresosExt.reduce((s,x)=>s+saldoIngExt(x,movs).recuperado,0);
+                  return(
+                    <div style={{...S.card("rgba(251,191,36,0.15)"),marginBottom:11}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:5}}>
+                        <div style={{textAlign:"center"}}>
+                          <div style={S.lbl}>Potencial</div>
+                          <div style={{fontSize:13,fontWeight:800,color:"#fbbf2488"}}>{fmt(totalInicial)}</div>
+                        </div>
+                        <div style={{textAlign:"center"}}>
+                          <div style={S.lbl}>Programado</div>
+                          <div style={{fontSize:13,fontWeight:800,color:"#a78bfa"}}>{fmt(totalProg_)}</div>
+                        </div>
+                        <div style={{textAlign:"center"}}>
+                          <div style={S.lbl}>Recuperado</div>
+                          <div style={{fontSize:13,fontWeight:800,color:"#22c55e"}}>{fmt(totalRec)}</div>
+                        </div>
+                      </div>
+                      <div style={{fontSize:9,color:"#475569"}}>{ingresosExt.filter(x=>estatusIngExt(x,movs)!=="Recuperado").length} activos · Pendiente: {fmt(totalPend)}</div>
+                    </div>
+                  );
+                })()}
                 {ingresosExt.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin ingresos extraordinarios registrados</div>}
                 {ingresosExt.map(x=>{
                   const cEst=COLOR_ING_EXT[x.estado]||"#94a3b8";
@@ -2184,7 +2273,7 @@ function App(){
                 {!isIngExt&&(
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
                     <div style={{background:`${colorTipo}11`,border:`1px solid ${colorTipo}33`,borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
-                      <div style={{fontSize:8,color:colorTipo,fontWeight:700,marginBottom:3}}>Deuda Actual</div>
+                      <div style={{fontSize:8,color:colorTipo,fontWeight:700,marginBottom:3}}>Deuda Inicial</div>
                       <div style={{fontSize:11,fontWeight:800,color:colorTipo}}>{fmt(viewCartera.montoActual)}</div>
                     </div>
                     <div style={{background:carteraDetalleModo==="programados"?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.08)",border:`1px solid ${carteraDetalleModo==="programados"?"#a78bfa":"#a78bfa33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
@@ -2320,8 +2409,18 @@ function App(){
                 <div style={{display:"flex",gap:8,marginTop:4}}>
                   <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(201,168,76,0.15)",color:"#C9A84C",border:"1px solid #C9A84C44"}}
                     onClick={()=>{setViewCartera(null);openCarteraForm(tipo,viewCartera);}}>✏ Editar</button>
-                  <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(248,113,113,0.15)",color:"#f87171",border:"1px solid #f8717144"}}
-                    onClick={()=>{if(window.confirm("¿Eliminar este registro?"))delCartera(tipo,viewCartera.id);}}>🗑 Eliminar</button>
+                  {(()=>{
+                    const countVinc=movs.filter(m=>(viewCartera.movIdsVinculados||[]).includes(m.id)).length;
+                    return countVinc>0?(
+                      <div style={{flex:1,background:"rgba(248,113,113,0.06)",border:"1px solid #f8717133",borderRadius:11,padding:"9px 10px",textAlign:"center"}}>
+                        <div style={{fontSize:9,color:"#f87171",fontWeight:700}}>🔒 No eliminable</div>
+                        <div style={{fontSize:8,color:"#64748b"}}>{countVinc} mov. vinculado{countVinc!==1?"s":""}</div>
+                      </div>
+                    ):(
+                      <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(248,113,113,0.15)",color:"#f87171",border:"1px solid #f8717144"}}
+                        onClick={()=>{if(window.confirm("¿Eliminar este registro?"))delCartera(tipo,viewCartera.id);}}>🗑 Eliminar</button>
+                    );
+                  })()}
                 </div>
                 <button style={S.cancB} onClick={()=>setViewCartera(null)}>Cerrar</button>
               </div>
@@ -2347,7 +2446,7 @@ function App(){
                 </div>
                 {!isIngExt&&<div style={S.fg}><label style={S.fl}>Nombre</label><input style={S.inp} value={formCartera.nombre||""} onChange={e=>set("nombre",e.target.value)} placeholder="Persona o empresa…"/></div>}
                 <div style={S.fg}><label style={S.fl}>Concepto</label><input style={S.inp} value={formCartera.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Descripción de la deuda…"/></div>
-                <div style={S.fg}><label style={S.fl}>{isIngExt?"Monto a recuperar $":"Saldo actual de la deuda $"}</label>
+                <div style={S.fg}><label style={S.fl}>{isIngExt?"Monto a recuperar $":"Deuda inicial $"}</label>
                   <input style={S.inp} type="number" value={formCartera.montoActual||formCartera.monto||formCartera.montoObjetivo||""} onChange={e=>set(isIngExt?"montoObjetivo":"montoActual",e.target.value)} placeholder="0.00"/>
                 </div>
                 {isAcr&&(
@@ -2588,20 +2687,17 @@ function App(){
         {showCuentaFilter&&(
           <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowCuentaFilter(false);}}>
             <div style={S.mBox}>
-              <div style={S.mTit}>🏦 FILTRAR POR CUENTA</div>
-              <div style={{marginBottom:11}}>
+              <div style={S.mTit}>🏦 FILTRAR POR CUENTA / TARJETA</div>
+              {/* Cuentas débito */}
+              <div style={{...S.sTit,marginBottom:7}}>CUENTAS DÉBITO</div>
+              <div style={{marginBottom:13}}>
                 {cuentas.filter(c=>!c.esReferencia).map(c=>{
                   const sel=filterCuentas===null||filterCuentas.has(c.id);
                   return(
                     <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #1e293b",cursor:"pointer"}}
                       onClick={()=>setFilterCuentas(prev=>{
-                        if(prev===null){
-                          const n=new Set(cuentas.filter(x=>!x.esReferencia).map(x=>x.id));
-                          n.delete(c.id); return n;
-                        }
-                        const n=new Set(prev);
-                        n.has(c.id)?n.delete(c.id):n.add(c.id);
-                        return n;
+                        if(prev===null){const n=new Set(cuentas.filter(x=>!x.esReferencia).map(x=>x.id));n.delete(c.id);return n;}
+                        const n=new Set(prev);n.has(c.id)?n.delete(c.id):n.add(c.id);return n;
                       })}>
                       <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel?c.color:"#334155"}`,background:sel?c.color:"transparent",flexShrink:0}}/>
                       <div style={{display:"flex",alignItems:"center",gap:7,flex:1}}>
@@ -2613,7 +2709,33 @@ function App(){
                   );
                 })}
               </div>
-              <button style={S.saveB} onClick={()=>{setFilterCuentas(null);setShowCuentaFilter(false);}}>Ver todas</button>
+              {/* Tarjetas de crédito */}
+              {tarjetas.length>0&&(<>
+                <div style={{...S.sTit,marginBottom:7}}>TARJETAS DE CRÉDITO</div>
+                <div style={{marginBottom:13}}>
+                  {tarjetas.map(t=>{
+                    const sel=filterTarjetasFiltro===null||filterTarjetasFiltro.has(t.id);
+                    const sd=tarjetaSaldos[t.id]||0;
+                    return(
+                      <div key={t.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:"1px solid #1e293b",cursor:"pointer"}}
+                        onClick={()=>setFilterTarjetasFiltro(prev=>{
+                          if(prev===null){const n=new Set(tarjetas.map(x=>x.id));n.delete(t.id);return n;}
+                          const n=new Set(prev);n.has(t.id)?n.delete(t.id):n.add(t.id);return n;
+                        })}>
+                        <div style={{width:16,height:16,borderRadius:4,border:`2px solid ${sel?t.color:"#334155"}`,background:sel?t.color:"transparent",flexShrink:0}}/>
+                        <div style={{display:"flex",alignItems:"center",gap:7,flex:1}}>
+                          <div style={{width:8,height:8,borderRadius:4,background:t.color}}/>
+                          <div>
+                            <div style={{fontSize:13,fontWeight:700}}>{t.nombre}</div>
+                            <div style={{fontSize:9,color:"#64748b"}}>Saldo deudor: {fmt(sd)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>)}
+              <button style={S.saveB} onClick={()=>{setFilterCuentas(null);setFilterTarjetasFiltro(null);setShowCuentaFilter(false);}}>Ver todas</button>
               <button style={S.cancB} onClick={()=>setShowCuentaFilter(false)}>Cerrar</button>
             </div>
           </div>
