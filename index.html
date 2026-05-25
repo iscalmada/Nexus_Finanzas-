@@ -587,11 +587,21 @@ const ModalMov=memo(function ModalMov({
               <div style={{fontSize:9,color:"#475569",marginTop:3}}>
                 {formMov.tipoOp==="Egreso"?"Vincula este pago a un acreedor para registrar el abono.":"Vincula este ingreso a un deudor o ingreso extraordinario para registrar el cobro."}
               </div>
-              {excedeSaldo&&(
-                <div style={{...S.errBox,marginTop:6}}><span>⛔</span>
-                  <span>El monto ({fmt(montoMov)}) excede el saldo pendiente ({fmt(saldoDisp)}). Ajusta el monto o vincula a otro registro.</span>
-                </div>
-              )}
+              {(()=>{
+                if(!formMov.vinculoTipo||!formMov.vinculoId) return null;
+                const rv=formMov.vinculoTipo==="acreedores"?acreedores.find(x=>x.id===formMov.vinculoId):
+                          formMov.vinculoTipo==="deudores"?deudores.find(x=>x.id===formMov.vinculoId):
+                          formMov.vinculoTipo==="ingresosExt"?ingresosExt.find(x=>x.id===formMov.vinculoId):null;
+                if(!rv) return null;
+                const sd=formMov.vinculoTipo==="ingresosExt"?saldoIngExt(rv,movs).pendiente:saldoPendiente(rv,movs);
+                const mm=parseFloat(formMov.monto)||0;
+                if(formMov.tipoAbono==="interes"||mm<=0||mm<=sd) return null;
+                return(
+                  <div style={{...S.errBox,marginTop:6}}><span>⛔</span>
+                    <span>El monto ({fmt(mm)}) excede el saldo pendiente ({fmt(sd)}). Ajusta el monto o vincula a otro registro.</span>
+                  </div>
+                );
+              })()}
               {/* Siempre preguntar capital/interés al vincular a acreedor */}
               {formMov.tipoOp==="Egreso"&&formMov.vinculoTipo==="acreedores"&&formMov.vinculoId&&(
                 <div style={{marginTop:9}}>
