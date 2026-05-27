@@ -170,14 +170,15 @@ function calcConsolidado(movs,pI,pE,cuentasRef){
     if(real)cuenta=true;
     if(prog){
       if(r.tipoOp==="Ingreso"&&r.prioridad<=(pI||3))cuenta=true;
-      if(r.tipoOp==="Egreso"&&r.prioridad<=(pE||3))cuenta=true;
-      if(r.tipoOp==="Pago Tarjeta")cuenta=true;
-      // Traspaso entre cuentas propias NO altera saldo consolidado
+      if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&r.prioridad<=(pE||3))cuenta=true; // Egreso TC no cuenta
+      if(r.tipoOp==="Pago Tarjeta")cuenta=true; // Pago TC sí afecta liquidez
+      // Traspaso: NO afecta consolidado
     }
     if(cuenta){
-      if(r.tipoOp==="Ingreso")s+=r.monto||0;
-      else if(r.tipoOp==="Egreso")s-=r.monto||0;
-      else if(r.tipoOp==="Pago Tarjeta")s-=r.monto||0;
+      if(r.tipoOp==="Ingreso") s+=r.monto||0;
+      else if(r.tipoOp==="Egreso"&&!r.usaTarjeta) s-=r.monto||0; // Egreso TC no mueve consolidado
+      else if(r.tipoOp==="Pago Tarjeta") s-=r.monto||0; // Pago TC sí sale de tus cuentas
+      // Traspaso y Egreso con tarjeta: NO afectan consolidado
     }
     return{...r,saldoConsolidado:s,enProyeccion:cuenta};
   });
@@ -188,7 +189,7 @@ function calcCuentaSaldos(cuentas,movs){
     if(!["INGRESADO","PAGADO"].includes(r.estatus))return;
     if(r.tipoOp==="Ingreso"&&r.cuentaId&&!r.usaTarjeta)s[r.cuentaId]=(s[r.cuentaId]||0)+(r.monto||0);
     if(r.tipoOp==="Egreso" &&r.cuentaId&&!r.usaTarjeta)s[r.cuentaId]=(s[r.cuentaId]||0)-(r.monto||0);
-    if(r.tipoOp==="Traspaso"){if(r.cuentaId)s[r.cuentaId]=(s[r.cuentaId]||0)-(r.monto||0);if(r.cuentaDestinoId)s[r.cuentaDestinoId]=(s[r.cuentaDestinoId]||0)+(r.monto||0);}
+    if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"){if(r.cuentaId)s[r.cuentaId]=(s[r.cuentaId]||0)-(r.monto||0);if(r.cuentaDestinoId)s[r.cuentaDestinoId]=(s[r.cuentaDestinoId]||0)+(r.monto||0);}
     if(r.tipoOp==="Pago Tarjeta"&&r.cuentaId)s[r.cuentaId]=(s[r.cuentaId]||0)-(r.monto||0);
   });
   return s;
@@ -208,7 +209,7 @@ function calcSaldoCuentaAntesDe(cuentaId,movId,movs,cuentas){
     if(!["INGRESADO","PAGADO"].includes(r.estatus))return;
     if(r.tipoOp==="Ingreso"&&r.cuentaId===cuentaId&&!r.usaTarjeta)s+=(r.monto||0);
     if(r.tipoOp==="Egreso" &&r.cuentaId===cuentaId&&!r.usaTarjeta)s-=(r.monto||0);
-    if(r.tipoOp==="Traspaso"){if(r.cuentaId===cuentaId)s-=(r.monto||0);if(r.cuentaDestinoId===cuentaId)s+=(r.monto||0);}
+    if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"){if(r.cuentaId===cuentaId)s-=(r.monto||0);if(r.cuentaDestinoId===cuentaId)s+=(r.monto||0);}
     if(r.tipoOp==="Pago Tarjeta"&&r.cuentaId===cuentaId)s-=(r.monto||0);
   });
   return s;
@@ -1021,7 +1022,7 @@ function App(){
 
         const esMovTarjeta=r.usaTarjeta&&r.tarjetaId; // Egreso cargado a TC
         const esPagoTC=r.tipoOp==="Pago Tarjeta"&&r.tarjetaId; // Pago a TC
-        const esTraspaso=r.tipoOp==="Traspaso"; // Traspaso entre cuentas propias
+        const esTraspaso=r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"; // Traspaso entre cuentas propias
         const esCuentaDebito=!esMovTarjeta&&!esPagoTC&&!esTraspaso; // Movimiento de cuenta débito
 
         // Solo filtro de tarjeta activo
@@ -1048,7 +1049,7 @@ function App(){
       })
       .filter(r=>{
         // Transferencias y Pagos de Tarjeta no tienen categoría — siempre pasan
-        if(r.tipoOp==="Traspaso"||r.tipoOp==="Pago Tarjeta") return true;
+        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return true;
         // Ingresos
         if(r.tipoOp==="Ingreso"){
           if(filterCatIng===null) return true; // null = todas
