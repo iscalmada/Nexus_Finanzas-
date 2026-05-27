@@ -160,7 +160,8 @@ function generarFechas(rec){
 // ─── SALDOS ──────────────────────────────────────────────────
 function calcConsolidado(movs,pI,pE,cuentasRef){
   const sorted=[...movs].filter(r=>r.fecha).sort((a,b)=>a.fecha!==b.fecha?a.fecha.localeCompare(b.fecha):a.orden-b.orden);
-  // Sumar saldoInicial de cuentas de referencia como arranque del consolidado
+  // Arranque: saldo inicial de cuentas de referencia (historial previo)
+  // Las cuentas reales se reflejan a través de sus movimientos
   let s=(cuentasRef||[]).filter(c=>c.esReferencia).reduce((acc,c)=>acc+(c.saldoInicial||0),0);
   return sorted.map(r=>{
     const real=["INGRESADO","PAGADO"].includes(r.estatus);
@@ -219,7 +220,8 @@ function calcSaldoProyFin(movs,cuentas,pI,pE,sm,sy){
   const endDate=`${sy}-${String(sm+1).padStart(2,"0")}-31`;
   const relevant=withS.filter(r=>r.fecha&&r.fecha<=endDate&&r.enProyeccion);
   if(!relevant.length){
-    return Object.values(calcCuentaSaldos(cuentas,movs)).reduce((s,v)=>s+v,0);
+    const saldos=calcCuentaSaldos(cuentas,movs);
+    return cuentas.filter(c=>!c.esReferencia).reduce((s,c)=>s+(saldos[c.id]||0),0);
   }
   return relevant[relevant.length-1].saldoConsolidado;
 }
@@ -1018,26 +1020,29 @@ function App(){
         if(!hasFiltCuenta&&!hasFiltTarjeta) return true;
 
         const esMovTarjeta=r.usaTarjeta&&r.tarjetaId; // Egreso cargado a TC
-        const esPagoTC=(r.tipoOp==="Pago Tarjeta"||r.tipoOp==="Traspaso")&&(r.tarjetaId||r.cuentaDestinoId); // Pago a TC
-        const esCuentaDebito=!esMovTarjeta&&!esPagoTC; // Movimiento de cuenta débito
+        const esPagoTC=r.tipoOp==="Pago Tarjeta"&&r.tarjetaId; // Pago a TC
+        const esTraspaso=r.tipoOp==="Traspaso"; // Traspaso entre cuentas propias
+        const esCuentaDebito=!esMovTarjeta&&!esPagoTC&&!esTraspaso; // Movimiento de cuenta débito
 
-        // Solo filtro de tarjeta activo (sin filtro de cuenta)
+        // Solo filtro de tarjeta activo
         if(hasFiltTarjeta&&!hasFiltCuenta){
           if(esMovTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
-          if(esPagoTC) return filterTarjetasFiltro.has(r.tarjetaId);
-          return false; // ocultar movimientos de cuenta débito
+          if(esPagoTC)     return filterTarjetasFiltro.has(r.tarjetaId);
+          return false;
         }
 
-        // Solo filtro de cuenta activo (sin filtro de tarjeta)
+        // Solo filtro de cuenta activo
         if(hasFiltCuenta&&!hasFiltTarjeta){
+          if(esTraspaso)   return r.cuentaId?filterCuentas.has(r.cuentaId)||filterCuentas.has(r.cuentaDestinoId):false;
           if(esCuentaDebito) return r.cuentaId?filterCuentas.has(r.cuentaId):false;
-          if(esPagoTC) return r.cuentaId?filterCuentas.has(r.cuentaId):false;
-          return false; // ocultar movimientos de TC cuando solo hay filtro de cuenta
+          if(esPagoTC)     return r.cuentaId?filterCuentas.has(r.cuentaId):false;
+          return false;
         }
 
-        // Ambos filtros activos — mostrar si pasa cualquiera
-        if(esMovTarjeta) return filterTarjetasFiltro.has(r.tarjetaId);
-        if(esPagoTC) return filterTarjetasFiltro.has(r.tarjetaId)||(r.cuentaId?filterCuentas.has(r.cuentaId):false);
+        // Ambos filtros activos
+        if(esMovTarjeta)   return filterTarjetasFiltro.has(r.tarjetaId);
+        if(esPagoTC)       return filterTarjetasFiltro.has(r.tarjetaId)||(r.cuentaId?filterCuentas.has(r.cuentaId):false);
+        if(esTraspaso)     return r.cuentaId?filterCuentas.has(r.cuentaId)||filterCuentas.has(r.cuentaDestinoId):false;
         if(esCuentaDebito) return r.cuentaId?filterCuentas.has(r.cuentaId):false;
         return false;
       })
