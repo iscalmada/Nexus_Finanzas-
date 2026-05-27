@@ -167,7 +167,8 @@ function calcConsolidado(movs,pI,pE,cuentasRef){
     const real=["INGRESADO","PAGADO"].includes(r.estatus);
     const prog=r.estatus==="PROGRAMADO";
     let cuenta=false;
-    if(real)cuenta=true;
+    // Movimientos reales que afectan el consolidado (no egresosTarjeta ni traspasos)
+    if(real&&!(r.tipoOp==="Egreso"&&r.usaTarjeta)&&r.tipoOp!=="Traspaso")cuenta=true;
     if(prog){
       if(r.tipoOp==="Ingreso"&&r.prioridad<=(pI||3))cuenta=true;
       if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&r.prioridad<=(pE||3))cuenta=true; // Egreso TC no cuenta
@@ -850,7 +851,11 @@ function App(){
     try { localStorage.setItem('nexus_' + key, JSON.stringify(val)); } catch(e) {}
   }
 
-  const[movs,setMovs]=useState(()=>loadLS('movs', INIT_MOVS));
+  const[movs,setMovs]=useState(()=>{
+    const data=loadLS('movs', INIT_MOVS);
+    // Migrar "Transferencia" → "Traspaso" en movimientos históricos
+    return data.map(m=>m.tipoOp==="Transferencia"?{...m,tipoOp:"Traspaso"}:m);
+  });
   const[cuentas,setCuentas]=useState(()=>loadLS('cuentas', INIT_CUENTAS));
   const[tarjetas,setTarjetas]=useState(()=>loadLS('tarjetas', INIT_TARJETAS));
   const[catIng,setCatIng]=useState(()=>loadLS('catIng', INIT_CAT_ING));
