@@ -2675,7 +2675,16 @@ function App(){
             </div>
 
             <div style={S.sTit}>RESPALDO JSON</div>
-            <div style={{...S.infoBx("#22c55e"),marginBottom:9}}><span>✓</span><span>Guardado automático activo — tus datos se guardan instantáneamente en este dispositivo.</span></div>
+            <div style={{...S.infoBx("#22c55e"),marginBottom:9}}>
+              <span>✓</span>
+              <span>Guardado automático activo — tus datos se guardan en este dispositivo.</span>
+            </div>
+            <div style={{background:"rgba(251,191,36,0.08)",border:"1px solid #fbbf2444",borderRadius:11,padding:"11px 13px",marginBottom:9}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#fbbf24",marginBottom:4}}>⚠ Respaldo recomendado</div>
+              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6}}>
+                Los datos viven en este navegador y dispositivo. Si cambias de navegador, limpias el caché o reinstalaas la app, se perderán. <strong style={{color:"#fbbf24"}}>Exporta el JSON regularmente</strong> y guárdalo en Google Drive.
+              </div>
+            </div>
             <div style={{...S.card(),cursor:"pointer"}} onClick={exportJSON}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(201,168,76,0.12)"}}><span>💾</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#C9A84C"}}>Exportar datos (JSON)</div><div style={{fontSize:10,color:"#475569"}}>Descarga un respaldo de todos tus datos</div></div></div>
             </div>
@@ -3091,16 +3100,10 @@ ReactDOM.render(React.createElement(App), document.getElementById('root'));
 
   </script>
   <script>
-    // Registrar Service Worker para PWA persistente
+    // Desregistrar cualquier Service Worker anterior que pudiera causar problemas
     if('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js?v=2').then(function(reg) {
-          // Forzar actualización si hay nueva versión
-          reg.update();
-          console.log('SW registrado v2:', reg.scope);
-        }).catch(function(err) {
-          console.log('SW error:', err);
-        });
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(reg){ reg.unregister(); });
       });
     }
     // Capturar errores de Babel/React y mostrarlos
