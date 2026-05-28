@@ -1237,11 +1237,10 @@ function App(){
 
     if(Object.keys(errs).length>0){setFieldErrors(errs);setSaveError("Completa los campos marcados en rojo.");return;}
 
-    // Validar saldo suficiente
-    if(esEfectivo&&!isEditReal){
+    // Validar saldo suficiente (solo para Egreso débito y Pago Tarjeta, no Traspaso)
+    if(esEfectivo&&!isEditReal&&data.tipoOp!=="Traspaso"){
       let cuentaADebitar=null;
       if(data.tipoOp==="Egreso"&&!data.usaTarjeta&&data.cuentaId)cuentaADebitar=data.cuentaId;
-      if(data.tipoOp==="Traspaso"&&data.cuentaId)cuentaADebitar=data.cuentaId;
       if(data.tipoOp==="Pago Tarjeta"&&data.cuentaId)cuentaADebitar=data.cuentaId;
       if(cuentaADebitar){
         const sa=calcSaldoCuentaAntesDe(cuentaADebitar,editMovId,movs,cuentas);
@@ -3095,8 +3094,10 @@ ReactDOM.render(React.createElement(App), document.getElementById('root'));
     // Registrar Service Worker para PWA persistente
     if('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('./sw.js').then(function(reg) {
-          console.log('SW registrado:', reg.scope);
+        navigator.serviceWorker.register('./sw.js?v=2').then(function(reg) {
+          // Forzar actualización si hay nueva versión
+          reg.update();
+          console.log('SW registrado v2:', reg.scope);
         }).catch(function(err) {
           console.log('SW error:', err);
         });
