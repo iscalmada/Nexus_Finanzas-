@@ -900,6 +900,7 @@ function App(){
   const[filterTipo,setFilterTipo]=useState("TODOS");
   const[filterEst,setFilterEst]=useState("TODOS");
   const[search,setSearch]=useState("");
+  const[searchGlobal,setSearchGlobal]=useState(false); // true = búsqueda global activa
   const[filterRetrasados,setFilterRetrasados]=useState(false);
   // filtro categorías - sets de ids seleccionados (null = todas)
   const[filterCatIng,setFilterCatIng]=useState(null);
@@ -1023,8 +1024,8 @@ function App(){
       .filter(r=>{
         // Filtro de visualización por prioridad (no afecta consolidado)
         if(filterPrioVis===null) return true;
-        // Solo aplica a PROGRAMADOS y PENDIENTES (los reales no tienen prioridad relevante para filtrar)
-        if(["INGRESADO","PAGADO"].includes(r.estatus)) return true;
+        // Con filtro activo: solo PROGRAMADOS y PENDIENTES de esa prioridad
+        if(["INGRESADO","PAGADO"].includes(r.estatus)) return false;
         return r.prioridad===filterPrioVis;
       })
       .filter(r=>{
@@ -1087,6 +1088,19 @@ function App(){
     const egProy =filtered.filter(r=>r.estatus==="PROGRAMADO"&&r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0);
     return{ingReal,egReal,ingProy,egProy};
   },[filtered]);
+
+  // Resultados de búsqueda global en cartera
+  const globalSearchResults=useMemo(()=>{
+    if(!search||search.length<2) return {acreedores:[],deudores:[],ingresosExt:[]};
+    const q=search.toLowerCase();
+    return {
+      acreedores: acreedores.filter(x=>(x.nombre||"").toLowerCase().includes(q)||(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
+      deudores:   deudores.filter(x=>(x.nombre||"").toLowerCase().includes(q)||(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
+      ingresosExt:ingresosExt.filter(x=>(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
+    };
+  },[search,acreedores,deudores,ingresosExt]);
+
+  const hasGlobalResults=globalSearchResults.acreedores.length>0||globalSearchResults.deudores.length>0||globalSearchResults.ingresosExt.length>0;
 
   const primerNegativo=useMemo(()=>{
     const retSet=new Set(retrasados.map(r=>r.id));
@@ -1638,7 +1652,42 @@ function App(){
                 <button style={S.cancB} onClick={()=>setShowPrioPanel(false)}>Cerrar</button>
               </div>
             )}
-            <input style={S.srch} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar concepto, notas o monto…"/>
+            <input style={S.srch} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar en movimientos y cartera…"/>
+            {hasGlobalResults&&search.length>=2&&(
+              <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:11,padding:"10px 13px",marginBottom:9}}>
+                <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,letterSpacing:1.5,marginBottom:8}}>TAMBIÉN EN CARTERA</div>
+                {globalSearchResults.acreedores.map(x=>(
+                  <div key={x.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #1e293b11",cursor:"pointer"}}
+                    onClick={()=>{setViewCartera({...x,tipo:"acreedores"});setView("cartera");setCarteraTab("acreedores");}}>
+                    <div>
+                      <div style={{fontSize:9,color:"#f87171",fontWeight:700}}>ACREEDOR · {x.origen}</div>
+                      <div style={{fontSize:11,color:"#e2e8f0"}}>{x.nombre||x.concepto}</div>
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:"#f87171"}}>{fmt(saldoPendiente(x,movs))}</span>
+                  </div>
+                ))}
+                {globalSearchResults.deudores.map(x=>(
+                  <div key={x.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #1e293b11",cursor:"pointer"}}
+                    onClick={()=>{setViewCartera({...x,tipo:"deudores"});setView("cartera");setCarteraTab("deudores");}}>
+                    <div>
+                      <div style={{fontSize:9,color:"#22c55e",fontWeight:700}}>DEUDOR · {x.origen}</div>
+                      <div style={{fontSize:11,color:"#e2e8f0"}}>{x.nombre||x.concepto}</div>
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:"#22c55e"}}>{fmt(saldoPendiente(x,movs))}</span>
+                  </div>
+                ))}
+                {globalSearchResults.ingresosExt.map(x=>(
+                  <div key={x.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",cursor:"pointer"}}
+                    onClick={()=>{setViewCartera({...x,tipo:"ingresosExt"});setView("cartera");setCarteraTab("ingresosExt");}}>
+                    <div>
+                      <div style={{fontSize:9,color:"#fbbf24",fontWeight:700}}>ING. EXTRAORDINARIO · {x.origen}</div>
+                      <div style={{fontSize:11,color:"#e2e8f0"}}>{x.concepto}</div>
+                    </div>
+                    <span style={{fontSize:12,fontWeight:700,color:"#fbbf24"}}>{fmt(x.montoObjetivo||x.monto||0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={S.chips}>{["TODOS",...TIPO_OP].map(t=><button key={t} style={S.chip(filterTipo===t)} onClick={()=>setFilterTipo(t)}>{t}</button>)}</div>
             <div style={S.chips}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
 
