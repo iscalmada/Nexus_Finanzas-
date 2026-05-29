@@ -917,6 +917,7 @@ function App(){
   const[prioI,setPrioI]=useState(3);
   const[prioE,setPrioE]=useState(3);
   const[multiMode,setMultiMode]=useState(false);
+  const[filterPrioVis,setFilterPrioVis]=useState(null); // null=todas, 1=Alta, 2=Media, 3=Baja
   const[selected,setSelected]=useState(new Set());
   const[showMultiEdit,setShowMultiEdit]=useState(false);
   const[multiForm,setMultiForm]=useState({estatus:"",prioridad:"",fecha:""});
@@ -1020,6 +1021,13 @@ function App(){
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
       .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
       .filter(r=>{
+        // Filtro de visualización por prioridad (no afecta consolidado)
+        if(filterPrioVis===null) return true;
+        // Solo aplica a PROGRAMADOS y PENDIENTES (los reales no tienen prioridad relevante para filtrar)
+        if(["INGRESADO","PAGADO"].includes(r.estatus)) return true;
+        return r.prioridad===filterPrioVis;
+      })
+      .filter(r=>{
         const hasFiltCuenta=filterCuentas.size>0;
         const hasFiltTarjeta=filterTarjetasFiltro.size>0;
         // Sin ningún filtro activo — mostrar todo
@@ -1053,21 +1061,23 @@ function App(){
         return false;
       })
       .filter(r=>{
-        // Transferencias y Pagos de Tarjeta no tienen categoría — siempre pasan
-        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return true;
-        // Ingresos
+        // Filtro por categoría
+        const hasCatIngActivo=filterCatIng!==null&&filterCatIng.size>0;
+        const hasCatEgActivo=filterCatEg!==null&&filterCatEg.size>0;
+        if(!hasCatIngActivo&&!hasCatEgActivo) return true;
+        // Traspasos y Pagos Tarjeta no tienen categoría: se ocultan cuando hay filtro activo
+        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return false;
         if(r.tipoOp==="Ingreso"){
-          if(filterCatIng===null) return true; // null = todas
+          if(!hasCatIngActivo) return true;
           return filterCatIng.has(r.cat)||filterCatIng.has(r.subcat);
         }
-        // Egresos
         if(r.tipoOp==="Egreso"){
-          if(filterCatEg===null) return true; // null = todas
+          if(!hasCatEgActivo) return true;
           return filterCatEg.has(r.cat)||filterCatEg.has(r.subcat);
         }
         return true;
       });
-  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf,filterCuentas,filterTarjetasFiltro,movs]);
+  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf,filterCuentas,filterTarjetasFiltro,movs,filterPrioVis]);
 
   // Totales filtrados — respeta todos los filtros activos, divide Reales y Proyectados
   const filteredTotals=useMemo(()=>{
@@ -1610,6 +1620,12 @@ function App(){
               <button style={S.prioTag(filterCuentas.size>0||filterTarjetasFiltro.size>0)}
                 onClick={()=>{setTempFilterCuentas(new Set(filterCuentas));setTempFilterTarjetas(new Set(filterTarjetasFiltro));setShowCuentaFilter(true);}}>
                 🏦 Cuentas{(filterCuentas.size+filterTarjetasFiltro.size)>0?" ("+(filterCuentas.size+filterTarjetasFiltro.size)+")":""}
+              </button>
+              <button style={S.prioTag(filterPrioVis!==null)} onClick={()=>{
+                // Ciclar: null → 1 → 2 → 3 → null
+                setFilterPrioVis(v=>v===null?1:v===1?2:v===2?3:null);
+              }}>
+                {filterPrioVis===null?"★ Prioridad":filterPrioVis===1?"★ Alta":filterPrioVis===2?"★ Media":"★ Baja"}
               </button>
               <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
             </div>
