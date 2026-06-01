@@ -1790,13 +1790,14 @@ function App(){
     const movsRealesVinculados=reg?(movs.filter(m=>(reg.movIdsVinculados||[]).includes(m.id))):[]; 
     if(movsRealesVinculados.length>0){
       // Hay movimientos reales — ofrecer desvincularlos y eliminar
-      const conceptos=movsRealesVinculados.slice(0,3).map(m=>`• ${m.concepto||"Sin concepto"} (${fmtDate(m.fecha)||"sin fecha"})`).join("
+      const conceptos=movsRealesVinculados.slice(0,3).map(m=>"• "+(m.concepto||"Sin concepto")+" ("+(fmtDate(m.fecha)||"sin fecha")+")").join("
 ");
-      const msg=`Este registro tiene ${movsRealesVinculados.length} movimiento${movsRealesVinculados.length!==1?"s":""} vinculado${movsRealesVinculados.length!==1?"s":""}:
-${conceptos}${movsRealesVinculados.length>3?"
-…y más":""}
+      const n=movsRealesVinculados.length;
+      const msg="Este registro tiene "+n+" movimiento"+(n!==1?"s":"")+" vinculado"+(n!==1?"s":"")+":
+"+conceptos+(n>3?"
+…y más":"")+"
 
-¿Desvincularlos y eliminar el registro?`;
+¿Desvincularlos y eliminar el registro?";
       if(!window.confirm(msg)) return;
       // Desvincular: quitar vinculoTipo/vinculoId de esos movimientos
       setMovs(p=>p.map(m=>movsRealesVinculados.find(mv=>mv.id===m.id)?{...m,vinculoTipo:null,vinculoId:null,tipoAbono:null}:m));
