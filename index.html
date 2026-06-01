@@ -162,8 +162,6 @@ const MESES         = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oc
 const MESES_FULL    = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const PRIO_LBL      = {1:"Alta",2:"Media",3:"Baja"};
 const ORIG_ACREEDOR = ["Sicresa","Familia","Terceros"];
-const OPO_ETAPAS    = ["Prospecto","Negociación","Cerrada","Perdida"];
-const OPO_COLOR_ETAPA = {Prospecto:"#60a5fa",Negociación:"#fbbf24",Cerrada:"#22c55e",Perdida:"#475569"};
 const ORIG_DEUDOR   = ["Sicresa","Terceros"];
 const ORIG_ING_EXT  = ["Patrimonio","Sicresa"];
 const EST_ING_EXT   = ["Pendiente","Programado","Parcial","Recuperado"];
@@ -700,12 +698,11 @@ const ModalMov=memo(function ModalMov({
                 if(mm<=0) return null;
 
                 if(formMov.vinculoTipo==="acreedores"&&formMov.tipoAbono){
-                  // interes_convencional: sin validación de monto
-                  if(formMov.tipoAbono==="interes_convencional") return null;
+                  // Mostrar saldo disponible de capital o interés y alertar si excede
                   const vinc=(rv.movIdsVinculados||[]);
                   const ejec=movsCalc.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-                  const abonadoCap=ejec.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional"&&m.tipoAbono!=="interes")).reduce((s,m)=>s+m.monto,0);
-                  const abonadoIntAcum=ejec.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
+                  const abonadoCap=ejec.filter(m=>m.tipoAbono!=="interes").reduce((s,m)=>s+m.monto,0);
+                  const abonadoInt=ejec.filter(m=>m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
                   if(formMov.tipoAbono==="capital"){
                     const pendCap=Math.max(0,(rv.montoCapital||rv.montoActual||0)-abonadoCap);
                     if(mm>pendCap+0.01) return(
@@ -713,11 +710,11 @@ const ModalMov=memo(function ModalMov({
                         <span>El monto ({fmt(mm)}) excede el capital pendiente ({fmt(pendCap)}). Ajusta el monto.</span>
                       </div>
                     );
-                  } else if(formMov.tipoAbono==="interes_acumulado"){
-                    const pendIntAcum=Math.max(0,(rv.montoInteres||0)-abonadoIntAcum);
-                    if((rv.montoInteres||0)>0&&mm>pendIntAcum+0.01) return(
+                  } else {
+                    const pendInt=Math.max(0,(rv.montoInteres||0)-abonadoInt);
+                    if((rv.montoInteres||0)>0&&mm>pendInt+0.01) return(
                       <div style={{...S.errBox,marginTop:6}}><span>⛔</span>
-                        <span>El monto ({fmt(mm)}) excede el interés acumulado pendiente ({fmt(pendIntAcum)}). Ajusta el monto.</span>
+                        <span>El monto ({fmt(mm)}) excede el interés pendiente ({fmt(pendInt)}). Ajusta el monto.</span>
                       </div>
                     );
                   }
@@ -732,56 +729,39 @@ const ModalMov=memo(function ModalMov({
                   </div>
                 );
               })()}
-              {/* Selector de tipo de abono al vincular a acreedor */}
+              {/* Siempre preguntar capital/interés al vincular a acreedor */}
               {formMov.tipoOp==="Egreso"&&formMov.vinculoTipo==="acreedores"&&formMov.vinculoId&&(
                 <div style={{marginTop:9}}>
-                  <label style={S.fl}>¿Este pago es a…?</label>
+                  <label style={S.fl}>¿Este pago es a capital o interés?</label>
                   {(()=>{
                     const rv=acreedores.find(x=>x.id===formMov.vinculoId);
-                    const tieneIntAcum=(rv?.montoInteres||0)>0;
-                    const movsCalc2=editMovId?movs.filter(m=>m.id!==editMovId):movs;
-                    const vinc2=(rv?.movIdsVinculados||[]);
-                    const ejec2=movsCalc2.filter(m=>vinc2.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-                    const pendCap=rv?Math.max(0,(rv.montoCapital||rv.montoActual||0)-ejec2.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional"&&m.tipoAbono!=="interes")).reduce((s,m)=>s+m.monto,0)):0;
-                    const pendIntAcum=rv?Math.max(0,(rv.montoInteres||0)-ejec2.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0)):0;
+                    const tieneIntDesglose=(rv?.montoInteres||0)>0;
                     return(<>
-                      <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:5}}>
-                        <button style={{...S.prioB2(formMov.tipoAbono==="capital","#22c55e"),flex:1,minWidth:80,padding:"8px 4px",fontSize:9}}
+                      <div style={{display:"flex",gap:7}}>
+                        <button style={{...S.prioB2(formMov.tipoAbono==="capital","#22c55e"),flex:1,padding:"8px 0",fontSize:10}}
                           onClick={()=>set("tipoAbono","capital")}>💰 Capital</button>
-                        {tieneIntAcum&&<button style={{...S.prioB2(formMov.tipoAbono==="interes_acumulado","#f87171"),flex:1,minWidth:80,padding:"8px 4px",fontSize:9}}
-                          onClick={()=>set("tipoAbono","interes_acumulado")}>📌 Int. Acumulado</button>}
-                        <button style={{...S.prioB2(formMov.tipoAbono==="interes_convencional","#fbbf24"),flex:1,minWidth:80,padding:"8px 4px",fontSize:9}}
-                          onClick={()=>set("tipoAbono","interes_convencional")}>💸 Int. Convencional</button>
+                        <button style={{...S.prioB2(formMov.tipoAbono==="interes","#f87171"),flex:1,padding:"8px 0",fontSize:10}}
+                          onClick={()=>set("tipoAbono","interes")}>💸 Interés</button>
                       </div>
-                      {/* Descripción del tipo seleccionado */}
-                      {formMov.tipoAbono==="capital"&&(
-                        <div style={{...S.infoBx("#22c55e"),marginBottom:5}}><span>💰</span>
-                          <span>Reduce el capital pendiente. Saldo disponible: <strong>{fmt(pendCap)}</strong></span>
-                        </div>
-                      )}
-                      {formMov.tipoAbono==="interes_acumulado"&&(
-                        <div style={{...S.infoBx("#f87171"),marginBottom:5}}><span>📌</span>
-                          <span>Reduce interés ya capitalizado. Saldo disponible: <strong>{fmt(pendIntAcum)}</strong></span>
-                        </div>
-                      )}
-                      {formMov.tipoAbono==="interes_convencional"&&(
-                        <div style={{...S.infoBx("#fbbf24"),marginBottom:5}}><span>💸</span>
-                          <span>Pago de interés periódico. No reduce el saldo de la deuda. Sin límite de monto.</span>
-                        </div>
-                      )}
-                      {/* Mini-resumen de saldos si hay desglose */}
-                      {tieneIntAcum&&(
-                        <div style={{display:"flex",gap:5,marginTop:4}}>
-                          <div style={{flex:1,background:"rgba(34,197,94,0.08)",border:"1px solid #22c55e33",borderRadius:7,padding:"5px 7px",textAlign:"center"}}>
-                            <div style={{fontSize:7,color:"#22c55e",fontWeight:700,marginBottom:1}}>Capital pend.</div>
-                            <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(pendCap)}</div>
+                      {rv&&tieneIntDesglose&&(()=>{
+                        const movsCalc2=editMovId?movs.filter(m=>m.id!==editMovId):movs;
+                        const vinc=(rv.movIdsVinculados||[]);
+                        const ejec=movsCalc2.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
+                        const pendCap=Math.max(0,(rv.montoCapital||rv.montoActual||0)-ejec.filter(m=>m.tipoAbono!=="interes").reduce((s,m)=>s+m.monto,0));
+                        const pendInt=Math.max(0,(rv.montoInteres||0)-ejec.filter(m=>m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0));
+                        return(
+                          <div style={{display:"flex",gap:6,marginTop:5}}>
+                            <div style={{flex:1,background:"rgba(34,197,94,0.08)",border:"1px solid #22c55e33",borderRadius:7,padding:"5px 8px",textAlign:"center"}}>
+                              <div style={{fontSize:8,color:"#22c55e",fontWeight:700}}>Capital pend.</div>
+                              <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(pendCap)}</div>
+                            </div>
+                            <div style={{flex:1,background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:7,padding:"5px 8px",textAlign:"center"}}>
+                              <div style={{fontSize:8,color:"#f87171",fontWeight:700}}>Interés pend.</div>
+                              <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(pendInt)}</div>
+                            </div>
                           </div>
-                          <div style={{flex:1,background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:7,padding:"5px 7px",textAlign:"center"}}>
-                            <div style={{fontSize:7,color:"#f87171",fontWeight:700,marginBottom:1}}>Int. Acum. pend.</div>
-                            <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(pendIntAcum)}</div>
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                       {!formMov.tipoAbono&&<div style={{fontSize:9,color:"#fbbf24",marginTop:3}}>⚠ Selecciona el tipo para registrar correctamente</div>}
                     </>);
                   })()}
@@ -1008,7 +988,6 @@ function App(){
     try { localStorage.setItem('nexus_' + key, JSON.stringify(val)); } catch(e) {}
   }
 
-  const[oportunidades,setOportunidades]=useState(()=>loadLS('oportunidades', []));
   const[movs,setMovs]=useState(()=>{
     const data=loadLS('movs', INIT_MOVS);
     // Migrar "Transferencia" → "Traspaso" en movimientos históricos
@@ -1032,7 +1011,6 @@ function App(){
   useEffect(()=>{ saveLS('catEg', catEg); }, [catEg]);
   useEffect(()=>{ saveLS('presupuestos', presupuestos); }, [presupuestos]);
   useEffect(()=>{ saveLS('acreedores', acreedores); }, [acreedores]);
-  useEffect(()=>{ saveLS('oportunidades', oportunidades); }, [oportunidades]);
   useEffect(()=>{ saveLS('deudores', deudores); }, [deudores]);
   useEffect(()=>{ saveLS('ingresosExt', ingresosExt); }, [ingresosExt]);
 
@@ -1122,11 +1100,6 @@ function App(){
   const[abonoTarget,setAbonoTarget]=useState(null); // {tipo,id}
   const[formAbono,setFormAbono]=useState({fecha:'',monto:'',concepto:'',tipoAbono:''});
 
-  const[opoTab,setOpoTab]=useState("activas"); // "activas"|"cerradas"|"perdidas"
-  const[showOpoForm,setShowOpoForm]=useState(false);
-  const[editOpoId,setEditOpoId]=useState(null);
-  const[formOpo,setFormOpo]=useState({});
-  const[viewOpo,setViewOpo]=useState(null);
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[jsonImportError,setJsonImportError]=useState("");
 
@@ -1226,29 +1199,30 @@ function App(){
         return false;
       })
       .filter(r=>{
-        // Filtro por categoría
-        // null = sin filtro (todas); Set vacío = ninguna; Set con items = filtro activo
+        // Filtro por categoría — null = sin filtro activo (mostrar todas)
         const hasCatIngActivo=filterCatIng!==null&&filterCatIng.size>0;
         const hasCatEgActivo=filterCatEg!==null&&filterCatEg.size>0;
-        // Sin ningún filtro activo en ningún lado → mostrar todo
         if(!hasCatIngActivo&&!hasCatEgActivo) return true;
-
-        // Traspasos y Pagos Tarjeta: sin categoría, se ocultan cuando hay filtro activo
-        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return false;
-
+        // Traspasos y Pagos Tarjeta no tienen categoría: solo se ocultan si
+        // el tipo coincide con el filtro activo; si el filtro es solo de egresos
+        // y el mov es un ingreso sin filtro de ing activo, debe pasar.
+        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta"){
+          // Estos tipos no tienen cat — si solo hay filtro del mismo "lado" se ocultan
+          // Si ambos filtros están activos o solo uno del lado contrario, se ocultan igual
+          return false;
+        }
         if(r.tipoOp==="Ingreso"){
-          // Si hay filtro de egresos activo pero NO hay filtro de ingresos:
-          // ocultar ingresos (el usuario quiere ver solo los egresos filtrados)
-          if(!hasCatIngActivo) return false;
-          // Hay filtro de ingresos: el mov pasa si su cat padre O subcat está en el Set
+          // Sin filtro de ingresos activo → pasa (aunque haya filtro de egresos)
+          if(!hasCatIngActivo) return true;
+          // El movimiento pasa si su categoría padre está en el Set
+          // O si su subcategoría está en el Set
+          // (seleccionar el padre implica ver todos sus hijos)
           if(filterCatIng.has(r.cat)) return true;
           if(r.subcat&&filterCatIng.has(r.subcat)) return true;
           return false;
         }
         if(r.tipoOp==="Egreso"){
-          // Si hay filtro de ingresos activo pero NO hay filtro de egresos:
-          // ocultar egresos
-          if(!hasCatEgActivo) return false;
+          if(!hasCatEgActivo) return true;
           if(filterCatEg.has(r.cat)) return true;
           if(r.subcat&&filterCatEg.has(r.subcat)) return true;
           return false;
@@ -1464,24 +1438,19 @@ function App(){
           }
         } else if(data.vinculoTipo==="acreedores"){
           // Acreedor: validar según tipo de abono
-          // "interes_convencional" = gasto puro, sin validación de saldo
-          if(data.tipoAbono!=="interes_convencional"){
-            const desglose=saldoPendienteDesglose(regV,movsParaCalculo);
-            if(data.tipoAbono==="interes_acumulado"||data.tipoAbono==="interes"){
-              // Interés acumulado: validar contra montoInteres del acreedor
-              if((regV.montoInteres||0)>0&&data.monto>desglose.pendIntAcum+0.01){
-                setSaveError(`El monto de interés acumulado (${fmt(data.monto)}) excede el pendiente (${fmt(desglose.pendIntAcum)}). Ajusta el monto.`);
-                return;
-              }
-            } else {
-              // Capital: validar que no exceda el capital pendiente
-              if(data.monto>desglose.pendCapital+0.01){
-                setSaveError(`El monto de capital (${fmt(data.monto)}) excede el capital pendiente (${fmt(desglose.pendCapital)}). Ajusta el monto.`);
-                return;
-              }
+          const desglose=saldoPendienteDesglose(regV,movsParaCalculo);
+          if(data.tipoAbono==="interes"){
+            if((regV.montoInteres||0)>0&&data.monto>desglose.pendInteres+0.01){
+              setSaveError(`El monto de interés (${fmt(data.monto)}) excede el interés pendiente (${fmt(desglose.pendInteres)}). Ajusta el monto.`);
+              return;
+            }
+          } else {
+            // Abono a capital
+            if(data.monto>desglose.pendCapital+0.01){
+              setSaveError(`El monto de capital (${fmt(data.monto)}) excede el capital pendiente (${fmt(desglose.pendCapital)}). Ajusta el monto.`);
+              return;
             }
           }
-          // interes_convencional: sin validación de exceso, se registra libre
         } else {
           // Deudores: validación genérica
           const sp=saldoPendiente(regV,movsParaCalculo);
@@ -1558,47 +1527,6 @@ function App(){
   // ── Cartera helpers ──
   const nextCarteraId = useCallback((arr)=>arr.length?Math.max(...arr.map(x=>x.id))+1:1,[]);
 
-  // ── Helpers Oportunidades ──
-  const openOpoForm = useCallback((item=null)=>{
-    if(item){
-      setFormOpo({...item,montoEstimado:String(item.montoEstimado??"")});
-      setEditOpoId(item.id);
-    } else {
-      setFormOpo({cliente:"",concepto:"",montoEstimado:"",probabilidad:2,etapa:"Prospecto",fechaEstimadaCierre:"",notas:"",ingExtVinculadoId:null,movIdsVinculados:[]});
-      setEditOpoId(null);
-    }
-    setShowOpoForm(true);
-  },[]);
-
-  const saveOpo = useCallback(()=>{
-    if(!formOpo.concepto) return;
-    const data={...formOpo,montoEstimado:parseFloat(formOpo.montoEstimado)||0};
-    if(editOpoId!==null){
-      setOportunidades(p=>p.map(x=>x.id===editOpoId?{...x,...data}:x));
-    } else {
-      setOportunidades(p=>[...p,{...data,id:nextCarteraId(oportunidades),movIdsVinculados:[]}]);
-    }
-    setShowOpoForm(false);setEditOpoId(null);
-  },[formOpo,editOpoId,oportunidades,nextCarteraId]);
-
-  const cerrarOportunidad = useCallback((opo)=>{
-    // Crear Ingreso Extraordinario automáticamente al cerrar
-    const nuevoIngExt={
-      id:nextCarteraId(ingresosExt),
-      origen:"Nexus Partners",
-      concepto:opo.concepto+(opo.cliente?" — "+opo.cliente:""),
-      monto:opo.montoEstimado,
-      montoObjetivo:opo.montoEstimado,
-      condiciones:opo.notas||"",
-      estado:"Pendiente",
-      movIdsVinculados:[],
-    };
-    setIngresosExt(p=>[...p,nuevoIngExt]);
-    setOportunidades(p=>p.map(x=>x.id===opo.id?{...x,etapa:"Cerrada",ingExtVinculadoId:nuevoIngExt.id}:x));
-    // Refrescar viewOpo si está abierto
-    if(viewOpo&&viewOpo.id===opo.id) setViewOpo({...opo,etapa:"Cerrada",ingExtVinculadoId:nuevoIngExt.id});
-  },[ingresosExt,nextCarteraId,viewOpo]);
-
   const abonado = useCallback((registro,movs)=>{
     if(!registro.movIdsVinculados||!registro.movIdsVinculados.length) return 0;
     return movs.filter(m=>registro.movIdsVinculados.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus)).reduce((s,m)=>s+m.monto,0);
@@ -1612,31 +1540,27 @@ function App(){
   const saldoPendiente = useCallback((registro,movs)=>{
     const vinc=(registro.movIdsVinculados||[]);
     const ejecutados=movs.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-    // Solo capital e interés acumulado reducen el saldo ("interes_convencional" no)
-    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional")).reduce((s,m)=>s+m.monto,0);
-    const abonadoIntAcum=ejecutados.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
+    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono!=="interes").reduce((s,m)=>s+m.monto,0);
+    const abonadoInteres=ejecutados.filter(m=>m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
+    // Si el acreedor tiene campos separados capital/interés los usamos; si no, fallback a montoActual
     const tieneDesglose=(registro.montoCapital||0)>0||(registro.montoInteres||0)>0;
     if(tieneDesglose){
       const pendCapital=Math.max(0,(registro.montoCapital||0)-abonadoCapital);
-      const pendIntAcum=Math.max(0,(registro.montoInteres||0)-abonadoIntAcum);
-      return pendCapital+pendIntAcum;
+      const pendInteres=Math.max(0,(registro.montoInteres||0)-abonadoInteres);
+      return pendCapital+pendInteres;
     }
     return Math.max(0,(registro.montoActual||0)-abonadoCapital);
   },[]);
 
-  // Saldo pendiente desglosado capital/interés acumulado
-  // tipoAbono posibles: "capital" | "interes_acumulado" | "interes_convencional"
-  // Solo "capital" e "interes_acumulado" reducen saldo; "interes_convencional" es gasto puro
+  // Saldo pendiente desglosado capital/interés — solo para acreedores con campos separados
   const saldoPendienteDesglose = useCallback((registro,movs)=>{
     const vinc=(registro.movIdsVinculados||[]);
     const ejecutados=movs.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes"&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional")).reduce((s,m)=>s+m.monto,0);
-    // Retrocompatibilidad: "interes" antiguo equivale a "interes_acumulado"
-    const abonadoIntAcum=ejecutados.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
-    const abonadoIntConv=ejecutados.filter(m=>m.tipoAbono==="interes_convencional").reduce((s,m)=>s+m.monto,0);
+    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono!=="interes").reduce((s,m)=>s+m.monto,0);
+    const abonadoInteres=ejecutados.filter(m=>m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
     const pendCapital=Math.max(0,(registro.montoCapital||registro.montoActual||0)-abonadoCapital);
-    const pendIntAcum=Math.max(0,(registro.montoInteres||0)-abonadoIntAcum);
-    return{pendCapital,pendIntAcum,pendInteres:pendIntAcum,abonadoCapital,abonadoInteres:abonadoIntAcum,abonadoIntAcum,abonadoIntConv};
+    const pendInteres=Math.max(0,(registro.montoInteres||0)-abonadoInteres);
+    return{pendCapital,pendInteres,abonadoCapital,abonadoInteres};
   },[]);
 
   // Estatus derivado para Ingresos Extraordinarios
@@ -1750,7 +1674,7 @@ function App(){
   },[acreedores,deudores,ingresosExt,movs]);
 
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,exportedAt:new Date().toISOString(),version:"v8"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,exportedAt:new Date().toISOString(),version:"v7"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
@@ -1775,7 +1699,6 @@ function App(){
         if(data.acreedores){setAcreedores(data.acreedores);saveLS('acreedores',data.acreedores);}
         if(data.deudores){setDeudores(data.deudores);saveLS('deudores',data.deudores);}
         if(data.ingresosExt){setIngresosExt(data.ingresosExt);saveLS('ingresosExt',data.ingresosExt);}
-        if(data.oportunidades){setOportunidades(data.oportunidades);saveLS('oportunidades',data.oportunidades);}
         setShowJsonModal(false);
         setView("dashboard");
       }catch(err){setJsonImportError("Archivo inválido. Usa un JSON exportado desde esta app.");}
@@ -1802,7 +1725,7 @@ function App(){
 
   const PrioILabel=prioI===3?"Todas":PRIO_LBL[prioI];
   const PrioELabel=prioE===3?"Todas":PRIO_LBL[prioE];
-  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","configuracion","cartera","oportunidades"];
+  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","configuracion","cartera"];
 
   // Semáforo color
   const semColor=s=>s==="verde"?"#22c55e":s==="amarillo"?"#fbbf24":"#f87171";
@@ -2439,248 +2362,6 @@ function App(){
           </div>
         )}
 
-
-        {/* ── OPORTUNIDADES NEXUS ── */}
-        {view==="oportunidades"&&(
-          <div style={S.sec}>
-            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}>
-              <button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button>
-              <span style={{...S.sTit,margin:0}}>OPORTUNIDADES NEXUS</span>
-            </div>
-
-            {/* Resumen Pipeline */}
-            {(()=>{
-              const activas=oportunidades.filter(o=>o.etapa==="Prospecto"||o.etapa==="Negociación");
-              const cerradas=oportunidades.filter(o=>o.etapa==="Cerrada");
-              const perdidas=oportunidades.filter(o=>o.etapa==="Perdida");
-              const montoActivas=activas.reduce((s,o)=>s+(o.montoEstimado||0),0);
-              const montoAltaProb=activas.filter(o=>o.probabilidad===1).reduce((s,o)=>s+(o.montoEstimado||0),0);
-              const montoCerradas=cerradas.reduce((s,o)=>s+(o.montoEstimado||0),0);
-              return(
-                <div style={{...S.card("rgba(201,168,76,0.25)"),marginBottom:11}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:7}}>
-                    <div style={{textAlign:"center"}}>
-                      <div style={S.lbl}>Pipeline activo</div>
-                      <div style={{fontSize:15,fontWeight:800,color:"#C9A84C"}}>{fmt(montoActivas)}</div>
-                      <div style={{fontSize:9,color:"#475569"}}>{activas.length} oportunidades</div>
-                    </div>
-                    <div style={{textAlign:"center"}}>
-                      <div style={S.lbl}>Prob. Alta</div>
-                      <div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>{fmt(montoAltaProb)}</div>
-                      <div style={{fontSize:9,color:"#475569"}}>{activas.filter(o=>o.probabilidad===1).length} ops</div>
-                    </div>
-                    <div style={{textAlign:"center"}}>
-                      <div style={S.lbl}>Cerradas</div>
-                      <div style={{fontSize:15,fontWeight:800,color:"#60a5fa"}}>{fmt(montoCerradas)}</div>
-                      <div style={{fontSize:9,color:"#475569"}}>{cerradas.length} ops</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Tabs */}
-            <div style={{display:"flex",borderBottom:"1px solid #1e293b",marginBottom:11}}>
-              {[["activas","🟡 Activas"],["cerradas","✅ Cerradas"],["perdidas","❌ Perdidas"]].map(([k,l])=>(
-                <button key={k} style={{flex:1,padding:"8px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
-                  color:opoTab===k?"#C9A84C":"#334155",borderBottom:opoTab===k?"2px solid #C9A84C":"2px solid transparent"}}
-                  onClick={()=>setOpoTab(k)}>{l}</button>
-              ))}
-            </div>
-
-            {/* Lista por tab */}
-            {(()=>{
-              const lista=oportunidades.filter(o=>{
-                if(opoTab==="activas") return o.etapa==="Prospecto"||o.etapa==="Negociación";
-                if(opoTab==="cerradas") return o.etapa==="Cerrada";
-                return o.etapa==="Perdida";
-              }).sort((a,b)=>a.probabilidad-b.probabilidad||((b.montoEstimado||0)-(a.montoEstimado||0)));
-
-              if(lista.length===0) return(
-                <div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>
-                  {opoTab==="activas"?"No hay oportunidades activas":opoTab==="cerradas"?"Sin oportunidades cerradas":"Sin oportunidades perdidas"}
-                </div>
-              );
-
-              return lista.map(opo=>{
-                const colorEtapa=OPO_COLOR_ETAPA[opo.etapa]||"#C9A84C";
-                const prioColor=opo.probabilidad===1?"#22c55e":opo.probabilidad===2?"#fbbf24":"#94a3b8";
-                const prioLabel=opo.probabilidad===1?"Alta":opo.probabilidad===2?"Media":"Baja";
-                const ingExt=opo.ingExtVinculadoId?ingresosExt.find(x=>x.id===opo.ingExtVinculadoId):null;
-                return(
-                  <div key={opo.id} style={{...S.card(),borderLeft:`3px solid ${colorEtapa}`,cursor:"pointer",marginBottom:8}}
-                    onClick={()=>setViewOpo(opo)}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
-                      <div style={{flex:1,marginRight:10}}>
-                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:`${colorEtapa}22`,color:colorEtapa}}>{opo.etapa}</span>
-                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:`${prioColor}22`,color:prioColor}}>★ {prioLabel}</span>
-                        </div>
-                        <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{opo.concepto}</div>
-                        {opo.cliente&&<div style={{fontSize:10,color:"#64748b",marginTop:1}}>👤 {opo.cliente}</div>}
-                      </div>
-                      <div style={{textAlign:"right"}}>
-                        <div style={{fontSize:9,color:"#64748b"}}>Estimado</div>
-                        <div style={{fontSize:16,fontWeight:800,color:"#C9A84C"}}>{fmt(opo.montoEstimado||0)}</div>
-                      </div>
-                    </div>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:9,color:"#475569"}}>
-                      <span>{opo.fechaEstimadaCierre?"📅 "+fmtDate(opo.fechaEstimadaCierre):"Sin fecha estimada"}</span>
-                      {ingExt&&<span style={{color:"#22c55e",fontWeight:700}}>→ Ing. Ext. vinculado</span>}
-                    </div>
-                    {opo.notas&&<div style={{fontSize:9,color:"#475569",fontStyle:"italic",marginTop:4,borderTop:"1px solid #1e293b",paddingTop:4}}>{opo.notas}</div>}
-                  </div>
-                );
-              });
-            })()}
-            <button style={S.fab} onClick={()=>openOpoForm()}>+</button>
-          </div>
-        )}
-
-        {/* ── MODAL DETALLE OPORTUNIDAD ── */}
-        {viewOpo&&(()=>{
-          const colorEtapa=OPO_COLOR_ETAPA[viewOpo.etapa]||"#C9A84C";
-          const prioColor=viewOpo.probabilidad===1?"#22c55e":viewOpo.probabilidad===2?"#fbbf24":"#94a3b8";
-          const prioLabel=viewOpo.probabilidad===1?"Alta":viewOpo.probabilidad===2?"Media":"Baja";
-          const ingExt=viewOpo.ingExtVinculadoId?ingresosExt.find(x=>x.id===viewOpo.ingExtVinculadoId):null;
-          const esCerrada=viewOpo.etapa==="Cerrada";
-          const esPerdida=viewOpo.etapa==="Perdida";
-          const esActiva=!esCerrada&&!esPerdida;
-          return(
-            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setViewOpo(null);}}>
-              <div style={S.mBox}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                  <div style={S.mTit}>🚀 OPORTUNIDAD</div>
-                  <button style={{background:"none",border:"none",color:"#475569",fontSize:18,cursor:"pointer"}} onClick={()=>setViewOpo(null)}>✕</button>
-                </div>
-
-                {/* Header */}
-                <div style={{background:"#13131f",borderRadius:11,padding:"12px 14px",marginBottom:11}}>
-                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5}}>
-                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:`${colorEtapa}22`,color:colorEtapa}}>{viewOpo.etapa}</span>
-                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:`${prioColor}22`,color:prioColor}}>★ Prob. {prioLabel}</span>
-                  </div>
-                  <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0",marginBottom:3}}>{viewOpo.concepto}</div>
-                  {viewOpo.cliente&&<div style={{fontSize:11,color:"#94a3b8"}}>👤 {viewOpo.cliente}</div>}
-                  {viewOpo.fechaEstimadaCierre&&<div style={{fontSize:10,color:"#64748b",marginTop:4}}>📅 Cierre estimado: {fmtDate(viewOpo.fechaEstimadaCierre)}</div>}
-                  {viewOpo.notas&&<div style={{fontSize:10,color:"#64748b",fontStyle:"italic",marginTop:5,borderTop:"1px solid #1e293b",paddingTop:5}}>{viewOpo.notas}</div>}
-                </div>
-
-                {/* Monto */}
-                <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid #C9A84C33",borderRadius:9,padding:"12px",textAlign:"center",marginBottom:11}}>
-                  <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,marginBottom:3}}>MONTO ESTIMADO</div>
-                  <div style={{fontSize:24,fontWeight:800,color:"#C9A84C"}}>{fmt(viewOpo.montoEstimado||0)}</div>
-                </div>
-
-                {/* Ingreso Extraordinario vinculado */}
-                {ingExt&&(
-                  <div style={{background:"rgba(34,197,94,0.08)",border:"1px solid #22c55e33",borderRadius:9,padding:"11px 13px",marginBottom:11}}>
-                    <div style={{fontSize:9,color:"#22c55e",fontWeight:700,letterSpacing:1,marginBottom:4}}>INGRESO EXTRAORDINARIO VINCULADO</div>
-                    <div style={{fontSize:12,fontWeight:700,color:"#e2e8f0",marginBottom:3}}>{ingExt.concepto}</div>
-                    {(()=>{
-                      const saldos=saldoIngExt(ingExt,movs);
-                      return(
-                        <div style={{display:"flex",gap:7}}>
-                          <div style={{flex:1,textAlign:"center"}}>
-                            <div style={{fontSize:8,color:"#64748b"}}>Recuperado</div>
-                            <div style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(saldos.recuperado)}</div>
-                          </div>
-                          <div style={{flex:1,textAlign:"center"}}>
-                            <div style={{fontSize:8,color:"#64748b"}}>Pendiente</div>
-                            <div style={{fontSize:11,fontWeight:700,color:"#fbbf24"}}>{fmt(saldos.pendiente)}</div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                    <button style={{...S.cancB,marginTop:7,fontSize:10,padding:"6px 0"}} onClick={()=>{setViewOpo(null);setView("cartera");setCarteraTab("ingresosExt");}}>
-                      Ver en Cartera →
-                    </button>
-                  </div>
-                )}
-
-                {/* Acciones */}
-                {esActiva&&(
-                  <div style={{...S.infoBx("#C9A84C"),marginBottom:11}}><span>💡</span>
-                    <span>Al cerrar la oportunidad se crea automáticamente un Ingreso Extraordinario en Cartera para dar seguimiento al cobro.</span>
-                  </div>
-                )}
-
-                <div style={{display:"flex",gap:7,marginBottom:7}}>
-                  <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(201,168,76,0.15)",color:"#C9A84C",border:"1px solid #C9A84C44"}}
-                    onClick={()=>{setViewOpo(null);openOpoForm(viewOpo);}}>✏ Editar</button>
-                  {esActiva&&!ingExt&&(
-                    <button style={{...S.saveB,flex:1,marginTop:0,background:"linear-gradient(135deg,#22c55e,#16a34a)"}}
-                      onClick={()=>cerrarOportunidad(viewOpo)}>✅ Cerrar</button>
-                  )}
-                  {esActiva&&(
-                    <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(71,85,105,0.3)",color:"#94a3b8",border:"1px solid #47556933"}}
-                      onClick={()=>{
-                        setOportunidades(p=>p.map(x=>x.id===viewOpo.id?{...x,etapa:"Perdida"}:x));
-                        setViewOpo(null);
-                      }}>❌ Perder</button>
-                  )}
-                </div>
-                {oportunidades.find(o=>o.id===viewOpo.id)&&(
-                  <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717133",fontSize:10}} onClick={()=>{
-                    if(window.confirm("¿Eliminar esta oportunidad?")){{
-                      setOportunidades(p=>p.filter(x=>x.id!==viewOpo.id));
-                      setViewOpo(null);
-                    }}
-                  }}>🗑 Eliminar</button>
-                )}
-                <button style={S.cancB} onClick={()=>setViewOpo(null)}>Cerrar</button>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ── MODAL FORMULARIO OPORTUNIDAD ── */}
-        {showOpoForm&&(()=>{
-          const set=(k,v)=>setFormOpo(f=>({...f,[k]:v}));
-          return(
-            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowOpoForm(false);}}>
-              <div style={S.mBox}>
-                <div style={S.mTit}>{editOpoId?"✏ EDITAR":"+ NUEVA"} OPORTUNIDAD</div>
-                <div style={S.fg}><label style={S.fl}>Cliente / Prospecto</label>
-                  <input style={S.inp} value={formOpo.cliente||""} onChange={e=>set("cliente",e.target.value)} placeholder="Nombre del cliente o empresa…"/>
-                </div>
-                <div style={S.fg}><label style={S.fl}>Concepto / Servicio</label>
-                  <input style={S.inp} value={formOpo.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="¿Qué se va a vender o gestionar?"/>
-                </div>
-                <div style={S.fg}><label style={S.fl}>Monto estimado $</label>
-                  <input style={S.inp} type="number" value={formOpo.montoEstimado||""} onChange={e=>set("montoEstimado",e.target.value)} placeholder="0.00"/>
-                </div>
-                <div style={S.fg}>
-                  <label style={S.fl}>Etapa</label>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    {OPO_ETAPAS.filter(e=>e!=="Cerrada").map(et=>(
-                      <button key={et} style={{...S.prioB2(formOpo.etapa===et,OPO_COLOR_ETAPA[et]),flex:"none",padding:"7px 11px",fontSize:10}}
-                        onClick={()=>set("etapa",et)}>{et}</button>
-                    ))}
-                  </div>
-                </div>
-                <div style={S.fg}>
-                  <label style={S.fl}>Probabilidad de cierre</label>
-                  <div style={{display:"flex",gap:7}}>
-                    {[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=>(
-                      <button key={v} style={{...S.prioB2(formOpo.probabilidad===v,c),flex:1,padding:"8px 0",fontSize:10}}
-                        onClick={()=>set("probabilidad",v)}>{l}</button>
-                    ))}
-                  </div>
-                </div>
-                <div style={S.fg}><label style={S.fl}>Fecha estimada de cierre</label>
-                  <input style={S.inp} type="date" value={formOpo.fechaEstimadaCierre||""} onChange={e=>set("fechaEstimadaCierre",e.target.value)}/>
-                </div>
-                <div style={S.fg}><label style={S.fl}>Notas</label>
-                  <textarea style={{...S.inp,minHeight:70,resize:"vertical",lineHeight:1.5}} value={formOpo.notas||""} onChange={e=>set("notas",e.target.value)} placeholder="Condiciones, contacto, próximos pasos…"/>
-                </div>
-                <button style={S.saveB} onClick={saveOpo}>GUARDAR</button>
-                <button style={S.cancB} onClick={()=>setShowOpoForm(false)}>Cancelar</button>
-              </div>
-            </div>
-          );
-        })()}
-
         {/* ── MENÚ ── */}
         {view==="menu"&&(
           <div style={S.sec}>
@@ -2691,7 +2372,6 @@ function App(){
                 {ico:"🎯",label:"Presupuestos",sub:"Control de gasto por categoría",target:"presupuestos",color:"#22c55e"},
                 {ico:"📈",label:"Proyección Presupuestal",sub:"Panorama financiero mes a mes",target:"proyeccion",color:"#60a5fa"},
                 {ico:"🤝",label:"Cartera",sub:`Acreedores · Deudores · Ing. Extraordinarios`,target:"cartera",color:"#f472b6"},
-                {ico:"🚀",label:"Oportunidades Nexus",sub:"Pipeline comercial · Proyección de ingresos",target:"oportunidades",color:"#C9A84C"},
               ].map(it=>(
                 <div key={it.target} style={S.menuRow} onClick={()=>setView(it.target)}>
                   <div style={{...S.menuIco,background:`${it.color}18`}}><span>{it.ico}</span></div>
@@ -3080,24 +2760,19 @@ function App(){
                   const totalProg=movProg.reduce((s,m)=>s+m.monto,0);
                   return(<>
                     <div style={{...S.sTit,marginBottom:9}}>ABONOS VÍA MOVIMIENTOS</div>
-                    {movEjec.length>0&&(()=>{
-                      const capital=movEjec.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional"&&m.tipoAbono!=="interes"));
-                      const intAcum=movEjec.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes");
-                      const intConv=movEjec.filter(m=>m.tipoAbono==="interes_convencional");
+                    {tieneInteres&&movEjec.length>0&&(()=>{
+                      const capital=movEjec.filter(m=>m.tipoAbono!=="interes");
+                      const interes=movEjec.filter(m=>m.tipoAbono==="interes");
                       return(
-                        <div style={{display:"flex",gap:5,marginBottom:9,flexWrap:"wrap"}}>
-                          <div style={{flex:1,minWidth:70,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
-                            <div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>💰 CAPITAL</div>
-                            <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(capital.reduce((s,m)=>s+m.monto,0))}</div>
+                        <div style={{display:"flex",gap:7,marginBottom:9}}>
+                          <div style={{flex:1,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:8,padding:"6px 10px",textAlign:"center"}}>
+                            <div style={{fontSize:8,color:"#22c55e",fontWeight:700}}>CAPITAL</div>
+                            <div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(capital.reduce((s,m)=>s+m.monto,0))}</div>
                           </div>
-                          {intAcum.length>0&&<div style={{flex:1,minWidth:70,background:"rgba(248,113,113,0.1)",border:"1px solid #f8717133",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
-                            <div style={{fontSize:7,color:"#f87171",fontWeight:700}}>📌 INT. ACUM.</div>
-                            <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(intAcum.reduce((s,m)=>s+m.monto,0))}</div>
-                          </div>}
-                          {intConv.length>0&&<div style={{flex:1,minWidth:70,background:"rgba(251,191,36,0.1)",border:"1px solid #fbbf2433",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
-                            <div style={{fontSize:7,color:"#fbbf24",fontWeight:700}}>💸 INT. CONV.</div>
-                            <div style={{fontSize:11,fontWeight:800,color:"#fbbf24"}}>{fmt(intConv.reduce((s,m)=>s+m.monto,0))}</div>
-                          </div>}
+                          <div style={{flex:1,background:"rgba(248,113,113,0.1)",border:"1px solid #f8717133",borderRadius:8,padding:"6px 10px",textAlign:"center"}}>
+                            <div style={{fontSize:8,color:"#f87171",fontWeight:700}}>INTERÉS</div>
+                            <div style={{fontSize:12,fontWeight:800,color:"#f87171"}}>{fmt(interes.reduce((s,m)=>s+m.monto,0))}</div>
+                          </div>
                         </div>
                       );
                     })()}
@@ -3109,25 +2784,22 @@ function App(){
                     )}
                     {/* Lista según modo seleccionado */}
                     {(carteraDetalleModo==="ejecutados"?movEjec:movProg).map(m=>{
-                      const esIntAcum=m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes";
-                      const esIntConv=m.tipoAbono==="interes_convencional";
-                      const esCap=!esIntAcum&&!esIntConv;
-                      const badgeColor=esIntConv?"#fbbf24":esIntAcum?"#f87171":"#22c55e";
-                      const badgeBg=esIntConv?"rgba(251,191,36,0.18)":esIntAcum?"rgba(248,113,113,0.18)":"rgba(34,197,94,0.18)";
-                      const badgeLabel=esIntConv?"💸 INT. CONV.":esIntAcum?"📌 INT. ACUM.":"💰 CAPITAL";
+                      const esInt=m.tipoAbono==="interes";
                       return(
                         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1e293b"}}>
                           <div style={{flex:1}}>
                             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:2}}>
-                              <span style={{fontSize:9,padding:"2px 7px",borderRadius:5,fontWeight:800,background:badgeBg,color:badgeColor}}>
-                                {badgeLabel}
+                              <span style={{fontSize:9,padding:"2px 7px",borderRadius:5,fontWeight:800,
+                                background:esInt?"rgba(248,113,113,0.18)":"rgba(34,197,94,0.18)",
+                                color:esInt?"#f87171":"#22c55e"}}>
+                                {esInt?"💸 INTERÉS":"💰 CAPITAL"}
                               </span>
                               <span style={S.badge(m.estatus)}>{m.estatus}</span>
                             </div>
                             <div style={{fontSize:11,color:"#e2e8f0",fontWeight:600}}>{m.concepto}</div>
                             <div style={{fontSize:9,color:"#64748b"}}>{fmtDate(m.fecha)}</div>
                           </div>
-                          <span style={{fontSize:13,fontWeight:800,color:badgeColor,marginLeft:8}}>{fmt(m.monto)}</span>
+                          <span style={{fontSize:13,fontWeight:800,color:esInt?"#f87171":"#22c55e",marginLeft:8}}>{fmt(m.monto)}</span>
                         </div>
                       );
                     })}
