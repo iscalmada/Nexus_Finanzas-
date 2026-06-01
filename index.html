@@ -584,7 +584,8 @@ const ModalMov=memo(function ModalMov({
             </div>
           </div>
         )}
-        {editMovId&&<div style={{...S.infoBx("#60a5fa"),marginBottom:11}}><span>✏</span><span>Tipo: <strong>{formMov.tipoOp}</strong> — para cambiar el monto, elimina y crea de nuevo.</span></div>}
+        {editMovId&&isEditReal&&<div style={{...S.infoBx("#60a5fa"),marginBottom:11}}><span>✏</span><span>Tipo: <strong>{formMov.tipoOp}</strong> · Monto bloqueado. El resto de campos son editables.</span></div>}
+        {editMovId&&!isEditReal&&<div style={{...S.infoBx("#60a5fa"),marginBottom:11}}><span>✏</span><span>Editando: <strong>{formMov.tipoOp}</strong></span></div>}
 
         {/* TRANSFERENCIA */}
         {isT&&(<>
@@ -711,8 +712,8 @@ const ModalMov=memo(function ModalMov({
                 {formMov.tipoOp==="Ingreso"&&ingresosExt.length>0&&(
                   <optgroup label="Ing. Extraordinarios">{ingresosExt.map(x=><option key={x.id} value={`ingresosExt:${x.id}`}>{x.concepto}</option>)}</optgroup>
                 )}
-                {formMov.tipoOp==="Ingreso"&&oportunidades.filter(o=>o.etapaId==="ea5").length>0&&(
-                  <optgroup label="Oportunidades Nexus (Concretadas)">{oportunidades.filter(o=>o.etapaId==="ea5").map(x=><option key={x.id} value={`oportunidades:${x.id}`}>{x.concepto}{x.empresa?" — "+x.empresa:""}</option>)}</optgroup>
+                {formMov.tipoOp==="Ingreso"&&oportunidades.filter(o=>getEtapa(o.etapaId,etapasAvance).pctAvance>0).length>0&&(
+                  <optgroup label="Oportunidades Nexus">{oportunidades.filter(o=>getEtapa(o.etapaId,etapasAvance).pctAvance>0).map(x=>{const et=getEtapa(x.etapaId,etapasAvance);return(<option key={x.id} value={"oportunidades:"+x.id}>{x.concepto+(x.empresa?" — "+x.empresa:"")+" ["+et.nombre+"]"}</option>);})}</optgroup>
                 )}
               </select>
               <div style={{fontSize:9,color:"#475569",marginTop:3}}>
@@ -751,6 +752,34 @@ const ModalMov=memo(function ModalMov({
                     );
                   }
                   return null;
+                }
+                // Oportunidades
+                if(formMov.vinculoTipo==="oportunidades"){
+                  const movsOpoCalc=movsCalc.filter(m=>(rv.movIdsVinculados||[]).includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
+                  const yaIngOpo=movsOpoCalc.reduce((s,m)=>s+m.monto,0);
+                  const pendOpo=Math.max(0,(rv.montoEstimado||0)-yaIngOpo);
+                  const etOpo=getEtapa(rv.etapaId,etapasAvance);
+                  const esConcretada=rv.etapaId==="ea5";
+                  return(
+                    <div style={{marginTop:5}}>
+                      {!esConcretada&&<div style={{...S.infoBx("#fbbf24"),marginBottom:4}}><span>⚠</span><span>Esta oportunidad no esta Concretada ({etOpo.nombre}). Al guardar como INGRESADO se te pedira concretarla.</span></div>}
+                      <div style={{display:"flex",gap:6}}>
+                        <div style={{flex:1,background:"rgba(201,168,76,0.08)",border:"1px solid #C9A84C33",borderRadius:7,padding:"5px 8px",textAlign:"center"}}>
+                          <div style={{fontSize:7,color:"#C9A84C",fontWeight:700}}>Estimado total</div>
+                          <div style={{fontSize:11,fontWeight:800,color:"#C9A84C"}}>{fmt(rv.montoEstimado||0)}</div>
+                        </div>
+                        <div style={{flex:1,background:"rgba(34,197,94,0.08)",border:"1px solid #22c55e33",borderRadius:7,padding:"5px 8px",textAlign:"center"}}>
+                          <div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>Ya ingresado</div>
+                          <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(yaIngOpo)}</div>
+                        </div>
+                        <div style={{flex:1,background:mm>pendOpo?"rgba(248,113,113,0.08)":"rgba(251,191,36,0.08)",border:"1px solid "+(mm>pendOpo?"#f8717133":"#fbbf2433"),borderRadius:7,padding:"5px 8px",textAlign:"center"}}>
+                          <div style={{fontSize:7,color:mm>pendOpo?"#f87171":"#fbbf24",fontWeight:700}}>Pendiente</div>
+                          <div style={{fontSize:11,fontWeight:800,color:mm>pendOpo?"#f87171":"#fbbf24"}}>{fmt(pendOpo)}</div>
+                        </div>
+                      </div>
+                      {mm>pendOpo+0.01&&<div style={{...S.errBox,marginTop:5}}><span>⛔</span><span>El monto ({fmt(mm)}) excede el pendiente ({fmt(pendOpo)}). Ajusta el monto.</span></div>}
+                    </div>
+                  );
                 }
                 // Deudores / ingresosExt
                 const sd=formMov.vinculoTipo==="ingresosExt"?saldoIngExtFn(rv,movsCalc).pendiente:saldoPendienteFn(rv,movsCalc);
@@ -1162,9 +1191,12 @@ function App(){
   const[opoTab,setOpoTab]=useState("activas"); // "activas"|"concretadas"|"rechazadas"
   const[opoOrden,setOpoOrden]=useState("fechaCierre"); // "fechaCierre"|"pctAvance"
   const[opoFiltroEtapa,setOpoFiltroEtapa]=useState(null); // null=todas o id de etapa
-  const[opoFiltroAliEst,setOpoFiltroAliEst]=useState(null);
-  const[opoFiltroAliCom,setOpoFiltroAliCom]=useState(null);
-  const[opoFiltroSol,setOpoFiltroSol]=useState(null);
+  const[opoFiltroAliEst,setOpoFiltroAliEst]=useState(new Set()); // Set vacío = todas
+  const[opoFiltroAliCom,setOpoFiltroAliCom]=useState(new Set());
+  const[opoFiltroSol,setOpoFiltroSol]=useState(new Set());
+  const[showOpoFiltroAliEst,setShowOpoFiltroAliEst]=useState(false);
+  const[showOpoFiltroAliCom,setShowOpoFiltroAliCom]=useState(false);
+  const[showOpoFiltroSol,setShowOpoFiltroSol]=useState(false);
   const[showOpoCatalogos,setShowOpoCatalogos]=useState(false); // modal catálogos Nexus
   const[opoCatTab,setOpoCatTab]=useState("etapas"); // "etapas"|"soluciones"|"aliadosEst"|"aliadosCom"
   const[newOpoCatItem,setNewOpoCatItem]=useState({nombre:"",descripcion:"",pctAvance:""});
@@ -1192,6 +1224,10 @@ function App(){
   const drag=useDrag(setMovs);
   const catIngDrag=useCatDrag(setCatIng);
   const catEgDrag=useCatDrag(setCatEg);
+  const etapasDrag=useCatDrag(setEtapasAvance);
+  const solDrag=useCatDrag(setSolucionesNexus);
+  const aliEstDrag=useCatDrag(setAliadosEst);
+  const aliComDrag=useCatDrag(setAliadosCom);
   const tdStr=todayStr();
 
   const retrasados=useMemo(()=>movs.filter(r=>r.fecha&&r.fecha<tdStr&&r.estatus==="PROGRAMADO"),[movs,tdStr]);
@@ -1528,11 +1564,20 @@ function App(){
             }
           }
           // interes_convencional: sin validación de exceso, se registra libre
+        } else if(data.vinculoTipo==="oportunidades"){
+          // Oportunidad: validar que no exceda el monto estimado pendiente
+          const movsOpo=movsParaCalculo.filter(m=>(regV.movIdsVinculados||[]).includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
+          const yaIngresado=movsOpo.reduce((s,m)=>s+m.monto,0);
+          const pendOpo=Math.max(0,(regV.montoEstimado||0)-yaIngresado);
+          if(data.monto>pendOpo+0.01){
+            setSaveError("El monto ("+fmt(data.monto)+") excede el saldo pendiente de la oportunidad ("+fmt(pendOpo)+"). Ajusta el monto.");
+            return;
+          }
         } else {
           // Deudores: validación genérica
           const sp=saldoPendiente(regV,movsParaCalculo);
           if(data.tipoAbono!=="interes"&&data.monto>sp+0.01){
-            setSaveError(`El monto excede el saldo pendiente de la cuenta por cobrar (${fmt(sp)}). Ajusta el monto.`);
+            setSaveError("El monto excede el saldo pendiente de la cuenta por cobrar ("+fmt(sp)+"). Ajusta el monto.");
             return;
           }
         }
@@ -1555,6 +1600,23 @@ function App(){
       setMovs(p=>[...p,{...data,id:newId,orden:newOrd}]);
     }
 
+    // Validación especial: ingreso INGRESADO vinculado a oportunidad no concretada
+    if(data.vinculoTipo==="oportunidades"&&data.vinculoId&&data.estatus==="INGRESADO"){
+      const opoVinc=oportunidades.find(x=>x.id===data.vinculoId);
+      if(opoVinc&&opoVinc.etapaId!=="ea5"){
+        const concretar=window.confirm(
+          "Este movimiento esta vinculado a una Oportunidad que aun no esta Concretada."+
+          " Para registrarlo como INGRESADO, la Oportunidad debe estar Concretada."+
+          " Presiona Aceptar para concretarla automaticamente, o Cancelar para no guardar el movimiento."
+        );
+        if(concretar){
+          setOportunidades(p=>p.map(x=>x.id===data.vinculoId?{...x,etapaId:"ea5",fechaConcretada:todayStr()}:x));
+        } else {
+          setSaveError("Movimiento no guardado. Concreta la Oportunidad primero o cambia el estatus a PROGRAMADO.");
+          return;
+        }
+      }
+    }
     // Vincular a cartera/oportunidades usando el ID calculado previamente
     if(data.vinculoTipo&&data.vinculoId){
       const vinculaEn=(setter)=>setter(p=>p.map(x=>x.id===data.vinculoId&&!(x.movIdsVinculados||[]).includes(newId)?{...x,movIdsVinculados:[...(x.movIdsVinculados||[]),newId]}:x));
@@ -1635,11 +1697,11 @@ function App(){
   },[formOpo,editOpoId,oportunidades,nextCarteraId,viewOpo]);
 
   const concretarOportunidad = useCallback((opo)=>{
-    // Al concretar: marcar etapa Concretada, el cobro se sigue desde la propia oportunidad
     const updated={...opo,etapaId:"ea5",fechaConcretada:todayStr()};
     setOportunidades(p=>p.map(x=>x.id===opo.id?updated:x));
-    if(viewOpo&&viewOpo.id===opo.id) setViewOpo(updated);
-  },[viewOpo]);
+    // Actualizar viewOpo inmediatamente para que el botón vincular funcione sin reabrir
+    setViewOpo(updated);
+  },[]);
 
   const rechazarOportunidad = useCallback((opo)=>{
     const updated={...opo,etapaId:"ea6"};
@@ -2558,16 +2620,64 @@ function App(){
               ))}
             </div>
             {(aliadosEst.length>0||aliadosCom.length>0||solucionesNexus.length>0)&&(
-              <div style={{...S.chips,marginBottom:5}}>
-                {aliadosEst.length>0&&<><span style={{fontSize:9,color:"#475569",alignSelf:"center"}}>Est:</span>
-                  {aliadosEst.map(a=><button key={a.id} style={S.chip(opoFiltroAliEst===a.id,"#a78bfa")} onClick={()=>setOpoFiltroAliEst(opoFiltroAliEst===a.id?null:a.id)}>{a.nombre}</button>)}
-                </>}
-                {aliadosCom.length>0&&<><span style={{fontSize:9,color:"#475569",alignSelf:"center"}}>Com:</span>
-                  {aliadosCom.map(a=><button key={a.id} style={S.chip(opoFiltroAliCom===a.id,"#38bdf8")} onClick={()=>setOpoFiltroAliCom(opoFiltroAliCom===a.id?null:a.id)}>{a.nombre}</button>)}
-                </>}
-                {solucionesNexus.length>0&&<><span style={{fontSize:9,color:"#475569",alignSelf:"center"}}>Sol:</span>
-                  {solucionesNexus.map(s=><button key={s.id} style={S.chip(opoFiltroSol===s.id,"#C9A84C")} onClick={()=>setOpoFiltroSol(opoFiltroSol===s.id?null:s.id)}>{s.nombre}</button>)}
-                </>}
+              <div style={{display:"flex",gap:6,marginBottom:5,flexWrap:"wrap"}}>
+                {aliadosEst.length>0&&(
+                  <div style={{position:"relative"}}>
+                    <button style={S.chip(opoFiltroAliEst.size>0,"#a78bfa")} onClick={()=>{setShowOpoFiltroAliEst(v=>!v);setShowOpoFiltroAliCom(false);setShowOpoFiltroSol(false);}}>
+                      ⚡ Aliado Est.{opoFiltroAliEst.size>0?" ("+opoFiltroAliEst.size+")":""}
+                    </button>
+                    {showOpoFiltroAliEst&&(
+                      <div style={{position:"absolute",top:"100%",left:0,zIndex:150,background:"#0d0d1a",border:"1px solid #a78bfa44",borderRadius:10,padding:"8px 10px",minWidth:170,boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
+                        <div style={{fontSize:8,color:"#a78bfa",fontWeight:700,marginBottom:6}}>ALIADO ESTRATÉGICO</div>
+                        {aliadosEst.map(a=>{const sel=opoFiltroAliEst.has(a.id);return(
+                          <div key={a.id} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setOpoFiltroAliEst(prev=>{const n=new Set(prev);n.has(a.id)?n.delete(a.id):n.add(a.id);return n;})}>
+                            <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?"#a78bfa":"#334155"),background:sel?"#a78bfa":"transparent",flexShrink:0}}/>
+                            <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b"}}>{a.nombre}</span>
+                          </div>
+                        );})}
+                        <button style={{...S.smBtn("#475569"),width:"100%",marginTop:6,fontSize:8}} onClick={()=>{setOpoFiltroAliEst(new Set());setShowOpoFiltroAliEst(false);}}>Limpiar</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {aliadosCom.length>0&&(
+                  <div style={{position:"relative"}}>
+                    <button style={S.chip(opoFiltroAliCom.size>0,"#38bdf8")} onClick={()=>{setShowOpoFiltroAliCom(v=>!v);setShowOpoFiltroAliEst(false);setShowOpoFiltroSol(false);}}>
+                      🤝 Aliado Com.{opoFiltroAliCom.size>0?" ("+opoFiltroAliCom.size+")":""}
+                    </button>
+                    {showOpoFiltroAliCom&&(
+                      <div style={{position:"absolute",top:"100%",left:0,zIndex:150,background:"#0d0d1a",border:"1px solid #38bdf844",borderRadius:10,padding:"8px 10px",minWidth:170,boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
+                        <div style={{fontSize:8,color:"#38bdf8",fontWeight:700,marginBottom:6}}>ALIADO COMERCIAL</div>
+                        {aliadosCom.map(a=>{const sel=opoFiltroAliCom.has(a.id);return(
+                          <div key={a.id} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setOpoFiltroAliCom(prev=>{const n=new Set(prev);n.has(a.id)?n.delete(a.id):n.add(a.id);return n;})}>
+                            <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?"#38bdf8":"#334155"),background:sel?"#38bdf8":"transparent",flexShrink:0}}/>
+                            <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b"}}>{a.nombre}</span>
+                          </div>
+                        );})}
+                        <button style={{...S.smBtn("#475569"),width:"100%",marginTop:6,fontSize:8}} onClick={()=>{setOpoFiltroAliCom(new Set());setShowOpoFiltroAliCom(false);}}>Limpiar</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {solucionesNexus.length>0&&(
+                  <div style={{position:"relative"}}>
+                    <button style={S.chip(opoFiltroSol.size>0,"#C9A84C")} onClick={()=>{setShowOpoFiltroSol(v=>!v);setShowOpoFiltroAliEst(false);setShowOpoFiltroAliCom(false);}}>
+                      ◈ Solución{opoFiltroSol.size>0?" ("+opoFiltroSol.size+")":""}
+                    </button>
+                    {showOpoFiltroSol&&(
+                      <div style={{position:"absolute",top:"100%",left:0,zIndex:150,background:"#0d0d1a",border:"1px solid #C9A84C44",borderRadius:10,padding:"8px 10px",minWidth:170,boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
+                        <div style={{fontSize:8,color:"#C9A84C",fontWeight:700,marginBottom:6}}>SOLUCIÓN NEXUS</div>
+                        {solucionesNexus.map(s=>{const sel=opoFiltroSol.has(s.id);return(
+                          <div key={s.id} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setOpoFiltroSol(prev=>{const n=new Set(prev);n.has(s.id)?n.delete(s.id):n.add(s.id);return n;})}>
+                            <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?"#C9A84C":"#334155"),background:sel?"#C9A84C":"transparent",flexShrink:0}}/>
+                            <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b"}}>{s.nombre}</span>
+                          </div>
+                        );})}
+                        <button style={{...S.smBtn("#475569"),width:"100%",marginTop:6,fontSize:8}} onClick={()=>{setOpoFiltroSol(new Set());setShowOpoFiltroSol(false);}}>Limpiar</button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -2593,9 +2703,9 @@ function App(){
                 return e.pctAvance===0; // rechazadas
               });
               if(opoFiltroEtapa)  lista=lista.filter(o=>o.etapaId===opoFiltroEtapa);
-              if(opoFiltroAliEst) lista=lista.filter(o=>o.aliadoEst===opoFiltroAliEst);
-              if(opoFiltroAliCom) lista=lista.filter(o=>o.aliadoCom===opoFiltroAliCom);
-              if(opoFiltroSol)    lista=lista.filter(o=>o.solucionNexus===opoFiltroSol);
+              if(opoFiltroAliEst.size>0) lista=lista.filter(o=>opoFiltroAliEst.has(o.aliadoEst));
+              if(opoFiltroAliCom.size>0) lista=lista.filter(o=>opoFiltroAliCom.has(o.aliadoCom));
+              if(opoFiltroSol.size>0)    lista=lista.filter(o=>opoFiltroSol.has(o.solucionNexus));
               lista=lista.sort((a,b)=>{
                 if(opoOrden==="pctAvance"){
                   const pa=getEtapa(a.etapaId,etapasAvance).pctAvance;
@@ -2755,28 +2865,36 @@ function App(){
                   )}
                 </div>
 
-                {/* Botón vincular movimiento — cuando está concretada */}
-                {esConcretada&&(
-                  <button style={{...S.saveB,background:"linear-gradient(135deg,#22c55e,#16a34a)",marginBottom:7}}
+                {/* Botón vincular movimiento — disponible en todas las etapas activas */}
+                {!esRechazada&&(
+                  <button style={{...S.saveB,
+                    background:esConcretada?"linear-gradient(135deg,#22c55e,#16a34a)":"rgba(201,168,76,0.15)",
+                    color:esConcretada?"#fff":"#C9A84C",
+                    border:esConcretada?"none":"1px solid #C9A84C44",
+                    marginBottom:7}}
                     onClick={()=>{
+                      const opoActual=oportunidades.find(x=>x.id===opo.id)||opo;
+                      const movsActuales=movs.filter(m=>(opoActual.movIdsVinculados||[]).includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
+                      const yaIng=movsActuales.reduce((s,m)=>s+m.monto,0);
+                      const pend=Math.max(0,(opoActual.montoEstimado||0)-yaIng);
                       setViewOpo(null);
                       setFormMov({...BLANK_MOV,
                         tipoOp:"Ingreso",
                         estatus:"PROGRAMADO",
-                        concepto:opo.concepto,
-                        monto:String(pendiente||opo.montoEstimado||""),
+                        concepto:opoActual.concepto,
+                        monto:String(pend||opoActual.montoEstimado||""),
                         vinculoTipo:"oportunidades",
-                        vinculoId:opo.id,
+                        vinculoId:opoActual.id,
                       });
                       setRecForm({...BLANK_REC,
-                        activo:opo.recurrencia!=="Única",
-                        recurrencia:opo.recurrencia==="Anual"?"Anual":opo.recurrencia==="Mensual"?"Mensual":"Mensual",
+                        activo:opoActual.recurrencia!=="Única",
+                        recurrencia:opoActual.recurrencia==="Anual"?"Anual":"Mensual",
                         fechaInicio:todayStr(),
                       });
                       setEditMovId(null);setSaveError("");setFieldErrors(null);
                       setShowMov(true);
                     }}>
-                    + Vincular movimiento de ingreso
+                    {esConcretada?"+ Vincular movimiento de ingreso":"+ Proyectar ingreso (no concretada)"}
                   </button>
                 )}
 
@@ -2911,8 +3029,17 @@ function App(){
                   ))}
                 </div>
                 {/* Lista de items */}
-                {catActual.map((item,idx)=>(
-                  <div key={item.id} style={{background:"#13131f",border:`1px solid ${esEtapas?`${opoColor(item.pctAvance)}33`:"#1e293b"}`,borderRadius:9,padding:"9px 11px",marginBottom:6}}>
+                {catActual.map((item,idx)=>{
+                  const dragObj=opoCatTab==="etapas"?etapasDrag:opoCatTab==="soluciones"?solDrag:opoCatTab==="aliadosEst"?aliEstDrag:aliComDrag;
+                  const isActDrag=dragObj.aId===item.id;
+                  const isOvDrag=dragObj.oViz===item.id;
+                  return(
+                  <div key={item.id}
+                    draggable
+                    onDragStart={()=>dragObj.start(item.id)}
+                    onDragOver={e=>{e.preventDefault();dragObj.enter(item.id);}}
+                    onDrop={dragObj.commit}
+                    style={{background:isActDrag?"#1e2a1e":isOvDrag?"#1a2030":"#13131f",border:"1px solid "+(esEtapas?opoColor(item.pctAvance)+"33":"#1e293b"),borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"grab",transition:"background 0.15s"}}>
                     {editOpoCatId===item.id?(
                       <div>
                         <input style={{...S.inp,marginBottom:6}} value={newOpoCatItem.nombre} onChange={e=>setNewOpoCatItem(f=>({...f,nombre:e.target.value}))} placeholder="Nombre…"/>
@@ -2947,12 +3074,13 @@ function App(){
                       </div>
                     )}
                   </div>
-                ))}
+                );
+                })}
                 {/* Agregar nuevo */}
                 {!esEtapas&&(
                   <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:9,padding:"10px 11px",marginTop:7}}>
                     <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,marginBottom:7}}>+ AGREGAR</div>
-                    <input style={{...S.inp,marginBottom:6}} value={newOpoCatItem.nombre} onChange={e=>setNewOpoCatItem(f=>({...f,nombre:e.target.value}))} placeholder={`Nombre ${opoCatTab==="soluciones"?"de la solución":"del aliado"}…`}/>
+                    <input style={{...S.inp,marginBottom:6}} value={newOpoCatItem.nombre} onChange={e=>setNewOpoCatItem(f=>({...f,nombre:e.target.value}))} placeholder={"Nombre "+(opoCatTab==="soluciones"?"de la solucion":"del aliado")+"..."}/>
                     <button style={S.saveB} onClick={()=>{
                       if(!newOpoCatItem.nombre.trim()) return;
                       setCatActual(p=>[...p,{id:nextCatId(p),nombre:newOpoCatItem.nombre.trim()}]);
