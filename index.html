@@ -154,7 +154,7 @@ const ResponsiveContainer = _RC.ResponsiveContainer || (({children,height})=>Rea
 
 // ─── CONSTANTES ───────────────────────────────────────────────
 const CUENTA_COLORS = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8"];
-const ESTATUS_LIST  = ["PENDIENTE","PROGRAMADO","INGRESADO","PAGADO"];
+const ESTATUS_LIST  = ["PENDIENTE","PROYECTADO","PROGRAMADO","INGRESADO","PAGADO"];
 const TIPO_OP       = ["Ingreso","Egreso","Traspaso","Pago Tarjeta"];
 const REC_OPTS      = ["Diaria","Semanal","Quincenal","Mensual","Bimestral","Anual"];
 const DIAS_SEM      = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
@@ -196,9 +196,10 @@ const EST_ING_EXT   = ["Pendiente","Programado","Parcial","Recuperado"];
 const COLOR_ING_EXT = {Pendiente:"#fbbf24",Programado:"#a78bfa",Parcial:"#60a5fa",Recuperado:"#22c55e"};
 const OP_COLORS     = {Ingreso:"#22c55e",Egreso:"#f87171",Traspaso:"#a78bfa","Pago Tarjeta":"#60a5fa"};
 const COLOR_EST     = {
-  INGRESADO:{bg:"rgba(34,197,94,0.12)",  text:"#22c55e",dot:"#22c55e"},
-  PAGADO:   {bg:"rgba(148,163,184,0.12)",text:"#94a3b8",dot:"#94a3b8"},
-  PENDIENTE:{bg:"rgba(251,191,36,0.12)", text:"#fbbf24",dot:"#fbbf24"},
+  INGRESADO: {bg:"rgba(34,197,94,0.12)",  text:"#22c55e",dot:"#22c55e"},
+  PAGADO:    {bg:"rgba(148,163,184,0.12)",text:"#94a3b8",dot:"#94a3b8"},
+  PENDIENTE: {bg:"rgba(251,191,36,0.12)", text:"#fbbf24",dot:"#fbbf24"},
+  PROYECTADO:{bg:"rgba(56,189,248,0.12)", text:"#38bdf8",dot:"#38bdf8"},
   PROGRAMADO:{bg:"rgba(139,92,246,0.12)",text:"#a78bfa",dot:"#a78bfa"},
 };
 const PIE_PALETTE = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8","#f87171","#4ade80","#facc15","#e879f9","#34d399"];
@@ -249,7 +250,7 @@ const presKey  = (id,sm,sy)=>`${id}${mesKey(sm,sy)}`;
 function estatusParaTipo(tipoOp){
   if(tipoOp==="Ingreso")      return ESTATUS_LIST.filter(e=>e!=="PAGADO");
   if(tipoOp==="Egreso")       return ESTATUS_LIST.filter(e=>e!=="INGRESADO");
-  if(tipoOp==="Pago Tarjeta") return ESTATUS_LIST.filter(e=>e!=="INGRESADO"&&e!=="PENDIENTE");
+  if(tipoOp==="Pago Tarjeta") return ESTATUS_LIST.filter(e=>e!=="INGRESADO"&&e!=="PENDIENTE"&&e!=="PROYECTADO");
   return ESTATUS_LIST;
 }
 
@@ -273,30 +274,27 @@ function generarFechas(rec){
 }
 
 // ─── SALDOS ──────────────────────────────────────────────────
-function calcConsolidado(movs,pI,pE,cuentasRef){
+function calcConsolidado(movs,pI,pE,cuentasRef,incluirProy){
+  // incluirProy: si true, PROYECTADO opera igual que PROGRAMADO en el consolidado
   const sorted=[...movs].filter(r=>r.fecha).sort((a,b)=>a.fecha!==b.fecha?a.fecha.localeCompare(b.fecha):a.orden-b.orden);
-  // Arranque: saldo inicial de cuentas de referencia (historial previo)
-  // Las cuentas reales se reflejan a través de sus movimientos
   let s=(cuentasRef||[]).filter(c=>c.esReferencia).reduce((acc,c)=>acc+(c.saldoInicial||0),0);
   return sorted.map(r=>{
     const real=["INGRESADO","PAGADO"].includes(r.estatus);
     const prog=r.estatus==="PROGRAMADO";
+    const proy=r.estatus==="PROYECTADO"&&(incluirProy!==false); // por default incluye proyectado
     let cuenta=false;
-    // Movimientos reales que afectan el consolidado (no egresosTarjeta ni traspasos)
     if(real&&!(r.tipoOp==="Egreso"&&r.usaTarjeta)&&r.tipoOp!=="Traspaso")cuenta=true;
-    if(prog){
+    if(prog||proy){
       if(r.tipoOp==="Ingreso"&&r.prioridad<=(pI||3))cuenta=true;
-      if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&r.prioridad<=(pE||3))cuenta=true; // Egreso TC no cuenta
-      if(r.tipoOp==="Pago Tarjeta")cuenta=true; // Pago TC sí afecta liquidez
-      // Traspaso: NO afecta consolidado
+      if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&r.prioridad<=(pE||3))cuenta=true;
+      if(r.tipoOp==="Pago Tarjeta")cuenta=true;
     }
     if(cuenta){
       if(r.tipoOp==="Ingreso") s+=r.monto||0;
-      else if(r.tipoOp==="Egreso"&&!r.usaTarjeta) s-=r.monto||0; // Egreso TC no mueve consolidado
-      else if(r.tipoOp==="Pago Tarjeta") s-=r.monto||0; // Pago TC sí sale de tus cuentas
-      // Traspaso y Egreso con tarjeta: NO afectan consolidado
+      else if(r.tipoOp==="Egreso"&&!r.usaTarjeta) s-=r.monto||0;
+      else if(r.tipoOp==="Pago Tarjeta") s-=r.monto||0;
     }
-    return{...r,saldoConsolidado:s,enProyeccion:cuenta};
+    return{...r,saldoConsolidado:s,enProyeccion:cuenta,esProy:proy&&!prog};
   });
 }
 function calcCuentaSaldos(cuentas,movs){
@@ -534,12 +532,13 @@ function BudgetBar({gasto,presupuesto,color="#C9A84C",esIngreso=false}){
 const ModalMov=memo(function ModalMov({
   formMov,setFormMov,editMovId,isEditReal,recForm,setRecForm,
   cuentas,cuentaSaldos,tarjetas,tarjetaSaldos,catIng,catEg,
-  acreedores,deudores,ingresosExt,movs,saldoPendienteFn,saldoIngExtFn,
+  acreedores,deudores,ingresosExt,oportunidades,etapasAvance,getEtapa,
+  movs,saldoPendienteFn,saldoIngExtFn,
   onSave,onClose,saveError,fieldErrors
 }){
   const isT  = formMov.tipoOp==="Traspaso";
   const isPT = formMov.tipoOp==="Pago Tarjeta";
-  const isProg= ["PENDIENTE","PROGRAMADO"].includes(formMov.estatus);
+  const isProg= ["PENDIENTE","PROYECTADO","PROGRAMADO"].includes(formMov.estatus);
   const isPend= formMov.estatus==="PENDIENTE";
   const ptNecesitaCuenta = isPT&&formMov.estatus==="PAGADO";
   const cats   = formMov.tipoOp==="Ingreso"?catIng:catEg;
@@ -559,7 +558,7 @@ const ModalMov=memo(function ModalMov({
   },[fieldErrors]);
 
   const handleEstatus = useCallback((val)=>{
-    const esProg2=["PENDIENTE","PROGRAMADO"].includes(val);
+    const esProg2=["PENDIENTE","PROYECTADO","PROGRAMADO"].includes(val);
     setFormMov(f=>({...f,estatus:val,...(esProg2?{cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false}:{})}));
   },[setFormMov]);
 
@@ -1095,6 +1094,7 @@ function App(){
   useEffect(()=>{ saveLS('presupuestos', presupuestos); }, [presupuestos]);
   useEffect(()=>{ saveLS('acreedores', acreedores); }, [acreedores]);
   useEffect(()=>{ saveLS('oportunidades', oportunidades); }, [oportunidades]);
+  useEffect(()=>{ saveLS('metaFondo', metaFondo); }, [metaFondo]);
   useEffect(()=>{ saveLS('etapasAvance', etapasAvance); }, [etapasAvance]);
   useEffect(()=>{ saveLS('solucionesNexus', solucionesNexus); }, [solucionesNexus]);
   useEffect(()=>{ saveLS('aliadosEst', aliadosEst); }, [aliadosEst]);
@@ -1142,6 +1142,7 @@ function App(){
   const[showPrioPanel,setShowPrioPanel]=useState(false);
   const[prioI,setPrioI]=useState(3);
   const[prioE,setPrioE]=useState(3);
+  const[incluirProy,setIncluirProy]=useState(false); // toggle PROYECTADO en consolidado
   const[multiMode,setMultiMode]=useState(false);
   const[filterPrioVis,setFilterPrioVis]=useState(null); // null=todas, 1=Alta, 2=Media, 3=Baja
   const[selected,setSelected]=useState(new Set());
@@ -1205,6 +1206,7 @@ function App(){
   const[editOpoId,setEditOpoId]=useState(null);
   const[formOpo,setFormOpo]=useState({});
   const[viewOpo,setViewOpo]=useState(null);
+  const[metaFondo,setMetaFondo]=useState(()=>loadLS('metaFondo',0));
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[jsonImportError,setJsonImportError]=useState("");
 
@@ -1230,8 +1232,8 @@ function App(){
   const aliComDrag=useCatDrag(setAliadosCom);
   const tdStr=todayStr();
 
-  const retrasados=useMemo(()=>movs.filter(r=>r.fecha&&r.fecha<tdStr&&r.estatus==="PROGRAMADO"),[movs,tdStr]);
-  const withSaldos=useMemo(()=>calcConsolidado(movs,prioI,prioE,cuentas),[movs,prioI,prioE,cuentas]);
+  const retrasados=useMemo(()=>movs.filter(r=>r.fecha&&r.fecha<tdStr&&(r.estatus==="PROGRAMADO"||r.estatus==="PROYECTADO")),[movs,tdStr]);
+  const withSaldos=useMemo(()=>calcConsolidado(movs,prioI,prioE,cuentas,incluirProy),[movs,prioI,prioE,cuentas,incluirProy]);
   const cuentaSaldos=useMemo(()=>calcCuentaSaldos(cuentas,movs),[cuentas,movs]);
   const tarjetaSaldos=useMemo(()=>calcTarjetaSaldos(tarjetas,movs),[tarjetas,movs]);
 
@@ -1369,8 +1371,9 @@ function App(){
   const stats=useMemo(()=>{
     const real=withSaldos.filter(r=>["INGRESADO","PAGADO"].includes(r.estatus));
     const retSet=new Set(retrasados.map(r=>r.id));
-    const progAll=withSaldos.filter(r=>r.estatus==="PROGRAMADO"&&r.enProyeccion);
-    const progPer=withSaldos.filter(r=>r.enProyeccion&&r.estatus==="PROGRAMADO"&&(period.inP(r.fecha)||retSet.has(r.id)));
+    const esProg_=r=>r.estatus==="PROGRAMADO"||(incluirProy&&r.estatus==="PROYECTADO");
+    const progAll=withSaldos.filter(r=>esProg_(r)&&r.enProyeccion);
+    const progPer=withSaldos.filter(r=>r.enProyeccion&&esProg_(r)&&(period.inP(r.fecha)||retSet.has(r.id)));
     const saldoReal=cuentas.filter(c=>!c.esReferencia).reduce((s,c)=>s+(cuentaSaldos[c.id]||0),0);
     const ig=x=>x.filter(r=>r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0);
     const eg=x=>x.filter(r=>r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0);
@@ -1501,14 +1504,14 @@ function App(){
     // PENDIENTE: limpiar fecha siempre (filosofía: sin fecha)
     if(data.estatus==="PENDIENTE") data.fecha=null;
     // Limpiar cuenta/tarjeta si es PENDIENTE o PROGRAMADO
-    if(["PENDIENTE","PROGRAMADO"].includes(data.estatus)){
+    if(["PENDIENTE","PROYECTADO","PROGRAMADO"].includes(data.estatus)){
       data.cuentaId=null;data.cuentaDestinoId=null;data.tarjetaId=null;data.usaTarjeta=false;
     }
 
     // ── Validaciones de campos requeridos ──
     const errs={};
     // Fecha: requerida para PROGRAMADO, INGRESADO, PAGADO (no para PENDIENTE)
-    if(data.estatus==="PROGRAMADO"&&!data.fecha)errs.fecha=true;
+    if((data.estatus==="PROGRAMADO"||data.estatus==="PROYECTADO")&&!data.fecha)errs.fecha=true;
     if(esEfectivo&&!data.fecha)errs.fecha=true;
     // Cuenta/tarjeta: requerida solo para movimientos efectivos
     if(esEfectivo&&data.tipoOp==="Ingreso"&&!data.cuentaId)errs.cuentaId=true;
@@ -1864,7 +1867,7 @@ function App(){
   },[acreedores,deudores,ingresosExt,movs]);
 
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,exportedAt:new Date().toISOString(),version:"v8"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,exportedAt:new Date().toISOString(),version:"v8"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
@@ -1890,6 +1893,7 @@ function App(){
         if(data.deudores){setDeudores(data.deudores);saveLS('deudores',data.deudores);}
         if(data.ingresosExt){setIngresosExt(data.ingresosExt);saveLS('ingresosExt',data.ingresosExt);}
         if(data.oportunidades){setOportunidades(data.oportunidades);saveLS('oportunidades',data.oportunidades);}
+        if(data.metaFondo!==undefined){setMetaFondo(data.metaFondo);saveLS('metaFondo',data.metaFondo);}
         if(data.etapasAvance){setEtapasAvance(data.etapasAvance);saveLS('etapasAvance',data.etapasAvance);}
         if(data.solucionesNexus){setSolucionesNexus(data.solucionesNexus);saveLS('solucionesNexus',data.solucionesNexus);}
         if(data.aliadosEst){setAliadosEst(data.aliadosEst);saveLS('aliadosEst',data.aliadosEst);}
@@ -1966,7 +1970,48 @@ function App(){
                 <div style={{fontSize:10,color:"#f87171",opacity:.8}}>Primer rojo el <strong>{fmtDate(primerNegativo.fecha)}</strong> → {fmt(primerNegativo.saldoConsolidado)}</div>
               </div>
             )}
-            <div style={S.card("rgba(201,168,76,0.25)")}><div style={S.lbl}>Saldo Real</div><div style={S.bigA()}>{fmt(stats.saldoReal)}</div><div style={{fontSize:10,color:"#475569",marginTop:2}}>Suma de cuentas débito</div></div>
+            {/* ── Saldo Real + Programado + Meta Fondo ── */}
+            {(()=>{
+              const ingProgTotal=movs.filter(r=>r.estatus==="PROGRAMADO"&&r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0);
+              const saldoMasProg=stats.saldoReal+ingProgTotal;
+              const pctFondo=metaFondo>0?Math.min(100,(saldoMasProg/metaFondo)*100):0;
+              const semFondo=pctFondo>=100?"#22c55e":pctFondo>=60?"#fbbf24":"#f87171";
+              return(
+                <div style={{...S.card("rgba(201,168,76,0.25)"),marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <div>
+                      <div style={S.lbl}>Saldo Real</div>
+                      <div style={S.bigA()}>{fmt(stats.saldoReal)}</div>
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={S.lbl}>+ Ing. Programado</div>
+                      <div style={{fontSize:14,fontWeight:800,color:"#22c55e"}}>+{fmt(ingProgTotal)}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#13131f",borderRadius:8,padding:"7px 11px",marginBottom:metaFondo>0?8:0}}>
+                    <span style={{fontSize:10,color:"#94a3b8"}}>Saldo Real + Programado</span>
+                    <span style={{fontSize:15,fontWeight:800,color:"#C9A84C"}}>{fmt(saldoMasProg)}</span>
+                  </div>
+                  {metaFondo>0&&(<>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:4}}>
+                      <span>🎯 Meta Fondo Contingencia</span>
+                      <span style={{color:semFondo,fontWeight:700}}>{Math.round(pctFondo)}% — {fmt(metaFondo)}</span>
+                    </div>
+                    <div style={{height:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:3}}>
+                      <div style={{height:"100%",borderRadius:4,background:semFondo,width:pctFondo+"%",transition:"width 0.5s"}}/>
+                    </div>
+                    <div style={{fontSize:9,color:pctFondo>=100?"#22c55e":"#475569",textAlign:"right"}}>
+                      {pctFondo>=100?"✅ Meta alcanzada":"Faltan "+fmt(metaFondo-saldoMasProg)}
+                    </div>
+                  </>)}
+                  {/* Toggle PROYECTADO */}
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8,paddingTop:7,borderTop:"1px solid #1e293b"}}>
+                    <span style={{fontSize:9,color:incluirProy?"#38bdf8":"#475569"}}>Incluir PROYECTADOS en consolidado</span>
+                    <button style={{...S.prioB2(incluirProy,"#38bdf8"),width:42,flex:"none",padding:"4px 0",fontSize:9}} onClick={()=>setIncluirProy(v=>!v)}>{incluirProy?"ON":"OFF"}</button>
+                  </div>
+                </div>
+              );
+            })()}
             <div style={S.g2}>
               <div style={S.card()}><div style={S.lbl}>Ingresos Reales</div><div style={{fontSize:16,fontWeight:800,color:"#22c55e"}}>{fmt(stats.totalIngresos)}</div></div>
               <div style={S.card()}><div style={S.lbl}>Egresos Reales</div><div style={{fontSize:16,fontWeight:800,color:"#f87171"}}>{fmt(stats.totalEgresos)}</div></div>
@@ -2070,6 +2115,13 @@ function App(){
                 <div style={S.prioRow}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioI===v,c)} onClick={()=>setPrioI(v)}>{l}</button>)}</div>
                 <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos</div>
                 <div style={S.prioRow}>{[[1,"Alta","#f87171"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioE===v,c)} onClick={()=>setPrioE(v)}>{l}</button>)}</div>
+                <div style={{borderTop:"1px solid #1e293b",paddingTop:9,marginTop:4}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontSize:9,color:incluirProy?"#38bdf8":"#475569",fontWeight:700}}>Incluir PROYECTADOS</span>
+                    <button style={{...S.prioB2(incluirProy,"#38bdf8"),width:42,flex:"none",padding:"4px 0",fontSize:9}} onClick={()=>setIncluirProy(v=>!v)}>{incluirProy?"ON":"OFF"}</button>
+                  </div>
+                  <div style={{fontSize:8,color:"#475569",marginTop:2}}>Considera movimientos Proyectados en el saldo consolidado</div>
+                </div>
                 <button style={S.cancB} onClick={()=>setShowPrioPanel(false)}>Cerrar</button>
               </div>
             )}
@@ -2184,6 +2236,15 @@ function App(){
                       <span style={{marginLeft:"auto"}}><span style={S.badge(row.estatus)}>{row.estatus}</span></span>
                     </div>
                     {row.obs&&<div style={{fontSize:9,color:"#475569",fontStyle:"italic",marginBottom:2}}>{row.obs}</div>}
+                    {row.vinculoTipo&&row.vinculoId&&(()=>{
+                      let label="";let color="#64748b";
+                      if(row.vinculoTipo==="acreedores"){const r2=acreedores.find(x=>x.id===row.vinculoId);label="🔴 Acreedor: "+(r2?r2.nombre||r2.concepto:"desvinculado");color="#f87171";}
+                      else if(row.vinculoTipo==="deudores"){const r2=deudores.find(x=>x.id===row.vinculoId);label="🟢 Deudor: "+(r2?r2.nombre||r2.concepto:"desvinculado");color="#22c55e";}
+                      else if(row.vinculoTipo==="ingresosExt"){const r2=ingresosExt.find(x=>x.id===row.vinculoId);label="⭐ Ing. Ext.: "+(r2?r2.concepto:"desvinculado");color="#fbbf24";}
+                      else if(row.vinculoTipo==="oportunidades"){const r2=oportunidades.find(x=>x.id===row.vinculoId);label="🚀 Oportunidad: "+(r2?r2.concepto:"desvinculada");color="#38bdf8";}
+                      if(!label) return null;
+                      return <div style={{fontSize:8,color,background:color+"11",padding:"2px 7px",borderRadius:5,marginBottom:2,fontWeight:600}}>{label}</div>;
+                    })()}
                     {/* Sin botón ⟳ — solo editar y eliminar */}
                     {!multiMode&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:2}}>
                       <div style={{display:"flex",gap:4}}>
@@ -3786,6 +3847,17 @@ function App(){
             <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setShowExportModal(true)}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(34,197,94,0.12)"}}><span>📥</span></div><div><div style={{fontSize:12,fontWeight:700}}>Exportar a Excel</div><div style={{fontSize:10,color:"#475569"}}>Selecciona el período a exportar</div></div></div>
             </div>
+            <div style={S.sTit}>META FONDO DE CONTINGENCIA</div>
+            <div style={S.card()}>
+              <div style={S.lbl}>Meta u Objetivo $</div>
+              <input style={{...S.inp,marginTop:5}} type="number"
+                value={metaFondo||""} onChange={e=>setMetaFondo(parseFloat(e.target.value)||0)}
+                placeholder="0.00"/>
+              <div style={{fontSize:9,color:"#475569",marginTop:5}}>
+                Se muestra en el Dashboard como barra de progreso vs Saldo Real + Ing. Programado
+              </div>
+              {metaFondo>0&&<div style={{fontSize:10,color:"#22c55e",marginTop:4,fontWeight:700}}>Meta activa: {fmt(metaFondo)}</div>}
+            </div>
             <div style={S.sTit}>DATOS</div>
             <div style={{...S.card(),cursor:"pointer"}} onClick={()=>{setShowReset(true);setResetPhase(1);setResetInput("");}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(248,113,113,0.12)"}}><span>🗑</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#f87171"}}>Eliminar movimientos</div><div style={{fontSize:10,color:"#475569"}}>Borra todos los movimientos registrados</div></div></div>
@@ -3821,6 +3893,7 @@ function App(){
             tarjetas={tarjetas} tarjetaSaldos={tarjetaSaldos}
             catIng={catIng} catEg={catEg}
             acreedores={acreedores} deudores={deudores} ingresosExt={ingresosExt}
+            oportunidades={oportunidades} etapasAvance={etapasAvance} getEtapa={getEtapa}
             movs={movs} saldoPendienteFn={saldoPendiente} saldoIngExtFn={saldoIngExt}
             onSave={saveMov} onClose={()=>{setShowMov(false);setEditMovId(null);setSaveError("");setFieldErrors(null);}}
             saveError={saveError} fieldErrors={fieldErrors}/>
