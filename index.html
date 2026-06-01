@@ -2602,7 +2602,7 @@ function App(){
                   const pb=getEtapa(b.etapaId,etapasAvance).pctAvance;
                   return pb-pa;
                 }
-                return (a.fechaEstimadaCierre||"9999")>.localeCompare?.(b.fechaEstimadaCierre||"9999")||((a.fechaEstimadaCierre||"9999")<(b.fechaEstimadaCierre||"9999")?-1:1);
+                return ((a.fechaEstimadaCierre||"9999")<(b.fechaEstimadaCierre||"9999")?-1:(a.fechaEstimadaCierre||"9999")>(b.fechaEstimadaCierre||"9999")?1:0);
               });
 
               if(lista.length===0) return(
