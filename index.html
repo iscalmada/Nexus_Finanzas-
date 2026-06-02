@@ -1086,6 +1086,7 @@ function App(){
 
 
   // ── Auto-guardado en localStorage ──
+  const[metaFondo,setMetaFondo]=useState(()=>loadLS('metaFondo',0));
   useEffect(()=>{ saveLS('movs', movs); }, [movs]);
   useEffect(()=>{ saveLS('cuentas', cuentas); }, [cuentas]);
   useEffect(()=>{ saveLS('tarjetas', tarjetas); }, [tarjetas]);
@@ -1206,7 +1207,6 @@ function App(){
   const[editOpoId,setEditOpoId]=useState(null);
   const[formOpo,setFormOpo]=useState({});
   const[viewOpo,setViewOpo]=useState(null);
-  const[metaFondo,setMetaFondo]=useState(()=>loadLS('metaFondo',0));
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[jsonImportError,setJsonImportError]=useState("");
 
