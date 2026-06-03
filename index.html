@@ -4027,7 +4027,7 @@ function App(){
                           </div>
                         </div>}
                       </div>
-                      :<span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>{catMode==="eg"&&cat.subs&&cat.subs.length===0&&cat.prio&&(<span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:(PRIO_EG_COLOR[cat.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[cat.prio]||"#64748b",marginLeft:5}}>{PRIO_EG_LBL[cat.prio]}</span>)}
+                      :(<><span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>{catMode==="eg"&&cat.subs&&cat.subs.length===0&&cat.prio&&(<span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:(PRIO_EG_COLOR[cat.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[cat.prio]||"#64748b",marginLeft:5}}>{PRIO_EG_LBL[cat.prio]}</span>)}</>)
                     }
                   </div>
                   {editingCatId!==cat.id&&<div style={{display:"flex",gap:5}}><button style={S.smBtn("#C9A84C")} onClick={()=>setAddingSubTo(cat.id===addingSubTo?null:cat.id)}>+ Sub</button><button style={S.smBtn("#f87171")} onClick={()=>delCat(cat.id)}>✕</button></div>}
