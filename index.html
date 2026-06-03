@@ -645,7 +645,7 @@ const ModalMov=memo(function ModalMov({
           <div style={S.fg}><label style={S.fl}>Estatus</label>
             <select style={S.sel} value={formMov.estatus} onChange={e=>handleEstatus(e.target.value)}>{estatusOpts.map(e=><option key={e} value={e}>{e}</option>)}</select>
           </div>
-          {isPend&&<div style={S.infoBx("#fbbf24")}><span>📋</span><span>PENDIENTE: sin fecha. Compromiso sin programar. Cambia a PROGRAMADO para asignar fecha.</span></div>}
+          {isPend&&<div style={S.infoBx("#fbbf24")}><span>📋</span><span>PENDIENTE: sin fecha aún. Cambia a PROGRAMADO o PROYECTADO para asignar fecha.</span></div>}
           {!isPend&&(
             <div style={S.fg} ref={fechaRef}><label style={S.fl}>Fecha</label>
               <input style={fieldErrors?.fecha?S.inpErr:S.inp} type="date" value={formMov.fecha||""} onChange={e=>set("fecha",e.target.value)}/>
@@ -1190,10 +1190,10 @@ function App(){
   const[showCatFilter,setShowCatFilter]=useState(false); // modal selector
 
   const[showPeriod,setShowPeriod]=useState(false);
-  const[showPrioPanel,setShowPrioPanel]=useState(false);
+  const[showPrioPanel,setShowPrioPanel]=useState(false); // false | 'ing' | 'eg'
   const[prioI,setPrioI]=useState(3);
   const[prioE,setPrioE]=useState(5); // 5=Todos para egresos (Esencial=1..Extraordinario=4)
-  const[incluirProy,setIncluirProy]=useState(false); // toggle PROYECTADO en consolidado
+  const[incluirProy,setIncluirProy]=useState(true); // toggle PROYECTADO en consolidado — ON por defecto
   const[multiMode,setMultiMode]=useState(false);
   const[filterPrioVis,setFilterPrioVis]=useState(null); // null=todas, 1=Alta, 2=Media, 3=Baja
   const[selected,setSelected]=useState(new Set());
@@ -1703,7 +1703,28 @@ function App(){
   const doDelete=id=>{const r=movs.find(x=>x.id===id);if(r?.serieId){setSerieConfirm({action:"delete",id,serieId:r.serieId,payload:null});setConfirmDel(null);}else{setMovs(p=>p.filter(x=>x.id!==id));setConfirmDel(null);}};
   const applySerieConfirm=scope=>{const{action,id,serieId,payload}=serieConfirm;if(action==="edit"){if(scope==="one")setMovs(p=>p.map(r=>r.id===id?{...r,...payload}:r));else setMovs(p=>p.map(r=>r.serieId===serieId?{...r,...payload,fecha:r.fecha,id:r.id,orden:r.orden}:r));}else{if(scope==="one")setMovs(p=>p.filter(r=>r.id!==id));else setMovs(p=>p.filter(r=>r.serieId!==serieId));}setSerieConfirm(null);};
   const toggleSelect=id=>setSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
-  const applyMultiEdit=()=>{setMovs(p=>p.map(r=>{if(!selected.has(r.id))return r;const u={...r};if(multiForm.estatus)u.estatus=multiForm.estatus;if(multiForm.prioridad)u.prioridad=parseInt(multiForm.prioridad);if(multiForm.fecha)u.fecha=multiForm.fecha;return u;}));setSelected(new Set());setMultiMode(false);setShowMultiEdit(false);};
+  const applyMultiEdit=()=>{
+    const selMovs=movs.filter(r=>selected.has(r.id));
+    const tipos=new Set(selMovs.map(r=>r.tipoOp));
+    setMovs(p=>p.map(r=>{
+      if(!selected.has(r.id))return r;
+      const u={...r};
+      if(multiForm.fecha)u.fecha=multiForm.fecha;
+      if(multiForm.estatus){
+        // Validar estatus por tipo
+        const est=multiForm.estatus;
+        if(r.tipoOp==="Ingreso"&&est!=="PAGADO")u.estatus=est;
+        else if(r.tipoOp==="Egreso"&&est!=="INGRESADO")u.estatus=est;
+        else if(r.tipoOp==="Pago Tarjeta"&&est!=="INGRESADO")u.estatus=est;
+        else if(r.tipoOp==="Traspaso")u.estatus=est;
+      }
+      if(multiForm.prioridad&&r.tipoOp!=="Traspaso"&&r.tipoOp!=="Pago Tarjeta"){
+        u.prioridad=parseInt(multiForm.prioridad);
+      }
+      return u;
+    }));
+    setSelected(new Set());setMultiMode(false);setShowMultiEdit(false);
+  };
 
   const exportExcel=useCallback((sm_,sy_,mode_)=>{
     const inPE=r=>{if(!r.fecha)return false;if(mode_==="mes"){const[y,m]=r.fecha.split("-").map(Number);return y===sy_&&m-1===sm_;}return r.fecha.startsWith(String(sy_));};
@@ -2165,6 +2186,12 @@ function App(){
                       <div style={{textAlign:"right"}}>
                         <div style={{fontSize:8,color:"#64748b"}}>Saldo deudor</div>
                         <div style={{fontSize:16,fontWeight:800,color:sd>0?"#f87171":"#22c55e"}}>{fmt(sd)}</div>
+                        {(t.diaCierre||t.diaLimitePago)&&(
+                          <div style={{marginTop:3}}>
+                            {t.diaCierre&&<div style={{fontSize:8,color:"#64748b"}}>✂ Corte: día {t.diaCierre}</div>}
+                            {t.diaLimitePago&&<div style={{fontSize:8,color:"#fbbf24"}}>⚡ Límite: día {t.diaLimitePago}</div>}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2195,7 +2222,12 @@ function App(){
             )}
             {/* Filtros */}
             <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
-              <button style={S.prioTag(prioI<3||prioE<3)} onClick={()=>setShowPrioPanel(v=>!v)}>⚙ {PrioILabel}/{PrioELabel}</button>
+              <button style={S.prioTag(prioI<3)} onClick={()=>setShowPrioPanel(v=>v==="ing"?false:"ing")}>
+                ↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}
+              </button>
+              <button style={S.prioTag(prioE<5)} onClick={()=>setShowPrioPanel(v=>v==="eg"?false:"eg")}>
+                ↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}
+              </button>
               <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>
                 {retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados
               </button>
@@ -2216,14 +2248,18 @@ function App(){
             </div>
             {showPrioPanel&&(
               <div style={S.prioPanel}>
-                <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↑ Probabilidad Ingresos</div>
+                {(showPrioPanel==="ing"||showPrioPanel===true)&&(<>
+                <div style={{fontSize:9,color:"#22c55e",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↑ Probabilidad Ingresos</div>
                 <div style={S.prioRow}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioI===v,c)} onClick={()=>setPrioI(v)}>{l}</button>)}</div>
-                <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos (proyección)</div>
+                </>)}
+                {(showPrioPanel==="eg"||showPrioPanel===true)&&(<>
+                <div style={{fontSize:9,color:"#f87171",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos (proyección)</div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:9}}>
                   {[[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"],[5,"Todos","#64748b"]].map(([v,l,c])=>(
                     <button key={v} style={{...S.prioB(prioE===v,c),flex:1,minWidth:50,fontSize:8,padding:"6px 2px"}} onClick={()=>setPrioE(v)}>{l}</button>
                   ))}
                 </div>
+                </>)}
                 <div style={{borderTop:"1px solid #1e293b",paddingTop:9,marginTop:4}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <span style={{fontSize:9,color:incluirProy?"#38bdf8":"#475569",fontWeight:700}}>Incluir PROYECTADOS</span>
@@ -2352,7 +2388,7 @@ function App(){
                       if(row.vinculoTipo==="acreedores"){const r2=acreedores.find(x=>x.id===row.vinculoId);label="🔴 Acreedor: "+(r2?r2.nombre||r2.concepto:"desvinculado");color="#f87171";}
                       else if(row.vinculoTipo==="deudores"){const r2=deudores.find(x=>x.id===row.vinculoId);label="🟢 Deudor: "+(r2?r2.nombre||r2.concepto:"desvinculado");color="#22c55e";}
                       else if(row.vinculoTipo==="ingresosExt"){const r2=ingresosExt.find(x=>x.id===row.vinculoId);label="⭐ Ing. Ext.: "+(r2?r2.concepto:"desvinculado");color="#fbbf24";}
-                      else if(row.vinculoTipo==="oportunidades"){const r2=oportunidades.find(x=>x.id===row.vinculoId);label="🚀 Oportunidad: "+(r2?r2.concepto:"desvinculada");color="#38bdf8";}
+                      else if(row.vinculoTipo==="oportunidades"){const r2=oportunidades.find(x=>x.id===row.vinculoId);const opoDisp=r2?(r2.empresa||r2.contacto||r2.concepto)+(r2.empresa&&r2.contacto?" · "+r2.contacto:""):"desvinculada";label="🚀 "+opoDisp;color="#38bdf8";}
                       if(!label) return null;
                       return <div style={{fontSize:8,color,background:color+"11",padding:"2px 7px",borderRadius:5,marginBottom:2,fontWeight:600}}>{label}</div>;
                     })()}
@@ -2376,11 +2412,25 @@ function App(){
               <button style={{width:40,height:40,borderRadius:20,background:"#C9A84C",border:"none",color:"#080810",fontSize:9,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 10px rgba(201,168,76,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>{
                   const hoy=todayStr();
-                  const all=document.querySelectorAll("[data-fecha]");
-                  let found=null;
-                  all.forEach(function(el){if(el.getAttribute("data-fecha")===hoy&&!found)found=el;});
-                  if(found) found.scrollIntoView({behavior:"smooth",block:"start"});
-                  else document.getElementById("mov-bottom").scrollIntoView({behavior:"smooth"});
+                  const now2=new Date();
+                  // Si el modo es mes y el mes actual no coincide con el período visible, forzar cambio
+                  if(period.mode==="mes"&&(period.sm!==now2.getMonth()||period.sy!==now2.getFullYear())){
+                    period.setSm(now2.getMonth());
+                    period.setSy(now2.getFullYear());
+                    // Dar tiempo al render antes de scrollear
+                    setTimeout(function(){
+                      const all2=document.querySelectorAll("[data-fecha]");
+                      let found2=null;
+                      all2.forEach(function(el){if(el.getAttribute("data-fecha")===hoy&&!found2)found2=el;});
+                      if(found2) found2.scrollIntoView({behavior:"smooth",block:"start"});
+                    },150);
+                  } else {
+                    const all=document.querySelectorAll("[data-fecha]");
+                    let found=null;
+                    all.forEach(function(el){if(el.getAttribute("data-fecha")===hoy&&!found)found=el;});
+                    if(found) found.scrollIntoView({behavior:"smooth",block:"start"});
+                    else document.getElementById("mov-bottom").scrollIntoView({behavior:"smooth"});
+                  }
                 }} title="Ir a hoy">Hoy</button>
               <button style={{width:40,height:40,borderRadius:20,background:"#10101e",border:"1px solid #1e293b",color:"#C9A84C",fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 10px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>document.getElementById("mov-bottom").scrollIntoView({behavior:"smooth"})} title="Ir al final">↓</button>
@@ -2913,9 +2963,13 @@ function App(){
                           <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:prob.color+"18",color:prob.color}}>★ {prob.label}</span>
                           {opo.recurrencia&&opo.recurrencia!=="Única"&&<span style={{fontSize:8,color:"#a78bfa",background:"rgba(167,139,250,0.1)",padding:"2px 6px",borderRadius:5}}>↻ {opo.recurrencia}</span>}
                         </div>
-                        <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{opo.concepto}</div>
-                        {opo.empresa&&<div style={{fontSize:10,color:"#64748b",marginTop:1}}>🏢 {opo.empresa}</div>}
-                        {opo.contacto&&<div style={{fontSize:10,color:"#64748b"}}>👤 {opo.contacto}</div>}
+                        {(opo.empresa||opo.contacto)&&(
+                          <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0",marginBottom:1}}>
+                            {opo.empresa||opo.contacto}
+                            {opo.empresa&&opo.contacto&&<span style={{fontSize:10,fontWeight:400,color:"#94a3b8"}}> · {opo.contacto}</span>}
+                          </div>
+                        )}
+                        <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{opo.concepto}</div>
                       </div>
                       <div style={{textAlign:"right",flexShrink:0}}>
                         <div style={{fontSize:9,color:"#64748b"}}>Estimado</div>
@@ -2978,9 +3032,13 @@ function App(){
                   <div style={{height:5,borderRadius:3,background:"#1e293b",overflow:"hidden",marginBottom:8}}>
                     <div style={{height:"100%",borderRadius:3,background:color,width:etapa.pctAvance+"%",transition:"width 0.4s"}}/>
                   </div>
-                  <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{opo.concepto}</div>
-                  {opo.empresa&&<div style={{fontSize:11,color:"#94a3b8"}}>🏢 {opo.empresa}</div>}
-                  {opo.contacto&&<div style={{fontSize:11,color:"#94a3b8"}}>👤 {opo.contacto}</div>}
+                  {(opo.empresa||opo.contacto)&&(
+                    <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0",marginBottom:2}}>
+                      {opo.empresa||opo.contacto}
+                      {opo.empresa&&opo.contacto&&<span style={{fontSize:11,fontWeight:400,color:"#94a3b8"}}> · {opo.contacto}</span>}
+                    </div>
+                  )}
+                  <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>{opo.concepto}</div>
                   {etapa.descripcion&&<div style={{fontSize:9,color:"#475569",fontStyle:"italic",marginTop:5,borderTop:"1px solid #1e293b",paddingTop:5}}>{etapa.descripcion}</div>}
                 </div>
 
@@ -3058,7 +3116,7 @@ function App(){
                       setViewOpo(null);
                       setFormMov({...BLANK_MOV,
                         tipoOp:"Ingreso",
-                        estatus:"PROGRAMADO",
+                        estatus:opoActual.etapaId==="ea5"?"PROGRAMADO":"PROYECTADO",
                         concepto:opoActual.concepto,
                         monto:String(pend||opoActual.montoEstimado||""),
                         vinculoTipo:"oportunidades",
@@ -3969,7 +4027,7 @@ function App(){
                           </div>
                         </div>}
                       </div>
-                      :<span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>
+                      :<span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>{catMode==="eg"&&cat.subs&&cat.subs.length===0&&cat.prio&&(<span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:(PRIO_EG_COLOR[cat.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[cat.prio]||"#64748b",marginLeft:5}}>{PRIO_EG_LBL[cat.prio]}</span>)}
                     }
                   </div>
                   {editingCatId!==cat.id&&<div style={{display:"flex",gap:5}}><button style={S.smBtn("#C9A84C")} onClick={()=>setAddingSubTo(cat.id===addingSubTo?null:cat.id)}>+ Sub</button><button style={S.smBtn("#f87171")} onClick={()=>delCat(cat.id)}>✕</button></div>}
@@ -4377,13 +4435,68 @@ function App(){
         {showMultiEdit&&(
           <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowMultiEdit(false);}}>
             <div style={S.mBox}>
-              <div style={S.mTit}>✏ EDICIÓN MÚLTIPLE — {selected.size} mov.</div>
-              <div style={{fontSize:10,color:"#475569",marginBottom:14}}>Deja vacío lo que no quieras cambiar.</div>
-              <div style={S.fg}><label style={S.fl}>Estatus</label><select style={S.sel} value={multiForm.estatus} onChange={e=>setMultiForm(f=>({...f,estatus:e.target.value}))}><option value="">— Sin cambio —</option>{ESTATUS_LIST.map(e=><option key={e} value={e}>{e}</option>)}</select></div>
-              <div style={S.fg}><label style={S.fl}>Prioridad</label><select style={S.sel} value={multiForm.prioridad} onChange={e=>setMultiForm(f=>({...f,prioridad:e.target.value}))}><option value="">— Sin cambio —</option><option value="1">Alta</option><option value="2">Media</option><option value="3">Baja</option></select></div>
-              <div style={S.fg}><label style={S.fl}>Fecha</label><input style={S.inp} type="date" value={multiForm.fecha} onChange={e=>setMultiForm(f=>({...f,fecha:e.target.value}))}/></div>
-              <button style={S.saveB} onClick={applyMultiEdit}>APLICAR</button>
-              <button style={S.cancB} onClick={()=>setShowMultiEdit(false)}>Cancelar</button>
+              {(()=>{
+                const selMovs=movs.filter(r=>selected.has(r.id));
+                const tipos=new Set(selMovs.map(r=>r.tipoOp));
+                const mezclado=tipos.size>1;
+                const soloIng=tipos.size===1&&tipos.has("Ingreso");
+                const soloEg=tipos.size===1&&tipos.has("Egreso");
+                const soloTras=tipos.size===1&&tipos.has("Traspaso");
+                const soloPT=tipos.size===1&&tipos.has("Pago Tarjeta");
+                const tipoLabel=[...tipos].join(" + ");
+                return(<>
+                  <div style={S.mTit}>✏ EDICIÓN MÚLTIPLE — {selected.size} mov.</div>
+                  {mezclado&&(
+                    <div style={{...S.infoBx("#f87171"),marginBottom:11}}><span>⚠</span>
+                      <span>Tienes mezclados: <strong>{tipoLabel}</strong>. Selecciona solo un tipo para editar prioridad/probabilidad. Solo se aplicará la fecha.</span>
+                    </div>
+                  )}
+                  {!mezclado&&<div style={{fontSize:9,color:"#C9A84C",background:"rgba(201,168,76,0.08)",borderRadius:7,padding:"5px 10px",marginBottom:11}}>Tipo: <strong>{tipoLabel}</strong> · {selected.size} movimientos</div>}
+                  {/* Fecha — siempre disponible */}
+                  <div style={S.fg}><label style={S.fl}>Fecha</label>
+                    <input style={S.inp} type="date" value={multiForm.fecha} onChange={e=>setMultiForm(f=>({...f,fecha:e.target.value}))}/>
+                  </div>
+                  {/* Estatus — disponible según tipo */}
+                  {!soloTras&&!soloPT&&(
+                    <div style={S.fg}><label style={S.fl}>Estatus</label>
+                      <select style={S.sel} value={multiForm.estatus} onChange={e=>setMultiForm(f=>({...f,estatus:e.target.value}))}>
+                        <option value="">— Sin cambio —</option>
+                        {soloIng&&["PENDIENTE","PROYECTADO","PROGRAMADO","INGRESADO"].map(e=><option key={e} value={e}>{e}</option>)}
+                        {soloEg&&["PENDIENTE","PROYECTADO","PROGRAMADO","PAGADO"].map(e=><option key={e} value={e}>{e}</option>)}
+                        {mezclado&&ESTATUS_LIST.map(e=><option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {(soloTras||soloPT)&&(
+                    <div style={S.fg}><label style={S.fl}>Estatus</label>
+                      <select style={S.sel} value={multiForm.estatus} onChange={e=>setMultiForm(f=>({...f,estatus:e.target.value}))}>
+                        <option value="">— Sin cambio —</option>
+                        {["PENDIENTE","PROYECTADO","PROGRAMADO","PAGADO"].map(e=><option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {/* Probabilidad/Prioridad — solo si no mezclado y no traspaso/PT */}
+                  {soloIng&&(
+                    <div style={S.fg}><label style={S.fl}>Probabilidad</label>
+                      <select style={S.sel} value={multiForm.prioridad} onChange={e=>setMultiForm(f=>({...f,prioridad:e.target.value}))}>
+                        <option value="">— Sin cambio —</option>
+                        <option value="1">Alta</option><option value="2">Media</option><option value="3">Baja</option>
+                      </select>
+                    </div>
+                  )}
+                  {soloEg&&(
+                    <div style={S.fg}><label style={S.fl}>Prioridad</label>
+                      <select style={S.sel} value={multiForm.prioridad} onChange={e=>setMultiForm(f=>({...f,prioridad:e.target.value}))}>
+                        <option value="">— Sin cambio —</option>
+                        <option value="1">Esencial</option><option value="2">Importante</option>
+                        <option value="3">Discrecional</option><option value="4">Extraordinario</option>
+                      </select>
+                    </div>
+                  )}
+                  <button style={S.saveB} onClick={applyMultiEdit}>APLICAR</button>
+                  <button style={S.cancB} onClick={()=>setShowMultiEdit(false)}>Cancelar</button>
+                </>);
+              })()}
             </div>
           </div>
         )}
