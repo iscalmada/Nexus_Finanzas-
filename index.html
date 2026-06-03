@@ -2902,15 +2902,15 @@ function App(){
                 const aliCom=aliadosCom.find(a=>a.id===opo.aliadoCom);
                 const sinMovimiento=opo.etapaId==="ea5"&&(opo.movIdsVinculados||[]).length===0;
                 return(
-                  <div key={opo.id} style={{...S.card(),borderLeft:`3px solid ${color}`,cursor:"pointer",marginBottom:8,
+                  <div key={opo.id} style={{...S.card(),borderLeft:"3px solid "+color,cursor:"pointer",marginBottom:8,
                     outline:sinMovimiento?"1px solid #C9A84C44":"none"}}
                     onClick={()=>setViewOpo(opo)}>
                     {sinMovimiento&&<div style={{fontSize:8,color:"#C9A84C",fontWeight:700,marginBottom:5}}>⚠ Pendiente vincular movimiento de ingreso</div>}
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                       <div style={{flex:1,marginRight:10}}>
                         <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3,flexWrap:"wrap"}}>
-                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:`${color}22`,color}}>{etapa.nombre}</span>
-                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:`${prob.color}18`,color:prob.color}}>★ {prob.label}</span>
+                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:color+"22",color}}>{etapa.nombre}</span>
+                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:prob.color+"18",color:prob.color}}>★ {prob.label}</span>
                           {opo.recurrencia&&opo.recurrencia!=="Única"&&<span style={{fontSize:8,color:"#a78bfa",background:"rgba(167,139,250,0.1)",padding:"2px 6px",borderRadius:5}}>↻ {opo.recurrencia}</span>}
                         </div>
                         <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{opo.concepto}</div>
@@ -2924,7 +2924,7 @@ function App(){
                     </div>
                     {/* Barra de progreso por etapa */}
                     <div style={{height:4,borderRadius:2,background:"#1e293b",overflow:"hidden",marginBottom:5}}>
-                      <div style={{height:"100%",borderRadius:2,background:color,width:`${etapa.pctAvance}%`,transition:"width 0.4s"}}/>
+                      <div style={{height:"100%",borderRadius:2,background:color,width:etapa.pctAvance+"%",transition:"width 0.4s"}}/>
                     </div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:9,color:"#475569"}}>
                       <div style={{display:"flex",gap:7}}>
@@ -2971,12 +2971,12 @@ function App(){
                 {/* Header */}
                 <div style={{background:"#13131f",borderRadius:11,padding:"12px 14px",marginBottom:11}}>
                   <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5,flexWrap:"wrap"}}>
-                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:`${color}22`,color}}>{etapa.nombre}</span>
-                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:`${prob.color}18`,color:prob.color}}>★ {prob.label}</span>
+                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:color+"22",color}}>{etapa.nombre}</span>
+                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:prob.color+"18",color:prob.color}}>★ {prob.label}</span>
                     {opo.recurrencia&&opo.recurrencia!=="Única"&&<span style={{fontSize:9,color:"#a78bfa",background:"rgba(167,139,250,0.1)",padding:"2px 7px",borderRadius:5}}>↻ {opo.recurrencia}</span>}
                   </div>
                   <div style={{height:5,borderRadius:3,background:"#1e293b",overflow:"hidden",marginBottom:8}}>
-                    <div style={{height:"100%",borderRadius:3,background:color,width:`${etapa.pctAvance}%`,transition:"width 0.4s"}}/>
+                    <div style={{height:"100%",borderRadius:3,background:color,width:etapa.pctAvance+"%",transition:"width 0.4s"}}/>
                   </div>
                   <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{opo.concepto}</div>
                   {opo.empresa&&<div style={{fontSize:11,color:"#94a3b8"}}>🏢 {opo.empresa}</div>}
@@ -3041,7 +3041,6 @@ function App(){
                     </div>
                   )}
                   {movsVinc.length===0&&<div style={{fontSize:9,color:"#475569",textAlign:"center",paddingTop:4}}>Sin movimientos vinculados</div>}
-                </div>
                 </div>
 
                 {/* Botón vincular movimiento — disponible en todas las etapas activas */}
@@ -3150,7 +3149,7 @@ function App(){
                       const sel=formOpo.etapaId===e.id;
                       return(
                         <button key={e.id} onClick={()=>set("etapaId",e.id)}
-                          style={{display:"flex",alignItems:"center",gap:9,padding:"8px 11px",borderRadius:9,border:`1px solid ${sel?c:"#1e293b"}`,background:sel?`${c}18`:"#13131f",cursor:"pointer",textAlign:"left"}}>
+                          style={{display:"flex",alignItems:"center",gap:9,padding:"8px 11px",borderRadius:9,border:"1px solid "+(sel?c:"#1e293b"),background:sel?c+"18":"#13131f",cursor:"pointer",textAlign:"left"}}>
                           <div style={{width:28,height:28,borderRadius:14,background:sel?c:"#1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:sel?"#080810":"#475569",flexShrink:0}}>{e.pctAvance}%</div>
                           <div>
                             <div style={{fontSize:11,fontWeight:sel?800:500,color:sel?c:"#94a3b8"}}>{e.nombre}</div>
@@ -3194,7 +3193,7 @@ function App(){
           const catActual=opoCatTab==="etapas"?etapasAvance:opoCatTab==="soluciones"?solucionesNexus:opoCatTab==="aliadosEst"?aliadosEst:aliadosCom;
           const setCatActual=opoCatTab==="etapas"?setEtapasAvance:opoCatTab==="soluciones"?setSolucionesNexus:opoCatTab==="aliadosEst"?setAliadosEst:setAliadosCom;
           const esEtapas=opoCatTab==="etapas";
-          const nextCatId=arr=>arr.length?`c${Date.now()}`:`c1`;
+          const nextCatId=arr=>arr.length?"c"+Date.now():"c1";
           return(
             <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowOpoCatalogos(false);}}>
               <div style={S.mBox}>
