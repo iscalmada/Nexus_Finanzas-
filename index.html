@@ -1325,6 +1325,7 @@ function App(){
       .filter(r=>filterTipo==="TODOS"||r.tipoOp===filterTipo)
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
       .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
+      .filter(r=>{
         const hasFiltCuenta=filterCuentas.size>0;
         const hasFiltTarjeta=filterTarjetasFiltro.size>0;
         // Sin ningún filtro activo — mostrar todo
@@ -1397,7 +1398,7 @@ function App(){
         }
         return true;
       });
-  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf,filterCuentas,filterTarjetasFiltro,movs]);
+  },[withSaldos,filterRetrasados,retrasados,period.inP,filterTipo,filterEst,search,filterCatIng,filterCatEg,catIng,catEg,subIdsOf,filterCuentas,filterTarjetasFiltro,filterProbIng,filterPrioEg,movs]);
 
   // Totales filtrados — respeta todos los filtros activos, divide Reales y Proyectados
   const filteredTotals=useMemo(()=>{
