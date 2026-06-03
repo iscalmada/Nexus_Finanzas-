@@ -2410,7 +2410,7 @@ function App(){
               const cNom=cuentas.find(c=>c.id===row.cuentaId)?.nombre;
               const cDest=cuentas.find(c=>c.id===row.cuentaDestinoId)?.nombre;
               const tcNom=tarjetas.find(t=>t.id===row.tarjetaId)?.nombre;
-              const esProg=["PENDIENTE","PROGRAMADO"].includes(row.estatus);
+              const esProg=["PENDIENTE","PROYECTADO","PROGRAMADO"].includes(row.estatus);
               const isEg=row.tipoOp==="Egreso";
               const prioColor=isEg?(PRIO_EG_COLOR[row.prioridad]||"#94a3b8"):(row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8");
               const prioLabel=isEg?(PRIO_EG_LBL[row.prioridad]||""):PRIO_LBL[row.prioridad]||"";
@@ -4647,7 +4647,9 @@ function App(){
           const cNom2=cuentas.find(c=>c.id===row.cuentaId)?.nombre||"";
           const cDest2=cuentas.find(c=>c.id===row.cuentaDestinoId)?.nombre||"";
           const tcNom2=tarjetas.find(t=>t.id===row.tarjetaId)?.nombre||"";
-          const prioColor=row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8";
+          const isEgMov=row.tipoOp==="Egreso";
+          const prioColor=isEgMov?(PRIO_EG_COLOR[row.prioridad]||"#94a3b8"):(row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8");
+          const prioLabelMov=isEgMov?(PRIO_EG_LBL[row.prioridad]||""):(PRIO_LBL[row.prioridad]||"");
           return(
             <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setViewMov(null);}}>
               <div style={S.mBox}>
