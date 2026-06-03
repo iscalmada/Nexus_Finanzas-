@@ -1178,6 +1178,10 @@ function App(){
   const[search,setSearch]=useState("");
   const[searchGlobal,setSearchGlobal]=useState(false); // true = búsqueda global activa
   const[filterRetrasados,setFilterRetrasados]=useState(false);
+  const[filterProbIng,setFilterProbIng]=useState(new Set()); // Set vacío = todas
+  const[filterPrioEg,setFilterPrioEg]=useState(new Set());  // Set vacío = todas
+  const[showFilterProbIng,setShowFilterProbIng]=useState(false);
+  const[showFilterPrioEg,setShowFilterPrioEg]=useState(false);
   // filtro categorías - sets de ids seleccionados (null = todas)
   const[filterCatIng,setFilterCatIng]=useState(null);
   const[filterCuentas,setFilterCuentas]=useState(new Set()); // Set vacío = sin filtro
@@ -1364,31 +1368,38 @@ function App(){
       })
       .filter(r=>{
         // Filtro por categoría
-        // null = sin filtro (todas); Set vacío = ninguna; Set con items = filtro activo
         const hasCatIngActivo=filterCatIng!==null&&filterCatIng.size>0;
         const hasCatEgActivo=filterCatEg!==null&&filterCatEg.size>0;
-        // Sin ningún filtro activo en ningún lado → mostrar todo
         if(!hasCatIngActivo&&!hasCatEgActivo) return true;
-
-        // Traspasos y Pagos Tarjeta: sin categoría, se ocultan cuando hay filtro activo
         if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return false;
-
         if(r.tipoOp==="Ingreso"){
-          // Si hay filtro de egresos activo pero NO hay filtro de ingresos:
-          // ocultar ingresos (el usuario quiere ver solo los egresos filtrados)
           if(!hasCatIngActivo) return false;
-          // Hay filtro de ingresos: el mov pasa si su cat padre O subcat está en el Set
           if(filterCatIng.has(r.cat)) return true;
           if(r.subcat&&filterCatIng.has(r.subcat)) return true;
           return false;
         }
         if(r.tipoOp==="Egreso"){
-          // Si hay filtro de ingresos activo pero NO hay filtro de egresos:
-          // ocultar egresos
           if(!hasCatEgActivo) return false;
           if(filterCatEg.has(r.cat)) return true;
           if(r.subcat&&filterCatEg.has(r.subcat)) return true;
           return false;
+        }
+        return true;
+      })
+      .filter(r=>{
+        // Filtro por probabilidad (Ingresos) y prioridad (Egresos)
+        const hasIngFilt=filterProbIng.size>0;
+        const hasEgFilt=filterPrioEg.size>0;
+        if(!hasIngFilt&&!hasEgFilt) return true;
+        // Si hay filtro activo en algún lado, Traspasos y PagoTC se ocultan
+        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return false;
+        if(r.tipoOp==="Ingreso"){
+          if(!hasIngFilt) return false; // hay filtro de Eg pero no de Ing → ocultar ingresos
+          return filterProbIng.has(r.prioridad||1);
+        }
+        if(r.tipoOp==="Egreso"){
+          if(!hasEgFilt) return false; // hay filtro de Ing pero no de Eg → ocultar egresos
+          return filterPrioEg.has(r.prioridad||3);
         }
         return true;
       });
@@ -2186,10 +2197,10 @@ function App(){
                       <div style={{textAlign:"right"}}>
                         <div style={{fontSize:8,color:"#64748b"}}>Saldo deudor</div>
                         <div style={{fontSize:16,fontWeight:800,color:sd>0?"#f87171":"#22c55e"}}>{fmt(sd)}</div>
-                        {(t.diaCierre||t.diaLimitePago)&&(
+                        {(t.fechaCorte||t.fechaLimPago)&&(
                           <div style={{marginTop:3}}>
-                            {t.diaCierre&&<div style={{fontSize:8,color:"#64748b"}}>✂ Corte: día {t.diaCierre}</div>}
-                            {t.diaLimitePago&&<div style={{fontSize:8,color:"#fbbf24"}}>⚡ Límite: día {t.diaLimitePago}</div>}
+                            {t.fechaCorte&&<div style={{fontSize:8,color:"#64748b"}}>✂ Corte: día {t.fechaCorte}</div>}
+                            {t.fechaLimPago&&<div style={{fontSize:8,color:"#fbbf24"}}>⚡ Límite: día {t.fechaLimPago}</div>}
                           </div>
                         )}
                       </div>
@@ -2222,11 +2233,60 @@ function App(){
             )}
             {/* Filtros */}
             <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
+              {/* Filtro visualización Ingresos por probabilidad */}
+              <div style={{position:"relative",display:"inline-block"}}>
+                <button style={S.prioTag(filterProbIng.size>0)}
+                  onClick={()=>{setShowFilterProbIng(v=>!v);setShowFilterPrioEg(false);}}>
+                  ↑ Prob.{filterProbIng.size>0?" ("+filterProbIng.size+")":""}
+                </button>
+                {showFilterProbIng&&(
+                  <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 12px",minWidth:160,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
+                    <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:7}}>PROBABILIDAD INGRESOS</div>
+                    {[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=>{
+                      const sel=filterProbIng.has(v);
+                      return(
+                        <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
+                          onClick={()=>setFilterProbIng(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
+                          <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?"#22c55e":"#334155"),background:sel?"#22c55e":"transparent",flexShrink:0}}/>
+                          <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
+                        </div>
+                      );
+                    })}
+                    <button style={{...S.smBtn("#475569"),width:"100%",marginTop:7,fontSize:8}}
+                      onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>Limpiar</button>
+                  </div>
+                )}
+              </div>
+              {/* Filtro visualización Egresos por prioridad */}
+              <div style={{position:"relative",display:"inline-block"}}>
+                <button style={S.prioTag(filterPrioEg.size>0)}
+                  onClick={()=>{setShowFilterPrioEg(v=>!v);setShowFilterProbIng(false);}}>
+                  ↓ Prior.{filterPrioEg.size>0?" ("+filterPrioEg.size+")":""}
+                </button>
+                {showFilterPrioEg&&(
+                  <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #f8717144",borderRadius:10,padding:"10px 12px",minWidth:175,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
+                    <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:7}}>PRIORIDAD EGRESOS</div>
+                    {[[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"]].map(([v,l,c])=>{
+                      const sel=filterPrioEg.has(v);
+                      return(
+                        <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
+                          onClick={()=>setFilterPrioEg(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
+                          <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0}}/>
+                          <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
+                        </div>
+                      );
+                    })}
+                    <button style={{...S.smBtn("#475569"),width:"100%",marginTop:7,fontSize:8}}
+                      onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>Limpiar</button>
+                  </div>
+                )}
+              </div>
+              {/* Botones del saldo consolidado (panel ⚙) */}
               <button style={S.prioTag(prioI<3)} onClick={()=>setShowPrioPanel(v=>v==="ing"?false:"ing")}>
-                ↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}
+                ⚙↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}
               </button>
               <button style={S.prioTag(prioE<5)} onClick={()=>setShowPrioPanel(v=>v==="eg"?false:"eg")}>
-                ↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}
+                ⚙↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}
               </button>
               <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>
                 {retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados
