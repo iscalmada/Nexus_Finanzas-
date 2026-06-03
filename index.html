@@ -1134,7 +1134,13 @@ function App(){
   const[gastoFamiliarEsencial,setGastoFamiliarEsencial]=useState(()=>loadLS('gastoFamiliarEsencial',0));
   const[factorFEF,setFactorFEF]=useState(()=>loadLS('factorFEF',2.5));
   const[prioFEF_ing,setPrioFEF_ing]=useState(2);
-  const[showFEFDesglose,setShowFEFDesglose]=useState(false); // 1=Alta, 2=Alta+Media (default), 3=Todas
+  const[showFEFDesglose,setShowFEFDesglose]=useState(false);
+  const[horizonteFEF,setHorizonteFEF]=useState(()=>{
+    // Default: hoy + factorFEF meses (en días)
+    const d=new Date();
+    d.setDate(d.getDate()+Math.round(2.5*30.4));
+    return d.toISOString().slice(0,10);
+  }); // 1=Alta, 2=Alta+Media (default), 3=Todas
   const[prioFEF_eg,setPrioFEF_eg]=useState(1);  // 1=soloEsencial, 2=+Importante, 3=+Discrecional, 4=Todos
   useEffect(()=>{ saveLS('movs', movs); }, [movs]);
   useEffect(()=>{ saveLS('cuentas', cuentas); }, [cuentas]);
@@ -2072,15 +2078,17 @@ function App(){
             {/* ── Fondo de Estabilidad Financiera ── */}
             {(()=>{
               // Ingresos: filtrados por probabilidad seleccionada (Alta+Media default)
-              const ingProg=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Ingreso"&&(parseInt(r.prioridad)||1)<=prioFEF_ing).reduce((s,r)=>s+r.monto,0);
+              // Horizonte: hoy hasta horizonteFEF
+              const hoyStr=todayStr();
+              const ingProg=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Ingreso"&&(parseInt(r.prioridad)||1)<=prioFEF_ing&&r.fecha&&r.fecha>=hoyStr&&r.fecha<=horizonteFEF).reduce((s,r)=>s+r.monto,0);
               // Egresos NO Esenciales: siempre prioridad > 1
-              const egNoEsenciales=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Egreso"&&!r.usaTarjeta&&(parseInt(r.prioridad)||3)>1);
+              const egNoEsenciales=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Egreso"&&!r.usaTarjeta&&(parseInt(r.prioridad)||3)>1&&r.fecha&&r.fecha>=hoyStr&&r.fecha<=horizonteFEF);
               const egNoEsencialesTotal=egNoEsenciales.reduce((s,r)=>s+r.monto,0);
               const fef=stats.saldoReal+ingProg-egNoEsencialesTotal;
               const metaFEF=gastoFamiliarEsencial>0?gastoFamiliarEsencial*factorFEF:0;
               const mesesFEF=gastoFamiliarEsencial>0?(fef/gastoFamiliarEsencial).toFixed(1):null;
               const pctFEF=metaFEF>0?Math.min(120,(fef/metaFEF)*100):0;
-              const semFEF=pctFEF>=100?"#22c55e":pctFEF>=60?"#fbbf24":"#f87171";
+              const semFEF=pctFEF>=100?"#22c55e":pctFEF>=80?"#22c55e":pctFEF>=50?"#fbbf24":"#f87171";
               const nivelIngLabel=prioFEF_ing===1?"Alta":prioFEF_ing===2?"Alta+Media":"Todas";
               const egPorNivel=[
                 {label:"Importantes",color:"#60a5fa",items:egNoEsenciales.filter(r=>(parseInt(r.prioridad)||3)===2)},
@@ -2143,8 +2151,11 @@ function App(){
                       <span>Meta FEF: {fmt(metaFEF)} ({factorFEF}x GFE)</span>
                       <span style={{color:semFEF,fontWeight:700}}>{Math.round(pctFEF)}%</span>
                     </div>
-                    <div style={{height:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:3}}>
-                      <div style={{height:"100%",borderRadius:4,background:semFEF,width:Math.min(100,pctFEF)+"%",transition:"width 0.5s"}}/>
+                    <div style={{height:pctFEF>=100?9:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:3,
+                      boxShadow:pctFEF>=100?"0 0 8px #22c55e88":"none",transition:"all 0.5s"}}>
+                      <div style={{height:"100%",borderRadius:4,background:pctFEF>=100?"linear-gradient(90deg,#22c55e,#86efac,#22c55e)":semFEF,
+                        width:Math.min(100,pctFEF)+"%",transition:"width 0.5s",
+                        backgroundSize:pctFEF>=100?"200% 100%":"auto"}}/>
                     </div>
                     {pctFEF>=100?(
                       <div style={{textAlign:"center",marginBottom:6,padding:"5px 0"}}>
@@ -2161,12 +2172,31 @@ function App(){
                     )}
                   </>)}
                   <div style={{background:"#0d0d1a",borderRadius:8,padding:"7px 10px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                       <span style={{fontSize:8,color:"#64748b"}}>Ingresos considerados</span>
                       <div style={{display:"flex",gap:3}}>
                         {[[1,"Alta","#22c55e"],[2,"Alta+Med","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=>(
                           <button key={v} style={{...S.prioB2(prioFEF_ing===v,c),flex:"none",padding:"3px 6px",fontSize:8}} onClick={()=>setPrioFEF_ing(v)}>{l}</button>
                         ))}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <span style={{fontSize:8,color:"#64748b"}}>Horizonte</span>
+                        <span style={{fontSize:7,color:"#334155",marginLeft:5}}>({Math.round((new Date(horizonteFEF)-new Date(todayStr()))/(1000*60*60*24))} días)</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:5}}>
+                        <input type="date" style={{...S.inp,padding:"2px 6px",fontSize:8,width:"auto"}}
+                          value={horizonteFEF}
+                          onChange={e=>{
+                            if(e.target.value) setHorizonteFEF(e.target.value);
+                          }}/>
+                        <button style={{...S.smBtn("#475569"),fontSize:7,padding:"2px 5px"}}
+                          onClick={()=>{
+                            const d=new Date();
+                            d.setDate(d.getDate()+Math.round((factorFEF||2.5)*30.4));
+                            setHorizonteFEF(d.toISOString().slice(0,10));
+                          }}>↺</button>
                       </div>
                     </div>
                   </div>
