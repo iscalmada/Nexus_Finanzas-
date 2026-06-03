@@ -161,6 +161,11 @@ const DIAS_SEM      = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const MESES         = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MESES_FULL    = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const PRIO_LBL      = {1:"Alta",2:"Media",3:"Baja"};
+const PRIO_EG_LBL   = {1:"Esencial",2:"Importante",3:"Discrecional",4:"Extraordinario"};
+const PRIO_EG_COLOR = {1:"#22c55e",2:"#60a5fa",3:"#fbbf24",4:"#f87171"};
+// Para egresos: 5 niveles donde 5 = "Todos"
+const PRIO_ING_OPTS  = [[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]];
+const PRIO_EG_OPTS   = [[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"],[5,"Todos","#64748b"]];
 const ORIG_ACREEDOR = ["Sicresa","Familia","Terceros"];
 // Catálogo inicial de Etapas de Avance (editable en app)
 const INIT_ETAPAS_AVANCE = [
@@ -286,7 +291,8 @@ function calcConsolidado(movs,pI,pE,cuentasRef,incluirProy){
     if(real&&!(r.tipoOp==="Egreso"&&r.usaTarjeta)&&r.tipoOp!=="Traspaso")cuenta=true;
     if(prog||proy){
       if(r.tipoOp==="Ingreso"&&r.prioridad<=(pI||3))cuenta=true;
-      if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&r.prioridad<=(pE||3))cuenta=true;
+      // Para egresos: pE 1-4 filtra por prioridad, pE=5 incluye todos
+      if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&((pE||5)>=5||r.prioridad<=(pE||5)))cuenta=true;
       if(r.tipoOp==="Pago Tarjeta")cuenta=true;
     }
     if(cuenta){
@@ -532,7 +538,7 @@ function BudgetBar({gasto,presupuesto,color="#C9A84C",esIngreso=false}){
 const ModalMov=memo(function ModalMov({
   formMov,setFormMov,editMovId,isEditReal,recForm,setRecForm,
   cuentas,cuentaSaldos,tarjetas,tarjetaSaldos,catIng,catEg,
-  acreedores,deudores,ingresosExt,oportunidades,etapasAvance,getEtapa,
+  acreedores,deudores,ingresosExt,oportunidades,etapasAvance,getEtapa,getPrioDefEg,
   movs,saldoPendienteFn,saldoIngExtFn,
   onSave,onClose,saveError,fieldErrors
 }){
@@ -653,12 +659,20 @@ const ModalMov=memo(function ModalMov({
           <div style={S.fg}><label style={S.fl}>Concepto</label><input style={S.inp} value={formMov.concepto} onChange={e=>set("concepto",e.target.value)} placeholder="Descripción…"/></div>
           <div style={{...S.r2,marginBottom:11}}>
             <div><label style={S.fl}>Categoría</label>
-              <select style={S.sel} value={formMov.cat} onChange={e=>setFormMov(f=>({...f,cat:e.target.value,subcat:""}))}>
+              <select style={S.sel} value={formMov.cat} onChange={e=>{
+                const newCat=e.target.value;
+                const newPrio=formMov.tipoOp==="Egreso"&&getPrioDefEg?getPrioDefEg(newCat,""):formMov.prioridad;
+                setFormMov(f=>({...f,cat:newCat,subcat:"",prioridad:newPrio}));
+              }}>
                 <option value="">— —</option>{cats.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
             </div>
             <div><label style={S.fl}>Subcategoría</label>
-              <select style={S.sel} value={formMov.subcat} onChange={e=>set("subcat",e.target.value)}>
+              <select style={S.sel} value={formMov.subcat} onChange={e=>{
+                const newSub=e.target.value;
+                const newPrio=formMov.tipoOp==="Egreso"&&getPrioDefEg?getPrioDefEg(formMov.cat,newSub):formMov.prioridad;
+                setFormMov(f=>({...f,subcat:newSub,prioridad:newPrio}));
+              }}>
                 <option value="">— —</option>{subcats.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
             </div>
@@ -688,33 +702,63 @@ const ModalMov=memo(function ModalMov({
           {isProg&&<div style={S.infoBx("#a78bfa")}><span>⚡</span><span>Programado — cuenta se asigna al confirmar como ejecutado.</span></div>}
           <div style={S.fg}>
             <label style={S.fl}>{formMov.tipoOp==="Ingreso"?"Probabilidad":"Prioridad"}</label>
-            <div style={S.prioR}>{[[1,"Alta"],[2,"Media"],[3,"Baja"]].map(([v,l])=><button key={v} style={S.prioB2(formMov.prioridad===v)} onClick={()=>set("prioridad",v)}>{l}</button>)}</div>
+            {formMov.tipoOp==="Ingreso"
+              ?<div style={S.prioR}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=><button key={v} style={S.prioB2(formMov.prioridad===v,c)} onClick={()=>set("prioridad",v)}>{l}</button>)}</div>
+              :<div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                {[[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"]].map(([v,l,c])=>(
+                  <button key={v} style={{...S.prioB2(formMov.prioridad===v,c),flex:1,minWidth:60,padding:"7px 4px",fontSize:9}} onClick={()=>set("prioridad",v)}>{l}</button>
+                ))}
+              </div>
+            }
           </div>
           <div style={S.fg}><label style={S.fl}>Observaciones</label><textarea style={{...S.inp,minHeight:60,resize:"vertical",lineHeight:1.5}} value={formMov.obs} onChange={e=>set("obs",e.target.value)}/></div>
           {/* Vinculación a Cartera — filtrada por tipo de movimiento */}
           {(formMov.tipoOp==="Egreso"||formMov.tipoOp==="Ingreso")&&(
             <div style={S.fg}>
-              <label style={S.fl}>Vincular a Cartera (opcional)</label>
-              <select style={S.sel} value={formMov.vinculoTipo?`${formMov.vinculoTipo}:${formMov.vinculoId}`:""}
-                onChange={e=>{
-                  if(!e.target.value){set("vinculoTipo",null);set("vinculoId",null);}
-                  else{const[t,i]=e.target.value.split(":");set("vinculoTipo",t);set("vinculoId",parseInt(i));}
-                }}>
-                <option value="">— Sin vincular —</option>
-                {formMov.tipoOp==="Egreso"&&acreedores.length>0&&(
-                  <optgroup label="Acreedores">{acreedores.map(x=><option key={x.id} value={`acreedores:${x.id}`}>{x.nombre||x.concepto}</option>)}</optgroup>
+              <label style={S.fl}>Vincular a (opcional)</label>
+              {formMov.tipoOp==="Egreso"&&(
+                <select style={S.sel} value={formMov.vinculoTipo&&formMov.vinculoId?"acreedores:"+formMov.vinculoId:""}
+                  onChange={e=>{
+                    if(!e.target.value){set("vinculoTipo",null);set("vinculoId",null);}
+                    else{const[t,i]=e.target.value.split(":");set("vinculoTipo",t);set("vinculoId",parseInt(i));}
+                  }}>
+                  <option value="">— Sin vincular —</option>
+                  {acreedores.map(x=><option key={x.id} value={"acreedores:"+x.id}>{x.nombre||x.concepto}</option>)}
+                </select>
+              )}
+              {formMov.tipoOp==="Ingreso"&&(<>
+                {/* Paso 1: elegir tipo de vinculación */}
+                <div style={{display:"flex",gap:6,marginBottom:7}}>
+                  {[["deudores","🟢 Deudor"],["ingresosExt","⭐ Ing. Ext."],["oportunidades","🚀 Oportunidad"]].map(([t,l])=>(
+                    <button key={t} style={{...S.prioB2(formMov.vinculoTipo===t,"#C9A84C"),flex:1,padding:"7px 4px",fontSize:9}}
+                      onClick={()=>{set("vinculoTipo",formMov.vinculoTipo===t?null:t);set("vinculoId",null);}}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                {/* Paso 2: mostrar lista según tipo elegido */}
+                {formMov.vinculoTipo==="deudores"&&(
+                  <select style={S.sel} value={formMov.vinculoId||""} onChange={e=>set("vinculoId",parseInt(e.target.value)||null)}>
+                    <option value="">— Seleccionar deudor —</option>
+                    {deudores.map(x=><option key={x.id} value={x.id}>{x.nombre||x.concepto}</option>)}
+                  </select>
                 )}
-                {formMov.tipoOp==="Ingreso"&&deudores.length>0&&(
-                  <optgroup label="Deudores">{deudores.map(x=><option key={x.id} value={`deudores:${x.id}`}>{x.nombre||x.concepto}</option>)}
-                  </optgroup>
+                {formMov.vinculoTipo==="ingresosExt"&&(
+                  <select style={S.sel} value={formMov.vinculoId||""} onChange={e=>set("vinculoId",parseInt(e.target.value)||null)}>
+                    <option value="">— Seleccionar Ing. Ext. —</option>
+                    {ingresosExt.map(x=><option key={x.id} value={x.id}>{x.concepto}</option>)}
+                  </select>
                 )}
-                {formMov.tipoOp==="Ingreso"&&ingresosExt.length>0&&(
-                  <optgroup label="Ing. Extraordinarios">{ingresosExt.map(x=><option key={x.id} value={`ingresosExt:${x.id}`}>{x.concepto}</option>)}</optgroup>
+                {formMov.vinculoTipo==="oportunidades"&&(
+                  <select style={S.sel} value={formMov.vinculoId||""} onChange={e=>set("vinculoId",parseInt(e.target.value)||null)}>
+                    <option value="">— Seleccionar Oportunidad —</option>
+                    {oportunidades.filter(o=>getEtapa(o.etapaId,etapasAvance).pctAvance>0).map(x=>{
+                      const et=getEtapa(x.etapaId,etapasAvance);
+                      return(<option key={x.id} value={x.id}>{x.concepto+(x.empresa?" | "+x.empresa:"")+(x.contacto?" | "+x.contacto:"")+" ["+et.nombre+"]"}</option>);
+                    })}
+                  </select>
                 )}
-                {formMov.tipoOp==="Ingreso"&&oportunidades.filter(o=>getEtapa(o.etapaId,etapasAvance).pctAvance>0).length>0&&(
-                  <optgroup label="Oportunidades Nexus">{oportunidades.filter(o=>getEtapa(o.etapaId,etapasAvance).pctAvance>0).map(x=>{const et=getEtapa(x.etapaId,etapasAvance);return(<option key={x.id} value={"oportunidades:"+x.id}>{x.concepto+(x.empresa?" — "+x.empresa:"")+" ["+et.nombre+"]"}</option>);})}</optgroup>
-                )}
-              </select>
+              </>)}
               <div style={{fontSize:9,color:"#475569",marginTop:3}}>
                 {formMov.tipoOp==="Egreso"?"Vincula este pago a un acreedor para registrar el abono.":"Vincula este ingreso a un deudor o ingreso extraordinario para registrar el cobro."}
               </div>
@@ -1087,6 +1131,10 @@ function App(){
 
   // ── Auto-guardado en localStorage ──
   const[metaFondo,setMetaFondo]=useState(()=>loadLS('metaFondo',0));
+  const[gastoFamiliarEsencial,setGastoFamiliarEsencial]=useState(()=>loadLS('gastoFamiliarEsencial',0));
+  const[factorFEF,setFactorFEF]=useState(()=>loadLS('factorFEF',2.5));
+  const[prioFEF_ing,setPrioFEF_ing]=useState(1); // 1=Alta, 2=Alta+Media, 3=Todas
+  const[prioFEF_eg,setPrioFEF_eg]=useState(1);  // 1=soloEsencial, 2=+Importante, 3=+Discrecional, 4=Todos
   useEffect(()=>{ saveLS('movs', movs); }, [movs]);
   useEffect(()=>{ saveLS('cuentas', cuentas); }, [cuentas]);
   useEffect(()=>{ saveLS('tarjetas', tarjetas); }, [tarjetas]);
@@ -1096,6 +1144,8 @@ function App(){
   useEffect(()=>{ saveLS('acreedores', acreedores); }, [acreedores]);
   useEffect(()=>{ saveLS('oportunidades', oportunidades); }, [oportunidades]);
   useEffect(()=>{ saveLS('metaFondo', metaFondo); }, [metaFondo]);
+  useEffect(()=>{ saveLS('gastoFamiliarEsencial', gastoFamiliarEsencial); }, [gastoFamiliarEsencial]);
+  useEffect(()=>{ saveLS('factorFEF', factorFEF); }, [factorFEF]);
   useEffect(()=>{ saveLS('etapasAvance', etapasAvance); }, [etapasAvance]);
   useEffect(()=>{ saveLS('solucionesNexus', solucionesNexus); }, [solucionesNexus]);
   useEffect(()=>{ saveLS('aliadosEst', aliadosEst); }, [aliadosEst]);
@@ -1142,7 +1192,7 @@ function App(){
   const[showPeriod,setShowPeriod]=useState(false);
   const[showPrioPanel,setShowPrioPanel]=useState(false);
   const[prioI,setPrioI]=useState(3);
-  const[prioE,setPrioE]=useState(3);
+  const[prioE,setPrioE]=useState(5); // 5=Todos para egresos (Esencial=1..Extraordinario=4)
   const[incluirProy,setIncluirProy]=useState(false); // toggle PROYECTADO en consolidado
   const[multiMode,setMultiMode]=useState(false);
   const[filterPrioVis,setFilterPrioVis]=useState(null); // null=todas, 1=Alta, 2=Media, 3=Baja
@@ -1230,6 +1280,9 @@ function App(){
   const solDrag=useCatDrag(setSolucionesNexus);
   const aliEstDrag=useCatDrag(setAliadosEst);
   const aliComDrag=useCatDrag(setAliadosCom);
+  const acreedoresDrag=useCatDrag(setAcreedores);
+  const deudoresDrag=useCatDrag(setDeudores);
+  const ingresosExtDrag=useCatDrag(setIngresosExt);
   const tdStr=todayStr();
 
   const retrasados=useMemo(()=>movs.filter(r=>r.fecha&&r.fecha<tdStr&&(r.estatus==="PROGRAMADO"||r.estatus==="PROYECTADO")),[movs,tdStr]);
@@ -1715,6 +1768,17 @@ function App(){
   // Helper: etapa activa de una oportunidad
   const getEtapa = useCallback((etapaId,etapas)=>etapas.find(e=>e.id===etapaId)||etapas[0],[]);
 
+  // Helper: prioridad por defecto de una cat/subcat de egreso
+  const getPrioDefEg = useCallback((catId,subcatId)=>{
+    const cat=catEg.find(c=>c.id===catId);
+    if(!cat) return 3;
+    if(subcatId){
+      const sub=cat.subs.find(s=>s.id===subcatId);
+      if(sub&&sub.prio) return sub.prio;
+    }
+    return cat.prio||3;
+  },[catEg]);
+
   const abonado = useCallback((registro,movs)=>{
     if(!registro.movIdsVinculados||!registro.movIdsVinculados.length) return 0;
     return movs.filter(m=>registro.movIdsVinculados.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus)).reduce((s,m)=>s+m.monto,0);
@@ -1867,7 +1931,7 @@ function App(){
   },[acreedores,deudores,ingresosExt,movs]);
 
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,exportedAt:new Date().toISOString(),version:"v8"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,exportedAt:new Date().toISOString(),version:"v8"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
@@ -1894,6 +1958,8 @@ function App(){
         if(data.ingresosExt){setIngresosExt(data.ingresosExt);saveLS('ingresosExt',data.ingresosExt);}
         if(data.oportunidades){setOportunidades(data.oportunidades);saveLS('oportunidades',data.oportunidades);}
         if(data.metaFondo!==undefined){setMetaFondo(data.metaFondo);saveLS('metaFondo',data.metaFondo);}
+        if(data.gastoFamiliarEsencial!==undefined){setGastoFamiliarEsencial(data.gastoFamiliarEsencial);saveLS('gastoFamiliarEsencial',data.gastoFamiliarEsencial);}
+        if(data.factorFEF!==undefined){setFactorFEF(data.factorFEF);saveLS('factorFEF',data.factorFEF);}
         if(data.etapasAvance){setEtapasAvance(data.etapasAvance);saveLS('etapasAvance',data.etapasAvance);}
         if(data.solucionesNexus){setSolucionesNexus(data.solucionesNexus);saveLS('solucionesNexus',data.solucionesNexus);}
         if(data.aliadosEst){setAliadosEst(data.aliadosEst);saveLS('aliadosEst',data.aliadosEst);}
@@ -1936,7 +2002,11 @@ function App(){
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
       <div style={S.app}>
         <div style={S.hdr}>
-          <div><div style={S.logo}>Nexus Partners</div><div style={S.sub}>PROYECCIÓN FINANCIERA PERSONAL</div></div>
+          <div>
+            <div style={S.logo}>Nexus CFP</div>
+            <div style={{fontSize:8,color:"#C9A84C",letterSpacing:1,marginBottom:1}}>by Nexus Partners</div>
+            <div style={S.sub}>CONTROL FINANCIERO PERSONAL</div>
+          </div>
           <div style={{textAlign:"right"}}><div style={{color:"#C9A84C",fontWeight:800,fontSize:12}}>{fmt(stats.saldoReal)}</div><div style={{fontSize:8,color:"#334155"}}>saldo real</div></div>
         </div>
         <div style={S.line}/><div style={{height:10}}/>
@@ -1970,44 +2040,79 @@ function App(){
                 <div style={{fontSize:10,color:"#f87171",opacity:.8}}>Primer rojo el <strong>{fmtDate(primerNegativo.fecha)}</strong> → {fmt(primerNegativo.saldoConsolidado)}</div>
               </div>
             )}
-            {/* ── Saldo Real + Programado + Meta Fondo ── */}
+            {/* ── Fondo de Estabilidad Financiera ── */}
             {(()=>{
-              const ingProgTotal=movs.filter(r=>r.estatus==="PROGRAMADO"&&r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0);
-              const saldoMasProg=stats.saldoReal+ingProgTotal;
-              const pctFondo=metaFondo>0?Math.min(100,(saldoMasProg/metaFondo)*100):0;
-              const semFondo=pctFondo>=100?"#22c55e":pctFondo>=60?"#fbbf24":"#f87171";
+              // Ingresos programados filtrados por probabilidad seleccionada (prioFEF_ing)
+              const ingProg=movs.filter(r=>r.estatus==="PROGRAMADO"&&r.tipoOp==="Ingreso"&&r.prioridad<=prioFEF_ing).reduce((s,r)=>s+r.monto,0);
+              // Egresos programados cuya prioridad EXCEDE el nivel de cobertura (se restan)
+              // prioFEF_eg: 1=soloEsencial(restar 2,3,4), 2=+Imp(restar 3,4), 3=+Disc(restar 4), 4=Todos(no restar nada)
+              const egNoProtegidos=movs.filter(r=>r.estatus==="PROGRAMADO"&&r.tipoOp==="Egreso"&&!r.usaTarjeta&&r.prioridad>prioFEF_eg).reduce((s,r)=>s+r.monto,0);
+              const fef=stats.saldoReal+ingProg-egNoProtegidos;
+              const metaFEF=gastoFamiliarEsencial>0?gastoFamiliarEsencial*factorFEF:0;
+              const mesesFEF=gastoFamiliarEsencial>0?(fef/gastoFamiliarEsencial).toFixed(1):null;
+              const pctFEF=metaFEF>0?Math.min(120,(fef/metaFEF)*100):0;
+              const semFEF=pctFEF>=100?"#22c55e":pctFEF>=60?"#fbbf24":"#f87171";
+              const nivelEgLabel=prioFEF_eg===1?"Solo Esenciales":prioFEF_eg===2?"Esenc+Imp":prioFEF_eg===3?"Esenc+Imp+Disc":"Todos";
+              const nivelIngLabel=prioFEF_ing===1?"Alta":prioFEF_ing===2?"Alta+Media":"Todas";
               return(
-                <div style={{...S.card("rgba(201,168,76,0.25)"),marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
-                    <div>
-                      <div style={S.lbl}>Saldo Real</div>
-                      <div style={S.bigA()}>{fmt(stats.saldoReal)}</div>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={S.lbl}>+ Ing. Programado</div>
-                      <div style={{fontSize:14,fontWeight:800,color:"#22c55e"}}>+{fmt(ingProgTotal)}</div>
+                <div style={{...S.card("rgba(201,168,76,0.2)"),marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <div style={{fontSize:10,fontWeight:800,color:"#C9A84C"}}>🏦 Fondo de Estabilidad Financiera</div>
+                    {mesesFEF&&<div style={{fontSize:9,color:semFEF,fontWeight:700,background:semFEF+"18",padding:"2px 8px",borderRadius:8}}>{mesesFEF} meses</div>}
+                  </div>
+                  {/* Desglose del cálculo */}
+                  <div style={{background:"#13131f",borderRadius:9,padding:"8px 11px",marginBottom:7}}>
+                    {[
+                      ["Saldo Real",stats.saldoReal,"#C9A84C","+"],
+                      ["+ Ing. Prog. ("+nivelIngLabel+")",ingProg,"#22c55e","+"],
+                      ["− Eg. no protegidos ("+nivelEgLabel+")",-egNoProtegidos,"#f87171",""],
+                    ].map(([l,v,c,p])=>(
+                      <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1e293b22"}}>
+                        <span style={{fontSize:9,color:"#64748b"}}>{l}</span>
+                        <span style={{fontSize:10,fontWeight:700,color:c}}>{v>=0?"+":""}{fmt(v)}</span>
+                      </div>
+                    ))}
+                    <div style={{display:"flex",justifyContent:"space-between",paddingTop:5,marginTop:2}}>
+                      <span style={{fontSize:10,color:"#e2e8f0",fontWeight:700}}>= Fondo Disponible</span>
+                      <span style={{fontSize:14,fontWeight:800,color:fef>=0?semFEF:"#f87171"}}>{fmt(fef)}</span>
                     </div>
                   </div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"#13131f",borderRadius:8,padding:"7px 11px",marginBottom:metaFondo>0?8:0}}>
-                    <span style={{fontSize:10,color:"#94a3b8"}}>Saldo Real + Programado</span>
-                    <span style={{fontSize:15,fontWeight:800,color:"#C9A84C"}}>{fmt(saldoMasProg)}</span>
-                  </div>
-                  {metaFondo>0&&(<>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:4}}>
-                      <span>🎯 Meta Fondo Contingencia</span>
-                      <span style={{color:semFondo,fontWeight:700}}>{Math.round(pctFondo)}% — {fmt(metaFondo)}</span>
+                  {/* Barra de progreso vs meta */}
+                  {metaFEF>0&&(<>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:3}}>
+                      <span>Meta FEF: {fmt(metaFEF)} ({factorFEF}× GFE)</span>
+                      <span style={{color:semFEF,fontWeight:700}}>{Math.round(pctFEF)}%</span>
                     </div>
                     <div style={{height:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:3}}>
-                      <div style={{height:"100%",borderRadius:4,background:semFondo,width:pctFondo+"%",transition:"width 0.5s"}}/>
+                      <div style={{height:"100%",borderRadius:4,background:semFEF,width:Math.min(100,pctFEF)+"%",transition:"width 0.5s"}}/>
                     </div>
-                    <div style={{fontSize:9,color:pctFondo>=100?"#22c55e":"#475569",textAlign:"right"}}>
-                      {pctFondo>=100?"✅ Meta alcanzada":"Faltan "+fmt(metaFondo-saldoMasProg)}
+                    <div style={{fontSize:9,color:pctFEF>=100?"#22c55e":"#475569",textAlign:"right",marginBottom:6}}>
+                      {pctFEF>=100?"✅ Meta alcanzada":"Faltan "+fmt(Math.max(0,metaFEF-fef))+" ("+Math.max(0,(metaFEF-fef)/Math.max(1,gastoFamiliarEsencial)).toFixed(1)+" meses)"}
                     </div>
                   </>)}
-                  {/* Toggle PROYECTADO */}
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8,paddingTop:7,borderTop:"1px solid #1e293b"}}>
-                    <span style={{fontSize:9,color:incluirProy?"#38bdf8":"#475569"}}>Incluir PROYECTADOS en consolidado</span>
-                    <button style={{...S.prioB2(incluirProy,"#38bdf8"),width:42,flex:"none",padding:"4px 0",fontSize:9}} onClick={()=>setIncluirProy(v=>!v)}>{incluirProy?"ON":"OFF"}</button>
+                  {/* Controles de escenario */}
+                  <div style={{background:"#0d0d1a",borderRadius:8,padding:"7px 10px"}}>
+                    <div style={{fontSize:8,color:"#475569",fontWeight:700,marginBottom:5}}>ESCENARIO</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <span style={{fontSize:8,color:"#64748b"}}>Ingresos considerados</span>
+                      <div style={{display:"flex",gap:3}}>
+                        {[[1,"Alta","#22c55e"],[2,"Alta+Med","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=>(
+                          <button key={v} style={{...S.prioB2(prioFEF_ing===v,c),flex:"none",padding:"3px 6px",fontSize:8}} onClick={()=>setPrioFEF_ing(v)}>{l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                      <span style={{fontSize:8,color:"#64748b"}}>Egresos protegidos</span>
+                      <div style={{display:"flex",gap:3}}>
+                        {[[1,"Esen","#22c55e"],[2,"+Imp","#60a5fa"],[3,"+Disc","#fbbf24"],[4,"Todo","#64748b"]].map(([v,l,c])=>(
+                          <button key={v} style={{...S.prioB2(prioFEF_eg===v,c),flex:"none",padding:"3px 6px",fontSize:8}} onClick={()=>setPrioFEF_eg(v)}>{l}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <span style={{fontSize:8,color:incluirProy?"#38bdf8":"#475569"}}>Incluir PROYECTADOS</span>
+                      <button style={{...S.prioB2(incluirProy,"#38bdf8"),width:38,flex:"none",padding:"3px 0",fontSize:8}} onClick={()=>setIncluirProy(v=>!v)}>{incluirProy?"ON":"OFF"}</button>
+                    </div>
                   </div>
                 </div>
               );
@@ -2113,8 +2218,12 @@ function App(){
               <div style={S.prioPanel}>
                 <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↑ Probabilidad Ingresos</div>
                 <div style={S.prioRow}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioI===v,c)} onClick={()=>setPrioI(v)}>{l}</button>)}</div>
-                <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos</div>
-                <div style={S.prioRow}>{[[1,"Alta","#f87171"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioE===v,c)} onClick={()=>setPrioE(v)}>{l}</button>)}</div>
+                <div style={{fontSize:9,color:"#475569",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos (proyección)</div>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:9}}>
+                  {[[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"],[5,"Todos","#64748b"]].map(([v,l,c])=>(
+                    <button key={v} style={{...S.prioB(prioE===v,c),flex:1,minWidth:50,fontSize:8,padding:"6px 2px"}} onClick={()=>setPrioE(v)}>{l}</button>
+                  ))}
+                </div>
                 <div style={{borderTop:"1px solid #1e293b",paddingTop:9,marginTop:4}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                     <span style={{fontSize:9,color:incluirProy?"#38bdf8":"#475569",fontWeight:700}}>Incluir PROYECTADOS</span>
@@ -2205,7 +2314,9 @@ function App(){
               const cDest=cuentas.find(c=>c.id===row.cuentaDestinoId)?.nombre;
               const tcNom=tarjetas.find(t=>t.id===row.tarjetaId)?.nombre;
               const esProg=["PENDIENTE","PROGRAMADO"].includes(row.estatus);
-              const prioColor=row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8";
+              const isEg=row.tipoOp==="Egreso";
+              const prioColor=isEg?(PRIO_EG_COLOR[row.prioridad]||"#94a3b8"):(row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8");
+              const prioLabel=isEg?(PRIO_EG_LBL[row.prioridad]||""):PRIO_LBL[row.prioridad]||"";
               const catNom=(row.tipoOp==="Ingreso"?catIng:catEg).find(c=>c.id===row.cat)?.nombre;
               return(
                 <div key={row.id} data-movid={row.id}
@@ -2229,7 +2340,7 @@ function App(){
                     <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
                       <span style={{fontSize:10,color:isRet?"#fbbf24":"#475569"}}>{row.fecha?fmtDate(row.fecha):"Sin fecha"}</span>
                       {catNom&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,color:"#64748b"}}>{catNom}</span></>}
-                      {esProg&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,fontWeight:700,color:prioColor}}>{row.tipoOp==="Ingreso"?"Prob":"Prior"} {PRIO_LBL[row.prioridad]}</span></>}
+                      {esProg&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,fontWeight:700,color:prioColor}}>{row.tipoOp==="Ingreso"?"Prob":""} {prioLabel}</span></>}
                       {tcNom&&<span style={{fontSize:8,color:"#f472b6",background:"#f472b611",padding:"1px 5px",borderRadius:4}}>💳 {tcNom}</span>}
                       {row.tipoOp==="Pago Tarjeta"&&tcNom&&cNom&&<span style={{fontSize:8,color:"#60a5fa",background:"#60a5fa11",padding:"1px 5px",borderRadius:4}}>← {cNom}</span>}
                       {cNom&&!tcNom&&<span style={{fontSize:8,color:"#475569",background:"#1a1a2e",padding:"1px 5px",borderRadius:4}}>{cNom}{cDest?" → "+cDest:""}</span>}
@@ -2847,7 +2958,7 @@ function App(){
           const aliCom=aliadosCom.find(a=>a.id===opo.aliadoCom);
           const movsVinc=movs.filter(m=>(opo.movIdsVinculados||[]).includes(m.id));
           const totalVinc=movsVinc.filter(m=>["PAGADO","INGRESADO"].includes(m.estatus)).reduce((s,m)=>s+m.monto,0);
-          const totalProg=movsVinc.filter(m=>m.estatus==="PROGRAMADO").reduce((s,m)=>s+m.monto,0);
+          const totalProg=movsVinc.filter(m=>m.estatus==="PROGRAMADO"||m.estatus==="PROYECTADO").reduce((s,m)=>s+m.monto,0);
           const pendiente=Math.max(0,(opo.montoEstimado||0)-totalVinc);
           return(
             <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setViewOpo(null);}}>
@@ -2896,34 +3007,41 @@ function App(){
                     <div style={{fontSize:9,color:"#C9A84C",fontWeight:700}}>INGRESO ESTIMADO</div>
                     <div style={{fontSize:20,fontWeight:800,color:"#C9A84C"}}>{fmt(opo.montoEstimado||0)}</div>
                   </div>
-                  {esConcretada&&(
+                  <div style={{display:"flex",gap:6,marginBottom:movsVinc.length>0?8:0}}>
+                    <div style={{flex:1,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
+                      <div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>Ingresado</div>
+                      <div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(totalVinc)}</div>
+                    </div>
+                    <div style={{flex:1,background:"rgba(167,139,250,0.1)",border:"1px solid #a78bfa33",borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
+                      <div style={{fontSize:7,color:"#a78bfa",fontWeight:700}}>Prog/Proy</div>
+                      <div style={{fontSize:12,fontWeight:800,color:"#a78bfa"}}>{fmt(totalProg)}</div>
+                    </div>
+                    <div style={{flex:1,background:pendiente>0?"rgba(251,191,36,0.1)":"rgba(34,197,94,0.1)",border:"1px solid "+(pendiente>0?"#fbbf2433":"#22c55e33"),borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
+                      <div style={{fontSize:7,color:pendiente>0?"#fbbf24":"#22c55e",fontWeight:700}}>Pendiente</div>
+                      <div style={{fontSize:12,fontWeight:800,color:pendiente>0?"#fbbf24":"#22c55e"}}>{fmt(pendiente)}</div>
+                    </div>
+                  </div>
+                  {movsVinc.length>0&&(
                     <div style={{borderTop:"1px solid #C9A84C22",paddingTop:8}}>
-                      <div style={{display:"flex",gap:6,marginBottom:6}}>
-                        <div style={{flex:1,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
-                          <div style={{fontSize:8,color:"#22c55e",fontWeight:700}}>Ingresado</div>
-                          <div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(totalVinc)}</div>
-                        </div>
-                        {totalProg>0&&<div style={{flex:1,background:"rgba(167,139,250,0.1)",border:"1px solid #a78bfa33",borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
-                          <div style={{fontSize:8,color:"#a78bfa",fontWeight:700}}>Programado</div>
-                          <div style={{fontSize:12,fontWeight:800,color:"#a78bfa"}}>{fmt(totalProg)}</div>
-                        </div>}
-                        <div style={{flex:1,background:pendiente>0?"rgba(251,191,36,0.1)":"rgba(34,197,94,0.1)",border:`1px solid ${pendiente>0?"#fbbf2433":"#22c55e33"}`,borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
-                          <div style={{fontSize:8,color:pendiente>0?"#fbbf24":"#22c55e",fontWeight:700}}>Pendiente</div>
-                          <div style={{fontSize:12,fontWeight:800,color:pendiente>0?"#fbbf24":"#22c55e"}}>{fmt(pendiente)}</div>
-                        </div>
-                      </div>
-                      {/* Movimientos vinculados */}
-                      {movsVinc.length>0&&movsVinc.map(m=>(
-                        <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderTop:"1px solid #1e293b22"}}>
-                          <div>
-                            <span style={S.badge(m.estatus)}>{m.estatus}</span>
-                            <span style={{fontSize:10,color:"#94a3b8",marginLeft:6}}>{m.concepto}</span>
+                      <div style={{fontSize:8,color:"#C9A84C",fontWeight:700,letterSpacing:1,marginBottom:6}}>MOVIMIENTOS VINCULADOS</div>
+                      {movsVinc.map(m=>{
+                        const esIng=["INGRESADO","PAGADO"].includes(m.estatus);
+                        const c=esIng?"#22c55e":m.estatus==="PROYECTADO"?"#38bdf8":"#a78bfa";
+                        return(
+                          <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #1e293b22"}}>
+                            <div>
+                              <span style={S.badge(m.estatus)}>{m.estatus}</span>
+                              <span style={{fontSize:10,color:"#94a3b8",marginLeft:6}}>{m.concepto}</span>
+                              {m.fecha&&<span style={{fontSize:9,color:"#475569",marginLeft:4}}>{fmtDate(m.fecha)}</span>}
+                            </div>
+                            <span style={{fontSize:12,fontWeight:800,color:c,marginLeft:8}}>{fmt(m.monto)}</span>
                           </div>
-                          <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(m.monto)}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
+                  {movsVinc.length===0&&<div style={{fontSize:9,color:"#475569",textAlign:"center",paddingTop:4}}>Sin movimientos vinculados</div>}
+                </div>
                 </div>
 
                 {/* Botón vincular movimiento — disponible en todas las etapas activas */}
@@ -3244,8 +3362,15 @@ function App(){
                   const sp=saldoPendiente(x,movs);
                   const prog=programado(x,movs);
                   const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
+                  const isActA=acreedoresDrag.aId===x.id,isOvA=acreedoresDrag.oViz===x.id;
                   return(
-                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #f87171",cursor:"pointer",marginBottom:8}} onClick={()=>{setViewCartera({...x,tipo:"acreedores"});setCarteraDetalleModo("ejecutados");}}>
+                    <div key={x.id}
+                      draggable onDragStart={()=>acreedoresDrag.start(x.id)}
+                      onDragOver={e=>{e.preventDefault();acreedoresDrag.enter(x.id);}}
+                      onDrop={acreedoresDrag.commit}
+                      style={{...S.card(),borderLeft:"3px solid #f87171",cursor:"pointer",marginBottom:8,
+                        background:isActA?"#1e2a1e":isOvA?"#1a2030":"#10101e",transition:"background 0.15s"}}
+                      onClick={()=>{setViewCartera({...x,tipo:"acreedores"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
                           <div style={{fontSize:8,color:"#f87171",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
@@ -3300,8 +3425,15 @@ function App(){
                   const sp=saldoPendiente(x,movs);
                   const prog=programado(x,movs);
                   const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
+                  const isActD=deudoresDrag.aId===x.id,isOvD=deudoresDrag.oViz===x.id;
                   return(
-                    <div key={x.id} style={{...S.card(),borderLeft:"3px solid #22c55e",cursor:"pointer",marginBottom:8}} onClick={()=>{setViewCartera({...x,tipo:"deudores"});setCarteraDetalleModo("ejecutados");}}>
+                    <div key={x.id}
+                      draggable onDragStart={()=>deudoresDrag.start(x.id)}
+                      onDragOver={e=>{e.preventDefault();deudoresDrag.enter(x.id);}}
+                      onDrop={deudoresDrag.commit}
+                      style={{...S.card(),borderLeft:"3px solid #22c55e",cursor:"pointer",marginBottom:8,
+                        background:isActD?"#1e2a1e":isOvD?"#1a2030":"#10101e",transition:"background 0.15s"}}
+                      onClick={()=>{setViewCartera({...x,tipo:"deudores"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
                           <div style={{fontSize:8,color:"#22c55e",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
@@ -3360,12 +3492,19 @@ function App(){
                 {ingresosExt.map(x=>{
                   const cEst=COLOR_ING_EXT[x.estado]||"#94a3b8";
                   const estadoCalc=estatusIngExt(x,movs);
+                  const isActI=ingresosExtDrag.aId===x.id,isOvI=ingresosExtDrag.oViz===x.id;
                   const cEstCalc=COLOR_ING_EXT[estadoCalc]||"#94a3b8";
                   const saldos=saldoIngExt(x,movs);
                   const montoObj=x.montoObjetivo||x.monto||0;
                   const pctRec=montoObj>0?Math.min(100,(saldos.recuperado/montoObj)*100):0;
                   return(
-                    <div key={x.id} style={{...S.card(),borderLeft:`3px solid ${cEstCalc}`,cursor:"pointer",marginBottom:8}} onClick={()=>{setViewCartera({...x,tipo:"ingresosExt"});setCarteraDetalleModo("ejecutados");}}>
+                    <div key={x.id}
+                      draggable onDragStart={()=>ingresosExtDrag.start(x.id)}
+                      onDragOver={e=>{e.preventDefault();ingresosExtDrag.enter(x.id);}}
+                      onDrop={ingresosExtDrag.commit}
+                      style={{...S.card(),borderLeft:"3px solid "+cEstCalc,cursor:"pointer",marginBottom:8,
+                        background:isActI?"#1e2a1e":isOvI?"#1a2030":"#10101e",transition:"background 0.15s"}}
+                      onClick={()=>{setViewCartera({...x,tipo:"ingresosExt"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
                           <div style={{fontSize:8,color:cEstCalc,fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
@@ -3815,7 +3954,22 @@ function App(){
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
                   <div style={{flex:1,marginRight:7}}>
                     {editingCatId===cat.id
-                      ?<div style={{display:"flex",gap:5}}><input style={{...S.inp,flex:1,padding:"4px 8px",fontSize:12}} value={editingCatName} onChange={e=>setEditingCatName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEditCat(cat.id);if(e.key==="Escape")setEditingCatId(null);}} autoFocus/><button style={S.smBtn("#22c55e")} onClick={()=>saveEditCat(cat.id)}>✓</button><button style={S.smBtn("#475569")} onClick={()=>setEditingCatId(null)}>✕</button></div>
+                      ?<div>
+                        <div style={{display:"flex",gap:5,marginBottom:5}}>
+                          <input style={{...S.inp,flex:1,padding:"4px 8px",fontSize:12}} value={editingCatName} onChange={e=>setEditingCatName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEditCat(cat.id);if(e.key==="Escape")setEditingCatId(null);}} autoFocus/>
+                          <button style={S.smBtn("#22c55e")} onClick={()=>saveEditCat(cat.id)}>✓</button>
+                          <button style={S.smBtn("#475569")} onClick={()=>setEditingCatId(null)}>✕</button>
+                        </div>
+                        {catMode==="eg"&&<div>
+                          <div style={{fontSize:8,color:"#475569",marginBottom:3}}>Prioridad por defecto</div>
+                          <div style={{display:"flex",gap:3}}>
+                            {[[1,"Esen","#22c55e"],[2,"Imp","#60a5fa"],[3,"Disc","#fbbf24"],[4,"Extr","#f87171"]].map(([v,l,c])=>(
+                              <button key={v} style={{...S.prioB2((cat.prio||3)===v,c),flex:1,padding:"4px 2px",fontSize:8}}
+                                onClick={()=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,prio:v}:x))}>{l}</button>
+                            ))}
+                          </div>
+                        </div>}
+                      </div>
                       :<span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>
                     }
                   </div>
@@ -3824,8 +3978,24 @@ function App(){
                 {cat.subs.map(sub=>(
                   <div key={sub.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0 4px 11px",borderLeft:"2px solid #1e293b",marginBottom:2}}>
                     {editingSubId===sub.id
-                      ?<div style={{display:"flex",gap:5,flex:1}}><input style={{...S.inp,flex:1,padding:"3px 7px",fontSize:11}} value={editingSubName} onChange={e=>setEditingSubName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEditSub(cat.id,sub.id);if(e.key==="Escape")setEditingSubId(null);}} autoFocus/><button style={S.smBtn("#22c55e")} onClick={()=>saveEditSub(cat.id,sub.id)}>✓</button><button style={S.smBtn("#475569")} onClick={()=>setEditingSubId(null)}>✕</button></div>
-                      :<><span style={{fontSize:11,color:"#94a3b8",cursor:"pointer",flex:1}} onClick={()=>{setEditingSubId(sub.id);setEditingSubName(sub.nombre);}}>{sub.nombre}</span><button style={S.smBtn("#f87171")} onClick={()=>delSub(cat.id,sub.id)}>✕</button></>
+                      ?<div style={{flex:1}}>
+                        <div style={{display:"flex",gap:5,marginBottom:catMode==="eg"?4:0}}>
+                          <input style={{...S.inp,flex:1,padding:"3px 7px",fontSize:11}} value={editingSubName} onChange={e=>setEditingSubName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")saveEditSub(cat.id,sub.id);if(e.key==="Escape")setEditingSubId(null);}} autoFocus/>
+                          <button style={S.smBtn("#22c55e")} onClick={()=>saveEditSub(cat.id,sub.id)}>✓</button>
+                          <button style={S.smBtn("#475569")} onClick={()=>setEditingSubId(null)}>✕</button>
+                        </div>
+                        {catMode==="eg"&&<div style={{display:"flex",gap:3}}>
+                          {[[1,"Esen","#22c55e"],[2,"Imp","#60a5fa"],[3,"Disc","#fbbf24"],[4,"Extr","#f87171"]].map(([v,l,c])=>(
+                            <button key={v} style={{...S.prioB2((sub.prio||3)===v,c),flex:1,padding:"3px 2px",fontSize:7}}
+                              onClick={()=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,subs:x.subs.map(s=>s.id===sub.id?{...s,prio:v}:s)}:x))}>{l}</button>
+                          ))}
+                        </div>}
+                      </div>
+                      :<>
+                        <span style={{fontSize:11,color:"#94a3b8",cursor:"pointer",flex:1}} onClick={()=>{setEditingSubId(sub.id);setEditingSubName(sub.nombre);}}>{sub.nombre}</span>
+                        {catMode==="eg"&&sub.prio&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:4,background:(PRIO_EG_COLOR[sub.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[sub.prio]||"#64748b",fontWeight:700}}>{(PRIO_EG_LBL[sub.prio]||"").substring(0,4)}</span>}
+                        <button style={S.smBtn("#f87171")} onClick={()=>delSub(cat.id,sub.id)}>✕</button>
+                      </>
                     }
                   </div>
                 ))}
@@ -3847,16 +4017,29 @@ function App(){
             <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setShowExportModal(true)}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(34,197,94,0.12)"}}><span>📥</span></div><div><div style={{fontSize:12,fontWeight:700}}>Exportar a Excel</div><div style={{fontSize:10,color:"#475569"}}>Selecciona el período a exportar</div></div></div>
             </div>
-            <div style={S.sTit}>META FONDO DE CONTINGENCIA</div>
+            <div style={S.sTit}>FONDO DE ESTABILIDAD FINANCIERA</div>
             <div style={S.card()}>
-              <div style={S.lbl}>Meta u Objetivo $</div>
-              <input style={{...S.inp,marginTop:5}} type="number"
-                value={metaFondo||""} onChange={e=>setMetaFondo(parseFloat(e.target.value)||0)}
-                placeholder="0.00"/>
-              <div style={{fontSize:9,color:"#475569",marginTop:5}}>
-                Se muestra en el Dashboard como barra de progreso vs Saldo Real + Ing. Programado
+              <div style={{marginBottom:11}}>
+                <div style={S.lbl}>Gasto Familiar Esencial (GFE) $</div>
+                <input style={{...S.inp,marginTop:4}} type="number"
+                  value={gastoFamiliarEsencial||""} onChange={e=>setGastoFamiliarEsencial(parseFloat(e.target.value)||0)}
+                  placeholder="0.00"/>
+                <div style={{fontSize:9,color:"#475569",marginTop:3}}>Estimación mensual de gastos esenciales fijos</div>
               </div>
-              {metaFondo>0&&<div style={{fontSize:10,color:"#22c55e",marginTop:4,fontWeight:700}}>Meta activa: {fmt(metaFondo)}</div>}
+              <div style={{marginBottom:11}}>
+                <div style={S.lbl}>Factor multiplicador</div>
+                <input style={{...S.inp,marginTop:4}} type="number" step="0.5" min="1" max="24"
+                  value={factorFEF||""} onChange={e=>setFactorFEF(parseFloat(e.target.value)||2.5)}
+                  placeholder="2.5"/>
+                <div style={{fontSize:9,color:"#475569",marginTop:3}}>Número de meses objetivo de cobertura (default 2.5)</div>
+              </div>
+              {gastoFamiliarEsencial>0&&(
+                <div style={{background:"rgba(201,168,76,0.1)",border:"1px solid #C9A84C33",borderRadius:9,padding:"9px 12px"}}>
+                  <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,marginBottom:3}}>Meta calculada</div>
+                  <div style={{fontSize:16,fontWeight:800,color:"#C9A84C"}}>{fmt(gastoFamiliarEsencial*(factorFEF||2.5))}</div>
+                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{fmt(gastoFamiliarEsencial)} × {factorFEF||2.5} meses</div>
+                </div>
+              )}
             </div>
             <div style={S.sTit}>DATOS</div>
             <div style={{...S.card(),cursor:"pointer"}} onClick={()=>{setShowReset(true);setResetPhase(1);setResetInput("");}}>
@@ -3894,6 +4077,7 @@ function App(){
             catIng={catIng} catEg={catEg}
             acreedores={acreedores} deudores={deudores} ingresosExt={ingresosExt}
             oportunidades={oportunidades} etapasAvance={etapasAvance} getEtapa={getEtapa}
+            getPrioDefEg={getPrioDefEg}
             movs={movs} saldoPendienteFn={saldoPendiente} saldoIngExtFn={saldoIngExt}
             onSave={saveMov} onClose={()=>{setShowMov(false);setEditMovId(null);setSaveError("");setFieldErrors(null);}}
             saveError={saveError} fieldErrors={fieldErrors}/>
