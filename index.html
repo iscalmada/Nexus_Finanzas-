@@ -12,10 +12,14 @@
     *{margin:0;padding:0;box-sizing:border-box;}
     body{background:#080810;color:#e2e8f0;font-family:'DM Sans',sans-serif;overscroll-behavior:none;}
     #root{min-height:100vh;}
-    #loading{position:fixed;inset:0;background:#080810;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;}
-    #loading .logo{font-size:13px;font-weight:800;letter-spacing:3px;color:#C9A84C;text-transform:uppercase;margin-bottom:8px;}
-    #loading .sub{font-size:9px;color:#475569;letter-spacing:2px;}
-    #loading .spinner{width:28px;height:28px;border:2px solid #1e293b;border-top:2px solid #C9A84C;border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:16px;}
+    #loading{position:fixed;inset:0;background:#080810;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:24px;}
+    #loading .ncfp-title{font-size:32px;font-weight:900;letter-spacing:4px;color:#C9A84C;margin-bottom:4px;}
+    #loading .ncfp-by{font-size:9px;color:#C9A84C88;letter-spacing:2px;margin-bottom:6px;}
+    #loading .ncfp-sub{font-size:10px;color:#334155;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:28px;}
+    #loading .ncfp-bienvenido{font-size:13px;color:#64748b;margin-bottom:6px;}
+    #loading .ncfp-nombre{font-size:16px;font-weight:700;color:#e2e8f0;margin-bottom:32px;}
+    #loading .spinner-ring{width:44px;height:44px;border:3px solid #1e293b;border-top:3px solid #C9A84C;border-radius:50%;animation:spin 0.9s linear infinite;margin-bottom:14px;}
+    #loading .ncfp-loading{font-size:9px;color:#334155;letter-spacing:2px;}
     @keyframes spin{to{transform:rotate(360deg);}}
     input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.6);}
     select option{background:#13131f;}
@@ -119,9 +123,13 @@ self.addEventListener("fetch", function(e) {
 </head>
 <body>
   <div id="loading">
-    <div class="spinner"></div>
-    <div class="logo">Nexus Partners</div>
-    <div class="sub">CARGANDO APLICACIÓN...</div>
+    <div class="ncfp-title">Nexus CFP</div>
+    <div class="ncfp-by">by Nexus Partners</div>
+    <div class="ncfp-sub">Control Financiero Personal</div>
+    <div class="spinner-ring"></div>
+    <div id="loading-bienvenido" class="ncfp-bienvenido" style="display:none">Bienvenido,</div>
+    <div id="loading-nombre" class="ncfp-nombre" style="display:none"></div>
+    <div class="ncfp-loading">CARGANDO...</div>
   </div>
   <div id="root"></div>
 
@@ -1131,6 +1139,9 @@ function App(){
 
   // ── Auto-guardado en localStorage ──
   const[metaFondo,setMetaFondo]=useState(()=>loadLS('metaFondo',0));
+  const[nombreUsuario,setNombreUsuario]=useState(()=>loadLS('nombreUsuario',''));
+  const[pinApp,setPinApp]=useState(()=>loadLS('pinApp',''));
+  const[pinActivo,setPinActivo]=useState(()=>loadLS('pinActivo',false));
   const[gastoFamiliarEsencial,setGastoFamiliarEsencial]=useState(()=>loadLS('gastoFamiliarEsencial',0));
   const[factorFEF,setFactorFEF]=useState(()=>loadLS('factorFEF',2.5));
   const[prioFEF_ing,setPrioFEF_ing]=useState(2);
@@ -1151,6 +1162,9 @@ function App(){
   useEffect(()=>{ saveLS('acreedores', acreedores); }, [acreedores]);
   useEffect(()=>{ saveLS('oportunidades', oportunidades); }, [oportunidades]);
   useEffect(()=>{ saveLS('metaFondo', metaFondo); }, [metaFondo]);
+  useEffect(()=>{ saveLS('nombreUsuario', nombreUsuario); }, [nombreUsuario]);
+  useEffect(()=>{ saveLS('pinApp', pinApp); }, [pinApp]);
+  useEffect(()=>{ saveLS('pinActivo', pinActivo); }, [pinActivo]);
   useEffect(()=>{ saveLS('gastoFamiliarEsencial', gastoFamiliarEsencial); }, [gastoFamiliarEsencial]);
   useEffect(()=>{ saveLS('factorFEF', factorFEF); }, [factorFEF]);
   useEffect(()=>{ saveLS('etapasAvance', etapasAvance); }, [etapasAvance]);
@@ -1268,6 +1282,12 @@ function App(){
   const[formOpo,setFormOpo]=useState({});
   const[viewOpo,setViewOpo]=useState(null);
   const[showJsonModal,setShowJsonModal]=useState(false);
+  const[pinInput,setPinInput]=useState('');
+  const[pinError,setPinError]=useState(false);
+  const[pinDesbloqueado,setPinDesbloqueado]=useState(()=>!loadLS('pinActivo',false));
+  const[showPinConfig,setShowPinConfig]=useState(false);
+  const[pinConfigStep,setPinConfigStep]=useState(1); // 1=nuevo, 2=confirmar
+  const[pinConfigTemp,setPinConfigTemp]=useState('');
   const[jsonImportError,setJsonImportError]=useState("");
 
   const[exportPeriod,setExportPeriod]=useState({sm:new Date().getMonth(),sy:new Date().getFullYear(),mode:"mes"});
@@ -1966,7 +1986,7 @@ function App(){
   },[acreedores,deudores,ingresosExt,movs]);
 
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,exportedAt:new Date().toISOString(),version:"v8"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,exportedAt:new Date().toISOString(),version:"v8"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
@@ -2032,6 +2052,66 @@ function App(){
   const semBg=s=>s==="verde"?S.semVerde:s==="amarillo"?S.semAmarillo:S.semRojo;
 
   // ── RENDER ───────────────────────────────────────────────────
+  // Hash simple para PIN (privacidad básica)
+  const hashPin=p=>p.split('').reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0).toString(36);
+
+  // ── PANTALLA DE DESBLOQUEO PIN ──
+  if(pinActivo&&!pinDesbloqueado){
+    const handlePinBtn=(d)=>{
+      if(pinInput.length>=(pinApp.length||4)) return;
+      const nuevo=pinInput+d;
+      setPinInput(nuevo);
+      setPinError(false);
+      if(nuevo.length===(pinApp.length||4)){
+        if(hashPin(nuevo)===pinApp){
+          setPinDesbloqueado(true);
+          setPinInput('');
+        } else {
+          setPinError(true);
+          setTimeout(()=>{setPinInput('');setPinError(false);},600);
+        }
+      }
+    };
+    return(
+      <div style={{position:"fixed",inset:0,background:"#080810",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",zIndex:9999,padding:24}}>
+        <div style={{marginBottom:32,textAlign:"center"}}>
+          <div style={{fontSize:30,fontWeight:900,color:"#C9A84C",letterSpacing:4,marginBottom:4}}>Nexus CFP</div>
+          <div style={{fontSize:9,color:"#C9A84C88",letterSpacing:2,marginBottom:6}}>by Nexus Partners</div>
+          <div style={{fontSize:10,color:"#334155",letterSpacing:1}}>CONTROL FINANCIERO PERSONAL</div>
+        </div>
+        {nombreUsuario&&(
+          <div style={{fontSize:14,color:"#94a3b8",marginBottom:28,fontWeight:500}}>
+            Bienvenido, <span style={{color:"#e2e8f0",fontWeight:700}}>{nombreUsuario}</span>
+          </div>
+        )}
+        <div style={{display:"flex",gap:12,marginBottom:24}}>
+          {Array.from({length:pinApp.length||4}).map((_,i)=>(
+            <div key={i} style={{width:16,height:16,borderRadius:"50%",
+              background:i<pinInput.length?(pinError?"#f87171":"#C9A84C"):"transparent",
+              border:"2px solid "+(pinError?"#f87171":i<pinInput.length?"#C9A84C":"#334155"),
+              transition:"all 0.15s"}}/>
+          ))}
+        </div>
+        {pinError&&<div style={{fontSize:11,color:"#f87171",marginBottom:12,fontWeight:700}}>PIN incorrecto — intenta de nuevo</div>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,76px)",gap:10}}>
+          {[1,2,3,4,5,6,7,8,9,"",0,"x"].map((d,i)=>(
+            <button key={i} onClick={()=>{
+              if(d==="") return;
+              if(d==="x"){setPinInput(p=>p.slice(0,-1));setPinError(false);}
+              else handlePinBtn(String(d));
+            }} style={{height:68,borderRadius:16,border:"1px solid "+(d==="x"?"#f8717133":"#1e293b"),
+              background:d===""?"transparent":d==="x"?"rgba(248,113,113,0.08)":"#13131f",
+              color:d==="x"?"#f87171":"#e2e8f0",fontSize:d==="x"?18:24,fontWeight:d==="x"?400:600,
+              cursor:d===""?"default":"pointer"}}>
+              {d==="x"?"⌫":d}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── RENDER PRINCIPAL ───────────────────────────────────────────────────
   return(
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
@@ -4219,6 +4299,35 @@ function App(){
                 </div>
               )}
             </div>
+            <div style={S.sTit}>PERSONALIZACIÓN Y SEGURIDAD</div>
+            <div style={S.card()}>
+              <div style={{marginBottom:13}}>
+                <div style={S.lbl}>Nombre para bienvenida</div>
+                <input style={{...S.inp,marginTop:4}} value={nombreUsuario} onChange={e=>setNombreUsuario(e.target.value)} placeholder="Ej. Ing. Almada"/>
+                <div style={{fontSize:9,color:"#475569",marginTop:3}}>Aparece en la pantalla de carga y en el PIN de desbloqueo</div>
+              </div>
+              <div style={{borderTop:"1px solid #1e293b",paddingTop:13}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <div>
+                    <div style={S.lbl}>PIN de acceso</div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:2}}>{pinActivo?"Activo — la app pide PIN al abrir":"Desactivado"}</div>
+                  </div>
+                  <button style={{...S.prioB2(pinActivo,"#C9A84C"),padding:"6px 14px",fontSize:10}}
+                    onClick={()=>{
+                      if(pinActivo){
+                        if(window.confirm("¿Desactivar el PIN de acceso?")){{setPinActivo(false);setPinApp('');}}
+                      } else {
+                        setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');
+                      }
+                    }}>{pinActivo?"Desactivar":"Activar"}</button>
+                </div>
+                {pinActivo&&(
+                  <button style={{...S.cancB,fontSize:10,marginTop:0}} onClick={()=>{setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');}}>
+                    Cambiar PIN
+                  </button>
+                )}
+              </div>
+            </div>
             <div style={S.sTit}>DATOS</div>
             <div style={{...S.card(),cursor:"pointer"}} onClick={()=>{setShowReset(true);setResetPhase(1);setResetInput("");}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(248,113,113,0.12)"}}><span>🗑</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#f87171"}}>Eliminar movimientos</div><div style={{fontSize:10,color:"#475569"}}>Borra todos los movimientos registrados</div></div></div>
@@ -4679,6 +4788,69 @@ function App(){
         )}
 
 
+        {/* ── MODAL CONFIGURACIÓN PIN ── */}
+        {showPinConfig&&(()=>{
+          const hashPin2=p=>p.split('').reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0).toString(36);
+          const handleConfigBtn=(d)=>{
+            if(pinConfigTemp.length>=6) return;
+            const nuevo=pinConfigTemp+d;
+            setPinConfigTemp(nuevo);
+            if(nuevo.length>=4){
+              if(pinConfigStep===1){
+                // Guardar el PIN temporalmente y pedir confirmación
+                setTimeout(()=>{setPinConfigStep(2);setPinConfigTemp('');},300);
+                // Guardar en ref temporal
+                window._pinTmp=nuevo;
+              } else {
+                // Confirmar
+                if(nuevo===window._pinTmp){
+                  setPinApp(hashPin2(nuevo));
+                  setPinActivo(true);
+                  setShowPinConfig(false);setPinConfigStep(1);setPinConfigTemp('');
+                  window._pinTmp=null;
+                  alert("PIN activado correctamente");
+                } else {
+                  setPinConfigTemp('');
+                  alert("Los PINs no coinciden. Intenta de nuevo.");
+                  setPinConfigStep(1);
+                }
+              }
+            }
+          };
+          const digitos=Array.from({length:6}).map((_,i)=>i<pinConfigTemp.length?"●":"○");
+          return(
+            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget){setShowPinConfig(false);setPinConfigStep(1);setPinConfigTemp('');}}}>
+              <div style={S.mBox}>
+                <div style={S.mTit}>{pinConfigStep===1?"🔒 CREAR PIN":"🔒 CONFIRMAR PIN"}</div>
+                <div style={{fontSize:11,color:"#64748b",marginBottom:20,textAlign:"center"}}>
+                  {pinConfigStep===1?"Ingresa tu nuevo PIN (4-6 dígitos)":"Ingresa el PIN nuevamente para confirmar"}
+                </div>
+                <div style={{display:"flex",justifyContent:"center",gap:10,marginBottom:24}}>
+                  {Array.from({length:Math.max(pinConfigTemp.length,4)}).map((_,i)=>(
+                    <div key={i} style={{width:14,height:14,borderRadius:"50%",
+                      background:i<pinConfigTemp.length?"#C9A84C":"transparent",
+                      border:"2px solid "+(i<pinConfigTemp.length?"#C9A84C":"#334155"),transition:"all 0.15s"}}/>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:11}}>
+                  {[1,2,3,4,5,6,7,8,9,"",0,"x"].map((d,i)=>(
+                    <button key={i} onClick={()=>{
+                      if(d==="") return;
+                      if(d==="x") setPinConfigTemp(p=>p.slice(0,-1));
+                      else handleConfigBtn(String(d));
+                    }} style={{height:56,borderRadius:12,border:"1px solid "+(d==="x"?"#f8717133":"#1e293b"),
+                      background:d===""?"transparent":"#13131f",
+                      color:d==="x"?"#f87171":"#e2e8f0",fontSize:d==="x"?16:20,fontWeight:600,
+                      cursor:d===""?"default":"pointer"}}>
+                      {d==="x"?"⌫":d}
+                    </button>
+                  ))}
+                </div>
+                <button style={S.cancB} onClick={()=>{setShowPinConfig(false);setPinConfigStep(1);setPinConfigTemp('');window._pinTmp=null;}}>Cancelar</button>
+              </div>
+            </div>
+          );
+        })()}
         {showJsonModal&&(
           <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowJsonModal(false);}}>
             <div style={S.mBox}>
@@ -4782,6 +4954,20 @@ ReactDOM.render(React.createElement(App), document.getElementById('root'));
 
   </script>
   <script>
+    // Mostrar nombre en pantalla de carga si está guardado
+    (function(){
+      try{
+        var nombre=localStorage.getItem('nombreUsuario');
+        if(nombre&&nombre!=='""'&&nombre!==""){
+          var n=JSON.parse(nombre);
+          if(n){
+            document.getElementById('loading-bienvenido').style.display='block';
+            document.getElementById('loading-nombre').style.display='block';
+            document.getElementById('loading-nombre').textContent=n;
+          }
+        }
+      }catch(e){}
+    })();
     // Capturar errores de Babel/React y mostrarlos
     window.addEventListener('error', function(e) {
       var l = document.getElementById('loading');
