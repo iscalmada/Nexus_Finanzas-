@@ -949,16 +949,24 @@ function ModalPresupuesto({data,presupuestos,setPresupuestos,sm,sy,onClose}){
   const currentVal=getPres(id);
   const[val,setVal]=useState(currentVal?String(currentVal):"");
   const[proyMode,setProyMode]=useState(false);
-  // Mes de inicio — por defecto el mes del período activo
+  // startSm/startSy solo se usan en modo proyección; en modo simple siempre se guarda en sm/sy
   const[startSm,setStartSm]=useState(sm);
   const[startSy,setStartSy]=useState(sy);
   const[endSm,setEndSm]=useState(sm===11?0:sm+1);
   const[endSy,setEndSy]=useState(sm===11?sy+1:sy);
   const prevStartM=()=>{if(startSm===0){setStartSm(11);setStartSy(y=>y-1);}else setStartSm(m=>m-1);};
   const nextStartM=()=>{if(startSm===11){setStartSm(0);setStartSy(y=>y+1);}else setStartSm(m=>m+1);};
+  const prevEndM=()=>{if(endSm===0){setEndSm(11);setEndSy(y=>y-1);}else setEndSm(m=>m-1);};
+  const nextEndM=()=>{if(endSm===11){setEndSm(0);setEndSy(y=>y+1);}else setEndSm(m=>m+1);};
 
-  const guardar=(smFin,syFin,smIni,syIni)=>{
+  // Sin proyMode: guarda SIEMPRE en sm/sy (el período activo visible)
+  // Con proyMode: guarda desde startSm/startSy hasta endSm/endSy
+  const guardar=()=>{
     const monto=parseFloat(val)||0;
+    const smIni=proyMode?startSm:sm;
+    const syIni=proyMode?startSy:sy;
+    const smFin=proyMode?endSm:sm;
+    const syFin=proyMode?endSy:sy;
     setPresupuestos(p=>{
       const n={...p};
       let cm=smIni,cy=syIni;
@@ -972,12 +980,11 @@ function ModalPresupuesto({data,presupuestos,setPresupuestos,sm,sy,onClose}){
     onClose();
   };
 
-  const prevEndM=()=>{
-    if(endSm===0){setEndSm(11);setEndSy(y=>y-1);}else setEndSm(m=>m-1);
-  };
-  const nextEndM=()=>{
-    if(endSm===11){setEndSm(0);setEndSy(y=>y+1);}else setEndSm(m=>m+1);
-  };
+  const countMeses=(()=>{
+    let c=0,cm=startSm,cy=startSy;
+    while(cy<endSy||(cy===endSy&&cm<=endSm)){c++;cm++;if(cm>11){cm=0;cy++;}}
+    return c;
+  })();
 
   return(
     <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
@@ -987,16 +994,6 @@ function ModalPresupuesto({data,presupuestos,setPresupuestos,sm,sy,onClose}){
         <div style={S.fg}><label style={S.fl}>Monto $</label>
           <input style={S.inp} type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder="0.00" autoFocus/>
         </div>
-        {/* Opción de proyectar varios meses */}
-        {/* Mes de inicio */}
-        <div style={{marginBottom:11}}>
-          <label style={S.fl}>Mes de inicio</label>
-          <div style={S.perBar}>
-            <button style={S.perBtn} onClick={prevStartM}>‹</button>
-            <span style={S.perLbl}>{MESES_FULL[startSm]} {startSy}</span>
-            <button style={S.perBtn} onClick={nextStartM}>›</button>
-          </div>
-        </div>
         <div style={{border:"1px solid #1e293b",borderRadius:11,padding:13,marginBottom:11}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:proyMode?11:0}}>
             <span style={{fontSize:11,fontWeight:700,color:proyMode?"#C9A84C":"#475569"}}>↻ Proyectar varios meses</span>
@@ -1004,26 +1001,36 @@ function ModalPresupuesto({data,presupuestos,setPresupuestos,sm,sy,onClose}){
           </div>
           {proyMode&&(
             <div>
-              <div style={{fontSize:10,color:"#475569",marginBottom:9}}>Desde <strong>{MESES_FULL[startSm]} {startSy}</strong> hasta:</div>
-              <div style={S.perBar}>
-                <button style={S.perBtn} onClick={prevEndM}>‹</button>
-                <span style={S.perLbl}>{MESES_FULL[endSm]} {endSy}</span>
-                <button style={S.perBtn} onClick={nextEndM}>›</button>
+              <div style={{marginBottom:9}}>
+                <div style={{fontSize:10,color:"#475569",marginBottom:5}}>Desde:</div>
+                <div style={S.perBar}>
+                  <button style={S.perBtn} onClick={prevStartM}>‹</button>
+                  <span style={S.perLbl}>{MESES_FULL[startSm]} {startSy}</span>
+                  <button style={S.perBtn} onClick={nextStartM}>›</button>
+                </div>
+              </div>
+              <div style={{marginBottom:6}}>
+                <div style={{fontSize:10,color:"#475569",marginBottom:5}}>Hasta:</div>
+                <div style={S.perBar}>
+                  <button style={S.perBtn} onClick={prevEndM}>‹</button>
+                  <span style={S.perLbl}>{MESES_FULL[endSm]} {endSy}</span>
+                  <button style={S.perBtn} onClick={nextEndM}>›</button>
+                </div>
               </div>
               <div style={{fontSize:9,color:"#475569",marginTop:4}}>
-                Se aplicará a {(()=>{let c=0,cm=startSm,cy=startSy;while(cy<endSy||(cy===endSy&&cm<=endSm)){c++;cm++;if(cm>11){cm=0;cy++;}}return c;})() } meses
+                Se aplicará a <strong style={{color:"#C9A84C"}}>{countMeses} {countMeses===1?"mes":"meses"}</strong>
               </div>
             </div>
           )}
         </div>
-        <button style={S.saveB} onClick={()=>proyMode?guardar(endSm,endSy,startSm,startSy):guardar(startSm,startSy,startSm,startSy)}>
+        <button style={S.saveB} onClick={guardar}>
           {proyMode?"GUARDAR Y PROYECTAR":"GUARDAR"}
         </button>
-        {presupuestos[presKey(id,startSm,startSy)]>0&&(
+        {presupuestos[presKey(id,sm,sy)]>0&&(
           <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{
-            setPresupuestos(p=>{const n={...p};delete n[presKey(id,startSm,startSy)];return n;});
+            setPresupuestos(p=>{const n={...p};delete n[presKey(id,sm,sy)];return n;});
             onClose();
-          }}>Quitar presupuesto de {MESES_FULL[startSm]}</button>
+          }}>Quitar presupuesto de {MESES_FULL[sm]}</button>
         )}
         <button style={S.cancB} onClick={onClose}>Cancelar</button>
       </div>
@@ -1238,6 +1245,7 @@ function App(){
   const[viewMov,setViewMov]=useState(null); // modal consulta
   const[serieConfirm,setSerieConfirm]=useState(null);
   const[showReset,setShowReset]=useState(false);
+  const[showResetPresupuestos,setShowResetPresupuestos]=useState(false);
   const clearLocalStorage=useCallback(()=>{
     ['movs','cuentas','tarjetas','catIng','catEg','presupuestos'].forEach(k=>localStorage.removeItem('nexus_'+k));
   },[]);
@@ -4381,6 +4389,9 @@ function App(){
             <div style={{...S.card(),cursor:"pointer"}} onClick={()=>{setShowReset(true);setResetPhase(1);setResetInput("");}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(248,113,113,0.12)"}}><span>🗑</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#f87171"}}>Eliminar movimientos</div><div style={{fontSize:10,color:"#475569"}}>Borra todos los movimientos registrados</div></div></div>
             </div>
+            <div style={{...S.card(),cursor:"pointer",marginTop:7}} onClick={()=>setShowResetPresupuestos(true)}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(251,191,36,0.12)"}}><span>🎯</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#fbbf24"}}>Limpiar presupuestos</div><div style={{fontSize:10,color:"#475569"}}>Elimina todos los montos de presupuesto definidos</div></div></div>
+            </div>
 
             <div style={S.sTit}>RESPALDO JSON</div>
             <div style={{...S.infoBx("#22c55e"),marginBottom:9}}>
@@ -4814,6 +4825,25 @@ function App(){
             <div style={S.delBox}>
               {resetPhase===1&&<><div style={{fontSize:13,fontWeight:700,color:"#f87171",marginBottom:7}}>⚠ Eliminar movimientos</div><div style={{fontSize:11,color:"#94a3b8",marginBottom:14}}>Cuentas y tarjetas se conservan.</div><button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>setResetPhase(2)}>Continuar</button><button style={S.cancB} onClick={()=>{setShowReset(false);setResetPhase(0);}}>Cancelar</button></>}
               {resetPhase===2&&<><div style={{fontSize:13,fontWeight:700,color:"#f87171",marginBottom:7}}>⛔ Confirmación final</div><div style={{fontSize:11,color:"#94a3b8",marginBottom:11}}>Escribe <span style={{color:"#f87171",fontWeight:700}}>CONFIRMAR</span></div><input style={{...S.inp,marginBottom:11,borderColor:"#f8717144"}} value={resetInput} onChange={e=>setResetInput(e.target.value)} placeholder="CONFIRMAR"/><button style={{...S.saveB,background:resetInput==="CONFIRMAR"?"linear-gradient(135deg,#f87171,#b91c1c)":"#1e293b",color:resetInput==="CONFIRMAR"?"#fff":"#475569"}} onClick={()=>{if(resetInput==="CONFIRMAR"){setMovs([]);setShowReset(false);setResetPhase(0);setResetInput("");}}}>Borrar todo</button><button style={S.cancB} onClick={()=>{setShowReset(false);setResetPhase(0);setResetInput("");}}>Cancelar</button></>}
+            </div>
+          </div>
+        )}
+
+        {showResetPresupuestos&&(
+          <div style={S.delCon}>
+            <div style={S.delBox}>
+              <div style={{fontSize:13,fontWeight:700,color:"#fbbf24",marginBottom:7}}>⚠ Limpiar presupuestos</div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:6,lineHeight:1.6}}>
+                Se eliminarán <strong style={{color:"#fbbf24"}}>todos los montos de presupuesto</strong> definidos en todas las categorías y meses.
+              </div>
+              <div style={{fontSize:10,color:"#475569",marginBottom:14}}>
+                Tus movimientos, cuentas y demás datos no se verán afectados.
+              </div>
+              <button style={{...S.saveB,background:"linear-gradient(135deg,#fbbf24,#b45309)",color:"#080810"}} onClick={()=>{
+                setPresupuestos({});
+                setShowResetPresupuestos(false);
+              }}>Sí, limpiar presupuestos</button>
+              <button style={S.cancB} onClick={()=>setShowResetPresupuestos(false)}>Cancelar</button>
             </div>
           </div>
         )}
