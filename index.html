@@ -3882,10 +3882,13 @@ function App(){
           const tipo=viewCartera.tipo;
           const isIngExt=tipo==="ingresosExt";
           const isAcr=tipo==="acreedores";
-          const sp=!isIngExt?saldoPendiente(viewCartera,movs):0;
-          const prog=!isIngExt?programado(viewCartera,movs):0;
-          const abonosDir=(viewCartera.abonos||[]);
-          const movVinc=movs.filter(m=>(viewCartera.movIdsVinculados||[]).includes(m.id));
+          // Leer SIEMPRE el registro vivo desde el estado (no la copia congelada del click)
+          const registroVivo=isIngExt?ingresosExt.find(x=>x.id===viewCartera.id):isAcr?acreedores.find(x=>x.id===viewCartera.id):deudores.find(x=>x.id===viewCartera.id);
+          const registroActual=registroVivo?{...registroVivo,tipo}:viewCartera;
+          const sp=!isIngExt?saldoPendiente(registroActual,movs):0;
+          const prog=!isIngExt?programado(registroActual,movs):0;
+          const abonosDir=(registroActual.abonos||[]);
+          const movVinc=movs.filter(m=>(registroActual.movIdsVinculados||[]).includes(m.id));
           const colorTipo=isIngExt?"#fbbf24":isAcr?"#f87171":"#22c55e";
           return(
             <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setViewCartera(null);}}>
@@ -3897,24 +3900,24 @@ function App(){
 
                 {/* Header */}
                 <div style={{background:"#13131f",borderRadius:11,padding:"12px 14px",marginBottom:11}}>
-                  <div style={{fontSize:8,color:colorTipo,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>{viewCartera.origen}</div>
-                  {!isIngExt&&<div style={{fontSize:16,fontWeight:800,color:"#e2e8f0",marginBottom:2}}>{viewCartera.nombre}</div>}
-                  <div style={{fontSize:isIngExt?15:12,fontWeight:isIngExt?800:400,color:isIngExt?"#e2e8f0":"#94a3b8",marginBottom:isIngExt?4:0}}>{viewCartera.concepto}</div>
-                  {isIngExt&&(()=>{const est=estatusIngExt(viewCartera,movs);const c=COLOR_ING_EXT[est]||"#94a3b8";return <span style={{fontSize:10,padding:"3px 9px",borderRadius:8,background:`${c}22`,color:c,fontWeight:700}}>{est}</span>;})()} 
-                  {isAcr&&viewCartera.condicionPago&&(
+                  <div style={{fontSize:8,color:colorTipo,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",marginBottom:3}}>{registroActual.origen}</div>
+                  {!isIngExt&&<div style={{fontSize:16,fontWeight:800,color:"#e2e8f0",marginBottom:2}}>{registroActual.nombre}</div>}
+                  <div style={{fontSize:isIngExt?15:12,fontWeight:isIngExt?800:400,color:isIngExt?"#e2e8f0":"#94a3b8",marginBottom:isIngExt?4:0}}>{registroActual.concepto}</div>
+                  {isIngExt&&(()=>{const est=estatusIngExt(registroActual,movs);const c=COLOR_ING_EXT[est]||"#94a3b8";return <span style={{fontSize:10,padding:"3px 9px",borderRadius:8,background:`${c}22`,color:c,fontWeight:700}}>{est}</span>;})()} 
+                  {isAcr&&registroActual.condicionPago&&(
                     <div style={{marginTop:5}}>
-                      <span style={{fontSize:9,padding:"2px 8px",borderRadius:6,fontWeight:700,background:viewCartera.condicionPago==="con_interes"?"rgba(248,113,113,0.15)":"rgba(96,165,250,0.15)",color:viewCartera.condicionPago==="con_interes"?"#f87171":"#60a5fa"}}>
-                        {viewCartera.condicionPago==="con_interes"?"💸 Paga interés":"❄ Deuda congelada"}
+                      <span style={{fontSize:9,padding:"2px 8px",borderRadius:6,fontWeight:700,background:registroActual.condicionPago==="con_interes"?"rgba(248,113,113,0.15)":"rgba(96,165,250,0.15)",color:registroActual.condicionPago==="con_interes"?"#f87171":"#60a5fa"}}>
+                        {registroActual.condicionPago==="con_interes"?"💸 Paga interés":"❄ Deuda congelada"}
                       </span>
                     </div>
                   )}
-                  {viewCartera.condiciones&&<div style={{fontSize:10,color:"#64748b",fontStyle:"italic",marginTop:6,borderTop:"1px solid #1e293b",paddingTop:6}}>{viewCartera.condiciones}</div>}
+                  {registroActual.condiciones&&<div style={{fontSize:10,color:"#64748b",fontStyle:"italic",marginTop:6,borderTop:"1px solid #1e293b",paddingTop:6}}>{registroActual.condiciones}</div>}
                 </div>
 
                 {/* Montos */}
                 {!isIngExt&&isAcr&&(()=>{
-                  const desglose=saldoPendienteDesglose(viewCartera,movs);
-                  const tieneDesglose=(viewCartera.montoCapital||0)>0||(viewCartera.montoInteres||0)>0;
+                  const desglose=saldoPendienteDesglose(registroActual,movs);
+                  const tieneDesglose=(registroActual.montoCapital||0)>0||(registroActual.montoInteres||0)>0;
                   return(<>
                     {/* Fila superior: Capital e Interés */}
                     {tieneDesglose&&(
@@ -3923,7 +3926,7 @@ function App(){
                           <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:4}}>💰 CAPITAL</div>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
                             <span style={{fontSize:9,color:"#64748b"}}>Inicial</span>
-                            <span style={{fontSize:11,fontWeight:800,color:"#22c55e88"}}>{fmt(viewCartera.montoCapital||0)}</span>
+                            <span style={{fontSize:11,fontWeight:800,color:"#22c55e88"}}>{fmt(registroActual.montoCapital||0)}</span>
                           </div>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
                             <span style={{fontSize:9,color:"#64748b"}}>Abonado</span>
@@ -3934,14 +3937,14 @@ function App(){
                             <span style={{fontSize:13,fontWeight:800,color:desglose.pendCapital>0?"#f87171":"#22c55e"}}>{fmt(desglose.pendCapital)}</span>
                           </div>
                           <div style={{marginTop:5,height:3,borderRadius:2,background:"#1e293b",overflow:"hidden"}}>
-                            <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${viewCartera.montoCapital>0?Math.min(100,(desglose.abonadoCapital/(viewCartera.montoCapital))*100):0}%`}}/>
+                            <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${registroActual.montoCapital>0?Math.min(100,(desglose.abonadoCapital/(registroActual.montoCapital))*100):0}%`}}/>
                           </div>
                         </div>
                         <div style={{background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:9,padding:"9px 8px"}}>
                           <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:4}}>💸 INTERÉS</div>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
                             <span style={{fontSize:9,color:"#64748b"}}>Inicial</span>
-                            <span style={{fontSize:11,fontWeight:800,color:"#f8717188"}}>{fmt(viewCartera.montoInteres||0)}</span>
+                            <span style={{fontSize:11,fontWeight:800,color:"#f8717188"}}>{fmt(registroActual.montoInteres||0)}</span>
                           </div>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
                             <span style={{fontSize:9,color:"#64748b"}}>Abonado</span>
@@ -3952,7 +3955,7 @@ function App(){
                             <span style={{fontSize:13,fontWeight:800,color:desglose.pendInteres>0?"#f87171":"#22c55e"}}>{fmt(desglose.pendInteres)}</span>
                           </div>
                           <div style={{marginTop:5,height:3,borderRadius:2,background:"#1e293b",overflow:"hidden"}}>
-                            <div style={{height:"100%",borderRadius:2,background:"#f87171",width:`${viewCartera.montoInteres>0?Math.min(100,(desglose.abonadoInteres/(viewCartera.montoInteres))*100):0}%`}}/>
+                            <div style={{height:"100%",borderRadius:2,background:"#f87171",width:`${registroActual.montoInteres>0?Math.min(100,(desglose.abonadoInteres/(registroActual.montoInteres))*100):0}%`}}/>
                           </div>
                         </div>
                       </div>
@@ -3961,7 +3964,7 @@ function App(){
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
                       <div style={{background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
                         <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:3}}>Deuda total</div>
-                        <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(viewCartera.montoActual)}</div>
+                        <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(registroActual.montoActual)}</div>
                       </div>
                       <div style={{background:carteraDetalleModo==="programados"?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.08)",border:`1px solid ${carteraDetalleModo==="programados"?"#a78bfa":"#a78bfa33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
                         onClick={()=>setCarteraDetalleModo(carteraDetalleModo==="programados"?"ejecutados":"programados")}>
@@ -3981,7 +3984,7 @@ function App(){
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
                     <div style={{background:`${"#22c55e"}11`,border:`1px solid ${"#22c55e"}33`,borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
                       <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:3}}>Deuda Inicial</div>
-                      <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(viewCartera.montoActual)}</div>
+                      <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(registroActual.montoActual)}</div>
                     </div>
                     <div style={{background:carteraDetalleModo==="programados"?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.08)",border:`1px solid ${carteraDetalleModo==="programados"?"#a78bfa":"#a78bfa33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
                       onClick={()=>setCarteraDetalleModo(carteraDetalleModo==="programados"?"ejecutados":"programados")}>
@@ -3996,8 +3999,8 @@ function App(){
                   </div>
                 )}
                 {isIngExt&&(()=>{
-                  const saldos=saldoIngExt(viewCartera,movs);
-                  const montoObj=viewCartera.montoObjetivo||viewCartera.monto||0;
+                  const saldos=saldoIngExt(registroActual,movs);
+                  const montoObj=registroActual.montoObjetivo||registroActual.monto||0;
                   const pctRec=montoObj>0?Math.min(100,(saldos.recuperado/montoObj)*100):0;
                   return(<>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:9}}>
@@ -4022,7 +4025,7 @@ function App(){
                   </>);
                 })()}
                 {isIngExt&&(<>
-                  {(()=>{const est=estatusIngExt(viewCartera,movs);return est!=="Recuperado"&&(
+                  {(()=>{const est=estatusIngExt(registroActual,movs);return est!=="Recuperado"&&(
                     <div style={{...S.infoBx("#22c55e"),marginBottom:11}}>
                       <span>💡</span>
                       <span>{est==="Pendiente"?"Da de alta un movimiento de Ingreso y vincúlalo aquí para registrar la recuperación parcial o total.":est==="Parcial"?"Recuperación parcial registrada. Vincula más movimientos para continuar.":"Hay un movimiento programado. Al ejecutarse se actualizará automáticamente."}</span>
@@ -4032,7 +4035,7 @@ function App(){
 
                 {/* Movimientos vinculados como abonos */}
                 {!isIngExt&&(()=>{
-                  const tieneInteres=viewCartera.condicionPago==="con_interes";
+                  const tieneInteres=registroActual.condicionPago==="con_interes";
                   const movEjec=movVinc.filter(m=>["PAGADO","INGRESADO"].includes(m.estatus));
                   const movProg=movVinc.filter(m=>m.estatus==="PROGRAMADO");
                   const totalEjec=movEjec.reduce((s,m)=>s+m.monto,0);
@@ -4123,9 +4126,9 @@ function App(){
 
                 <div style={{display:"flex",gap:8,marginTop:4}}>
                   <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(201,168,76,0.15)",color:"#C9A84C",border:"1px solid #C9A84C44"}}
-                    onClick={()=>{setViewCartera(null);openCarteraForm(tipo,viewCartera);}}>✏ Editar</button>
+                    onClick={()=>{setViewCartera(null);openCarteraForm(tipo,registroActual);}}>✏ Editar</button>
                   {(()=>{
-                    const movsReales=movs.filter(m=>(viewCartera.movIdsVinculados||[]).includes(m.id));
+                    const movsReales=movs.filter(m=>(registroActual.movIdsVinculados||[]).includes(m.id));
                     // Siempre mostrar botón eliminar — delCartera maneja la confirmación
                     return(
                       <button style={{...S.saveB,flex:1,marginTop:0,
