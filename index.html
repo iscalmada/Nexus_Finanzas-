@@ -1149,6 +1149,8 @@ function App(){
   const[nombreUsuario,setNombreUsuario]=useState(()=>loadLS('nombreUsuario',''));
   const[pinApp,setPinApp]=useState(()=>loadLS('pinApp',''));
   const[pinActivo,setPinActivo]=useState(()=>loadLS('pinActivo',false));
+  const[tiempoBloqueo,setTiempoBloqueo]=useState(()=>loadLS('tiempoBloqueo',5)); // minutos: default 5
+  const pinLastActiveRef=React.useRef(Date.now());
   const[gastoFamiliarEsencial,setGastoFamiliarEsencial]=useState(()=>loadLS('gastoFamiliarEsencial',0));
   const[factorFEF,setFactorFEF]=useState(()=>loadLS('factorFEF',2.5));
   const[prioFEF_ing,setPrioFEF_ing]=useState(2);
@@ -1291,9 +1293,6 @@ function App(){
   const[viewOpo,setViewOpo]=useState(null);
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[pinInput,setPinInput]=useState('');
-  const[tiempoBloqueo,setTiempoBloqueo]=useState(()=>loadLS('tiempoBloqueo',5)); // minutos
-  const pinTimerRef=React.useRef(null);
-  const pinLastActiveRef=React.useRef(Date.now());
   const[pinError,setPinError]=useState(false);
   const[pinDesbloqueado,setPinDesbloqueado]=useState(()=>!loadLS('pinActivo',false));
   const[showPinConfig,setShowPinConfig]=useState(false);
