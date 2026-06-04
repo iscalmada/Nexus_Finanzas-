@@ -1172,6 +1172,7 @@ function App(){
   useEffect(()=>{ saveLS('nombreUsuario', nombreUsuario); }, [nombreUsuario]);
   useEffect(()=>{ saveLS('pinApp', pinApp); }, [pinApp]);
   useEffect(()=>{ saveLS('pinActivo', pinActivo); }, [pinActivo]);
+  useEffect(()=>{ saveLS('tiempoBloqueo', tiempoBloqueo); }, [tiempoBloqueo]);
   useEffect(()=>{ saveLS('gastoFamiliarEsencial', gastoFamiliarEsencial); }, [gastoFamiliarEsencial]);
   useEffect(()=>{ saveLS('factorFEF', factorFEF); }, [factorFEF]);
   useEffect(()=>{ saveLS('etapasAvance', etapasAvance); }, [etapasAvance]);
@@ -1290,6 +1291,9 @@ function App(){
   const[viewOpo,setViewOpo]=useState(null);
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[pinInput,setPinInput]=useState('');
+  const[tiempoBloqueo,setTiempoBloqueo]=useState(()=>loadLS('tiempoBloqueo',5)); // minutos
+  const pinTimerRef=React.useRef(null);
+  const pinLastActiveRef=React.useRef(Date.now());
   const[pinError,setPinError]=useState(false);
   const[pinDesbloqueado,setPinDesbloqueado]=useState(()=>!loadLS('pinActivo',false));
   const[showPinConfig,setShowPinConfig]=useState(false);
@@ -1826,6 +1830,27 @@ function App(){
     setOportunidades(p=>p.map(x=>x.id===opo.id?updated:x));
     if(viewOpo&&viewOpo.id===opo.id) setViewOpo(updated);
   },[viewOpo]);
+
+  // Bloqueo automático por inactividad cuando PIN está activo
+  useEffect(()=>{
+    if(!pinActivo) return;
+    const handleVisibility=()=>{
+      if(document.hidden){
+        // App va a segundo plano — registrar el momento
+        pinLastActiveRef.current=Date.now();
+      } else {
+        // App vuelve a primer plano — verificar tiempo transcurrido
+        const elapsed=(Date.now()-pinLastActiveRef.current)/1000/60; // en minutos
+        if(elapsed>=tiempoBloqueo){
+          setPinDesbloqueado(false);
+          setPinInput('');
+          setPinError(false);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange',handleVisibility);
+    return()=>document.removeEventListener('visibilitychange',handleVisibility);
+  },[pinActivo,tiempoBloqueo]);
 
   // Helper: etapa activa de una oportunidad
   const getEtapa = useCallback((etapaId,etapas)=>etapas.find(e=>e.id===etapaId)||etapas[0],[]);
@@ -4331,11 +4356,26 @@ function App(){
                       }
                     }}>{pinActivo?"Desactivar":"Activar"}</button>
                 </div>
-                {pinActivo&&(
-                  <button style={{...S.cancB,fontSize:10,marginTop:0}} onClick={()=>{setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');}}>
-                    Cambiar PIN
-                  </button>
-                )}
+                {pinActivo&&(<>
+                  <div style={{marginTop:9}}>
+                    <div style={{...S.lbl,marginBottom:6}}>Bloquear después de</div>
+                    <div style={{display:"flex",gap:5}}>
+                      {[[1,"1 min"],[5,"5 min"],[15,"15 min"],[30,"30 min"]].map(([v,l])=>(
+                        <button key={v} style={{...S.prioB2(tiempoBloqueo===v,"#C9A84C"),flex:1,padding:"5px 0",fontSize:9}} onClick={()=>setTiempoBloqueo(v)}>{l}</button>
+                      ))}
+                    </div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:3}}>Si la app está en segundo plano más de este tiempo, pedirá PIN al volver</div>
+                  </div>
+                  <div style={{display:"flex",gap:7,marginTop:9}}>
+                    <button style={{...S.cancB,flex:1,fontSize:10,marginTop:0}} onClick={()=>{setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');}}>
+                      Cambiar PIN
+                    </button>
+                    <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(248,113,113,0.15)",color:"#f87171",border:"1px solid #f8717144",fontSize:10}}
+                      onClick={()=>{setPinDesbloqueado(false);setPinInput('');setView("menu");}}>
+                      🔒 Bloquear ahora
+                    </button>
+                  </div>
+                </>)}
               </div>
             </div>
             <div style={S.sTit}>DATOS</div>
