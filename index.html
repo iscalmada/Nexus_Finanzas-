@@ -2628,7 +2628,7 @@ function App(){
                     <div style={{display:"flex",gap:4,alignItems:"center",flexWrap:"wrap",marginBottom:2}}>
                       <span style={{fontSize:10,color:isRet?"#fbbf24":"#475569"}}>{row.fecha?fmtDate(row.fecha):"Sin fecha"}</span>
                       {catNom&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,color:"#64748b"}}>{catNom}</span></>}
-                      {esProg&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,fontWeight:700,color:prioColor}}>{row.tipoOp==="Ingreso"?"Prob":""} {prioLabel}</span></>}
+                      {(esProg||isEg)&&prioLabel&&<><span style={{color:"#1e293b"}}>·</span><span style={{fontSize:8,fontWeight:700,color:prioColor}}>{row.tipoOp==="Ingreso"?"Prob":""} {prioLabel}</span></>}
                       {tcNom&&<span style={{fontSize:8,color:"#f472b6",background:"#f472b611",padding:"1px 5px",borderRadius:4}}>💳 {tcNom}</span>}
                       {row.tipoOp==="Pago Tarjeta"&&tcNom&&cNom&&<span style={{fontSize:8,color:"#60a5fa",background:"#60a5fa11",padding:"1px 5px",borderRadius:4}}>← {cNom}</span>}
                       {cNom&&!tcNom&&<span style={{fontSize:8,color:"#475569",background:"#1a1a2e",padding:"1px 5px",borderRadius:4}}>{cNom}{cDest?" → "+cDest:""}</span>}
@@ -2705,7 +2705,7 @@ function App(){
               <button style={S.perBtn} onClick={statPeriod.next}>›</button>
             </div>
             <div style={{display:"flex",borderBottom:"1px solid #1e293b",marginBottom:13}}>
-              {[["gastos","↓ Gastos"],["ingresos","↑ Ingresos"],["evolucion","~ Evolución"]].map(([k,l])=>(
+              {[["gastos","↓ Gastos"],["ingresos","↑ Ingresos"],["evolucion","~ Evolución"],["prioridad","⚑ Prioridad"]].map(([k,l])=>(
                 <button key={k} style={S.statTab(statTab===k)} onClick={()=>{setStatTab(k);setStatOpenCat(null);}}>{l}</button>
               ))}
             </div>
@@ -2821,6 +2821,96 @@ function App(){
                 ))}
               </div>
             )}
+            {statTab==="prioridad"&&(()=>{
+              // Calcular egresos ejecutados del período por prioridad
+              const egsEjec=movs.filter(r=>["PAGADO","INGRESADO"].includes(r.estatus)&&r.tipoOp==="Egreso"&&r.fecha&&statPeriod.inP(r.fecha));
+              const totalEg=egsEjec.reduce((s,r)=>s+r.monto,0);
+              const porPrio=[1,2,3,4].map(p=>({
+                p,
+                label:PRIO_EG_LBL[p],
+                color:PRIO_EG_COLOR[p],
+                total:egsEjec.filter(r=>(parseInt(r.prioridad)||3)===p).reduce((s,r)=>s+r.monto,0),
+                count:egsEjec.filter(r=>(parseInt(r.prioridad)||3)===p).length,
+              })).filter(x=>x.total>0);
+              // Tendencia mensual: últimos 8 meses
+              const hoy=new Date();
+              const mesesTend=Array.from({length:8},(_,i)=>{
+                const d=new Date(hoy.getFullYear(),hoy.getMonth()-7+i,1);
+                return{sm:d.getMonth(),sy:d.getFullYear(),label:MESES[d.getMonth()]+" "+String(d.getFullYear()).slice(2)};
+              });
+              const tendData=mesesTend.map(m=>{
+                const egsM=movs.filter(r=>["PAGADO","INGRESADO"].includes(r.estatus)&&r.tipoOp==="Egreso"&&r.fecha&&r.fecha.startsWith(m.sy+"-"+String(m.sm+1).padStart(2,"0")));
+                return{...m,total:egsM.reduce((s,r)=>s+r.monto,0),...Object.fromEntries([1,2,3,4].map(p=>[p,egsM.filter(r=>(parseInt(r.prioridad)||3)===p).reduce((s,r)=>s+r.monto,0)]))};
+              }).filter(m=>m.total>0);
+              const maxTend=Math.max(...tendData.map(m=>m.total),1);
+              if(egsEjec.length===0) return <div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin egresos ejecutados en este período</div>;
+              return(<>
+                {/* Resumen total */}
+                <div style={{textAlign:"center",marginBottom:11}}>
+                  <span style={{fontSize:10,color:"#475569"}}>Total egresos ejecutados</span><br/>
+                  <span style={{fontSize:20,fontWeight:800,color:"#f87171"}}>{fmt(totalEg)}</span>
+                </div>
+                {/* Chips por prioridad */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:14}}>
+                  {[1,2,3,4].map(p=>{
+                    const dat=porPrio.find(x=>x.p===p)||{total:0,count:0,color:PRIO_EG_COLOR[p],label:PRIO_EG_LBL[p]};
+                    const pct=totalEg>0?Math.round(dat.total/totalEg*100):0;
+                    return(
+                      <div key={p} style={{background:`${dat.color}11`,border:`1px solid ${dat.color}33`,borderRadius:11,padding:"10px 12px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+                          <span style={{fontSize:10,fontWeight:700,color:dat.color}}>{dat.label}</span>
+                          <span style={{fontSize:9,background:`${dat.color}22`,color:dat.color,padding:"2px 7px",borderRadius:8,fontWeight:700}}>{pct}%</span>
+                        </div>
+                        <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0",marginBottom:3}}>{fmt(dat.total)}</div>
+                        <div style={{height:4,borderRadius:2,background:"#1e293b",overflow:"hidden",marginBottom:3}}>
+                          <div style={{height:"100%",borderRadius:2,background:dat.color,width:`${pct}%`,transition:"width 0.4s"}}/>
+                        </div>
+                        <div style={{fontSize:9,color:"#475569"}}>{dat.count} movimiento{dat.count!==1?"s":""}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Tendencia mensual barras apiladas */}
+                {tendData.length>1&&(<>
+                  <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:1,marginBottom:8}}>TENDENCIA MENSUAL</div>
+                  {/* Leyenda */}
+                  <div style={{display:"flex",gap:9,marginBottom:9,flexWrap:"wrap"}}>
+                    {[1,2,3,4].map(p=>(
+                      <div key={p} style={{display:"flex",alignItems:"center",gap:4}}>
+                        <div style={{width:8,height:8,borderRadius:2,background:PRIO_EG_COLOR[p]}}/>
+                        <span style={{fontSize:8,color:"#64748b"}}>{PRIO_EG_LBL[p]}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"11px 13px",marginBottom:7}}>
+                    {tendData.map((m,i)=>{
+                      const pct=m.total/maxTend*100;
+                      return(
+                        <div key={i} style={{marginBottom:9}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                            <span style={{fontSize:10,color:"#94a3b8",fontWeight:600}}>{m.label}</span>
+                            <span style={{fontSize:9,color:"#f87171",fontWeight:700}}>{fmt(m.total)}</span>
+                          </div>
+                          {/* Barra apilada */}
+                          <div style={{height:12,borderRadius:4,background:"#1e293b",overflow:"hidden",display:"flex"}}>
+                            {[1,2,3,4].map(p=>{
+                              const w=m.total>0?(m[p]/m.total*pct):0;
+                              return w>0?<div key={p} style={{height:"100%",background:PRIO_EG_COLOR[p],width:`${w}%`,title:PRIO_EG_LBL[p]}}/>:null;
+                            })}
+                          </div>
+                          {/* Mini detalle */}
+                          <div style={{display:"flex",gap:7,marginTop:3,flexWrap:"wrap"}}>
+                            {[1,2,3,4].filter(p=>m[p]>0).map(p=>(
+                              <span key={p} style={{fontSize:8,color:PRIO_EG_COLOR[p]}}>{PRIO_EG_LBL[p].substring(0,4)}: {fmtShort(m[p])}</span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>)}
+              </>);
+            })()}
             <div style={{height:18}}/>
           </div>
         )}
@@ -2987,20 +3077,61 @@ function App(){
                           </>)}
                           {mes.detalleEg.length>0&&(<>
                             <div style={{fontSize:9,color:"#f87171",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6,marginTop:mes.detalleIng.length?8:0}}>↓ Egresos</div>
-                            {mes.detalleEg.map((c,i)=>(
+                            {mes.detalleEg.map((c,i)=>{
+                              const prioCat=c.prio||(c.subs.length>0&&c.subs[0].prio?c.subs[0].prio:null);
+                              const prioC=PRIO_EG_COLOR[prioCat]||"#64748b";
+                              const prioL=PRIO_EG_LBL[prioCat]||"";
+                              return(
                               <div key={c.id} style={{marginBottom:5}}>
                                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:c.subs.length?2:0}}>
-                                  <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
+                                  <div style={{display:"flex",alignItems:"center",gap:5,flex:1}}>
+                                    <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
+                                    {prioL&&<span style={{fontSize:7,padding:"1px 5px",borderRadius:4,background:prioC+"22",color:prioC,fontWeight:700,flexShrink:0}}>{prioL.substring(0,4)}</span>}
+                                  </div>
                                   <span style={{fontSize:11,fontWeight:700,color:"#f87171"}}>{fmt(c.pres)}</span>
                                 </div>
-                                {c.subs.map(s=>(
+                                {c.subs.map(s=>{
+                                  const prioS=PRIO_EG_COLOR[s.prio]||"#64748b";
+                                  const prioSL=PRIO_EG_LBL[s.prio]||"";
+                                  return(
                                   <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #f8717133"}}>
-                                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
+                                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                      <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
+                                      {prioSL&&<span style={{fontSize:7,padding:"1px 4px",borderRadius:3,background:prioS+"22",color:prioS,fontWeight:700}}>{prioSL.substring(0,4)}</span>}
+                                    </div>
                                     <span style={{fontSize:10,fontWeight:700,color:"#f87171"}}>{fmt(s.pres)}</span>
                                   </div>
-                                ))}
+                                );})}
                               </div>
-                            ))}
+                            );})}
+                            {/* Subtotales por prioridad */}
+                            {(()=>{
+                              const tots=[1,2,3,4].map(p=>{
+                                let sum=0;
+                                mes.detalleEg.forEach(c=>{
+                                  if(c.subs.length===0&&(c.prio||3)===p) sum+=c.pres;
+                                  c.subs.forEach(s=>{if((s.prio||3)===p) sum+=s.pres;});
+                                });
+                                return{p,sum,label:PRIO_EG_LBL[p],color:PRIO_EG_COLOR[p]};
+                              }).filter(x=>x.sum>0);
+                              if(tots.length<2) return null;
+                              const totalEgMes=tots.reduce((s,x)=>s+x.sum,0);
+                              return(
+                                <div style={{borderTop:"1px solid #f8717122",marginTop:7,paddingTop:7}}>
+                                  <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:5,letterSpacing:1}}>SUBTOTALES POR PRIORIDAD</div>
+                                  {tots.map(t=>(
+                                    <div key={t.p} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                                      <div style={{display:"flex",alignItems:"center",gap:5}}>
+                                        <div style={{width:6,height:6,borderRadius:2,background:t.color}}/>
+                                        <span style={{fontSize:10,color:t.color,fontWeight:600}}>{t.label}</span>
+                                        <span style={{fontSize:8,color:"#475569"}}>{totalEgMes>0?Math.round(t.sum/totalEgMes*100):0}%</span>
+                                      </div>
+                                      <span style={{fontSize:10,fontWeight:700,color:t.color}}>{fmt(t.sum)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </>)}
                           {mes.detalleIng.length===0&&mes.detalleEg.length===0&&(
                             <div style={{textAlign:"center",padding:"12px 0",fontSize:11,color:"#334155"}}>Sin presupuesto definido</div>
