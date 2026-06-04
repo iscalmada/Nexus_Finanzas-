@@ -1273,6 +1273,7 @@ function App(){
   // exportar
   const[showExportModal,setShowExportModal]=useState(false);
   const[carteraTab,setCarteraTab]=useState("acreedores"); // acreedores|deudores|ingresosExt
+  const[carteraOrigen,setCarteraOrigen]=useState("Todos");
   const[showCarteraForm,setShowCarteraForm]=useState(false);
   const[editCarteraId,setEditCarteraId]=useState(null);
   const[formCartera,setFormCartera]=useState({});
@@ -3631,34 +3632,48 @@ function App(){
               {[["acreedores","🔴 Acreedores"],["deudores","🟢 Deudores"],["ingresosExt","⭐ Ing. Ext."]].map(([k,l])=>(
                 <button key={k} style={{flex:1,padding:"8px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
                   color:carteraTab===k?"#C9A84C":"#334155",borderBottom:carteraTab===k?"2px solid #C9A84C":"2px solid transparent"}}
-                  onClick={()=>setCarteraTab(k)}>{l}</button>
+                  onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");}}>{l}</button>
               ))}
             </div>
 
             {/* ── ACREEDORES ── */}
             {carteraTab==="acreedores"&&(()=>{
-              const total=acreedores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
+              const origenes=["Todos",...ORIG_ACREEDOR];
+              const acrFiltrados=carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen);
+              const total=acrFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
+                {/* Selector de origen */}
+                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
+                  {origenes.map(o=>{
+                    const cnt=o==="Todos"?acreedores.length:acreedores.filter(x=>x.origen===o).length;
+                    return(<button key={o} style={{...S.prioB2(carteraOrigen===o,"#f87171"),flex:"none",padding:"5px 10px",fontSize:9}}
+                      onClick={()=>setCarteraOrigen(o)}>{o} {cnt>0&&<span style={{opacity:0.7}}>({cnt})</span>}</button>);
+                  })}
+                </div>
                 {(()=>{
-                  const totalInicial=acreedores.reduce((s,x)=>s+(x.montoActual||0),0);
+                  const totalInicial=acrFiltrados.reduce((s,x)=>s+(x.montoActual||0),0);
+                  const totalTodos=acreedores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
                   return(
                     <div style={{...S.card("rgba(248,113,113,0.2)"),marginBottom:11}}>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:5}}>
                         <div>
-                          <div style={S.lbl}>Deuda inicial total</div>
+                          <div style={S.lbl}>Deuda inicial {carteraOrigen!=="Todos"&&<span style={{color:"#f87171"}}>· {carteraOrigen}</span>}</div>
                           <div style={{fontSize:16,fontWeight:800,color:"#f8717188"}}>{fmt(totalInicial)}</div>
                         </div>
                         <div>
-                          <div style={S.lbl}>Saldo pendiente total</div>
+                          <div style={S.lbl}>Saldo pendiente {carteraOrigen!=="Todos"&&<span style={{color:"#f87171"}}>· {carteraOrigen}</span>}</div>
                           <div style={{fontSize:16,fontWeight:800,color:"#f87171"}}>{fmt(total)}</div>
                         </div>
                       </div>
-                      <div style={{fontSize:9,color:"#475569"}}>{acreedores.length} acreedor{acreedores.length!==1?"es":""} · Pagado: {fmt(totalInicial-total)}</div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
+                        <span>{acrFiltrados.length} acreedor{acrFiltrados.length!==1?"es":""} · Pagado: {fmt(totalInicial-total)}</span>
+                        {carteraOrigen!=="Todos"&&<span>Total todos: {fmt(totalTodos)}</span>}
+                      </div>
                     </div>
                   );
                 })()}
-                {acreedores.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin acreedores registrados</div>}
-                {acreedores.map(x=>{
+                {acrFiltrados.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>{carteraOrigen==="Todos"?"Sin acreedores registrados":"Sin acreedores de "+carteraOrigen}</div>}
+                {acrFiltrados.map(x=>{
                   const sp=saldoPendiente(x,movs);
                   const prog=programado(x,movs);
                   const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
@@ -3699,29 +3714,43 @@ function App(){
 
             {/* ── DEUDORES ── */}
             {carteraTab==="deudores"&&(()=>{
-              const total=deudores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
+              const origenes=["Todos",...ORIG_DEUDOR];
+              const deuFiltrados=carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen);
+              const total=deuFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
+                {/* Selector de origen */}
+                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
+                  {origenes.map(o=>{
+                    const cnt=o==="Todos"?deudores.length:deudores.filter(x=>x.origen===o).length;
+                    return(<button key={o} style={{...S.prioB2(carteraOrigen===o,"#22c55e"),flex:"none",padding:"5px 10px",fontSize:9}}
+                      onClick={()=>setCarteraOrigen(o)}>{o} {cnt>0&&<span style={{opacity:0.7}}>({cnt})</span>}</button>);
+                  })}
+                </div>
                 {(()=>{
-                  const totalInicial=deudores.reduce((s,x)=>s+(x.montoActual||0),0);
-                  const totalCobrado=deudores.reduce((s,x)=>s+abonado(x,movs),0);
+                  const totalInicial=deuFiltrados.reduce((s,x)=>s+(x.montoActual||0),0);
+                  const totalCobrado=deuFiltrados.reduce((s,x)=>s+abonado(x,movs),0);
+                  const totalTodos=deudores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
                   return(
                     <div style={{...S.card("rgba(34,197,94,0.2)"),marginBottom:11}}>
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:5}}>
                         <div>
-                          <div style={S.lbl}>Total inicial a cobrar</div>
+                          <div style={S.lbl}>Total inicial {carteraOrigen!=="Todos"&&<span style={{color:"#22c55e"}}>· {carteraOrigen}</span>}</div>
                           <div style={{fontSize:16,fontWeight:800,color:"#22c55e88"}}>{fmt(totalInicial)}</div>
                         </div>
                         <div>
-                          <div style={S.lbl}>Efectivamente cobrado</div>
+                          <div style={S.lbl}>Efectivamente cobrado {carteraOrigen!=="Todos"&&<span style={{color:"#22c55e"}}>· {carteraOrigen}</span>}</div>
                           <div style={{fontSize:16,fontWeight:800,color:"#22c55e"}}>{fmt(totalCobrado)}</div>
                         </div>
                       </div>
-                      <div style={{fontSize:9,color:"#475569"}}>{deudores.length} deudor{deudores.length!==1?"es":""} · Pendiente: {fmt(total)}</div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
+                        <span>{deuFiltrados.length} deudor{deuFiltrados.length!==1?"es":""} · Pendiente: {fmt(total)}</span>
+                        {carteraOrigen!=="Todos"&&<span>Total todos: {fmt(totalTodos)}</span>}
+                      </div>
                     </div>
                   );
                 })()}
-                {deudores.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin deudores registrados</div>}
-                {deudores.map(x=>{
+                {deuFiltrados.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>{carteraOrigen==="Todos"?"Sin deudores registrados":"Sin deudores de "+carteraOrigen}</div>}
+                {deuFiltrados.map(x=>{
                   const sp=saldoPendiente(x,movs);
                   const prog=programado(x,movs);
                   const pct=x.montoActual>0?Math.max(0,Math.min(100,100-(sp/x.montoActual*100))):0;
@@ -3762,14 +3791,26 @@ function App(){
 
             {/* ── INGRESOS EXTRAORDINARIOS ── */}
             {carteraTab==="ingresosExt"&&(()=>{
-              const totalPend=ingresosExt.filter(x=>x.estado!=="Recuperado").reduce((s,x)=>s+(x.monto||0),0);
+              const origenes=["Todos",...ORIG_ING_EXT];
+              const ingFiltrados=carteraOrigen==="Todos"?ingresosExt:ingresosExt.filter(x=>x.origen===carteraOrigen);
+              const totalPend=ingFiltrados.filter(x=>x.estado!=="Recuperado").reduce((s,x)=>s+(x.monto||0),0);
               return(<>
+                {/* Selector de origen */}
+                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
+                  {origenes.map(o=>{
+                    const cnt=o==="Todos"?ingresosExt.length:ingresosExt.filter(x=>x.origen===o).length;
+                    return(<button key={o} style={{...S.prioB2(carteraOrigen===o,"#fbbf24"),flex:"none",padding:"5px 10px",fontSize:9}}
+                      onClick={()=>setCarteraOrigen(o)}>{o} {cnt>0&&<span style={{opacity:0.7}}>({cnt})</span>}</button>);
+                  })}
+                </div>
                 {(()=>{
-                  const totalInicial=ingresosExt.reduce((s,x)=>s+(x.montoObjetivo||x.monto||0),0);
-                  const totalProg_=ingresosExt.reduce((s,x)=>s+saldoIngExt(x,movs).programado,0);
-                  const totalRec=ingresosExt.reduce((s,x)=>s+saldoIngExt(x,movs).recuperado,0);
+                  const totalInicial=ingFiltrados.reduce((s,x)=>s+(x.montoObjetivo||x.monto||0),0);
+                  const totalProg_=ingFiltrados.reduce((s,x)=>s+saldoIngExt(x,movs).programado,0);
+                  const totalRec=ingFiltrados.reduce((s,x)=>s+saldoIngExt(x,movs).recuperado,0);
+                  const totalPendTodos=ingresosExt.filter(x=>x.estado!=="Recuperado").reduce((s,x)=>s+(x.monto||0),0);
                   return(
                     <div style={{...S.card("rgba(251,191,36,0.15)"),marginBottom:11}}>
+                      {carteraOrigen!=="Todos"&&<div style={{fontSize:9,color:"#fbbf24",fontWeight:700,marginBottom:6,letterSpacing:1}}>ORIGEN: {carteraOrigen}</div>}
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:5}}>
                         <div style={{textAlign:"center"}}>
                           <div style={S.lbl}>Potencial</div>
@@ -3784,12 +3825,15 @@ function App(){
                           <div style={{fontSize:13,fontWeight:800,color:"#22c55e"}}>{fmt(totalRec)}</div>
                         </div>
                       </div>
-                      <div style={{fontSize:9,color:"#475569"}}>{ingresosExt.filter(x=>estatusIngExt(x,movs)!=="Recuperado").length} activos · Pendiente: {fmt(totalPend)}</div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#475569"}}>
+                        <span>{ingFiltrados.filter(x=>estatusIngExt(x,movs)!=="Recuperado").length} activos · Pendiente: {fmt(totalPend)}</span>
+                        {carteraOrigen!=="Todos"&&<span>Total todos: {fmt(totalPendTodos)}</span>}
+                      </div>
                     </div>
                   );
                 })()}
-                {ingresosExt.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>Sin ingresos extraordinarios registrados</div>}
-                {ingresosExt.map(x=>{
+                {ingFiltrados.length===0&&<div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>{carteraOrigen==="Todos"?"Sin ingresos extraordinarios registrados":"Sin ingresos de "+carteraOrigen}</div>}
+                {ingFiltrados.map(x=>{
                   const cEst=COLOR_ING_EXT[x.estado]||"#94a3b8";
                   const estadoCalc=estatusIngExt(x,movs);
                   const isActI=ingresosExtDrag.aId===x.id,isOvI=ingresosExtDrag.oViz===x.id;
