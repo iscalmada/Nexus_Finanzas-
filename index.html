@@ -1246,6 +1246,8 @@ function App(){
   const[serieConfirm,setSerieConfirm]=useState(null);
   const[showReset,setShowReset]=useState(false);
   const[showResetPresupuestos,setShowResetPresupuestos]=useState(false);
+  const[showRepararVinculos,setShowRepararVinculos]=useState(false);
+  const[repararResult,setRepararResult]=useState(null);
   const clearLocalStorage=useCallback(()=>{
     ['movs','cuentas','tarjetas','catIng','catEg','presupuestos'].forEach(k=>localStorage.removeItem('nexus_'+k));
   },[]);
@@ -1726,9 +1728,18 @@ function App(){
         }
       }
     }
-    // Vincular a cartera/oportunidades usando el ID calculado previamente
+    // Vincular a cartera/oportunidades — incluir TODOS los IDs generados (series incluidas)
     if(data.vinculoTipo&&data.vinculoId){
-      const vinculaEn=(setter)=>setter(p=>p.map(x=>x.id===data.vinculoId&&!(x.movIdsVinculados||[]).includes(newId)?{...x,movIdsVinculados:[...(x.movIdsVinculados||[]),newId]}:x));
+      // Calcular todos los IDs que se acaban de crear
+      const idsGenerados=recForm.activo
+        ? generarFechas(recForm).map((_,i)=>newId+i)
+        : [newId];
+      const vinculaEn=(setter)=>setter(p=>p.map(x=>{
+        if(x.id!==data.vinculoId) return x;
+        const yaVinc=x.movIdsVinculados||[];
+        const nuevos=idsGenerados.filter(id=>!yaVinc.includes(id));
+        return nuevos.length>0?{...x,movIdsVinculados:[...yaVinc,...nuevos]}:x;
+      }));
       if(data.vinculoTipo==="acreedores")   vinculaEn(setAcreedores);
       else if(data.vinculoTipo==="deudores") vinculaEn(setDeudores);
       else if(data.vinculoTipo==="ingresosExt") vinculaEn(setIngresosExt);
@@ -4432,12 +4443,31 @@ function App(){
                 </>)}
               </div>
             </div>
-            <div style={S.sTit}>DATOS</div>
-            <div style={{...S.card(),cursor:"pointer"}} onClick={()=>{setShowReset(true);setResetPhase(1);setResetInput("");}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(248,113,113,0.12)"}}><span>🗑</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#f87171"}}>Eliminar movimientos</div><div style={{fontSize:10,color:"#475569"}}>Borra todos los movimientos registrados</div></div></div>
+            <div style={{display:"flex",alignItems:"center",gap:8,margin:"18px 0 10px"}}>
+              <div style={{flex:1,height:1,background:"#1e293b"}}/>
+              <div style={{fontSize:9,fontWeight:800,color:"#475569",letterSpacing:1.5,padding:"4px 10px",border:"1px solid #1e293b",borderRadius:20}}>⚙ HERRAMIENTAS ESPECIALES</div>
+              <div style={{flex:1,height:1,background:"#1e293b"}}/>
             </div>
-            <div style={{...S.card(),cursor:"pointer",marginTop:7}} onClick={()=>setShowResetPresupuestos(true)}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(251,191,36,0.12)"}}><span>🎯</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#fbbf24"}}>Limpiar presupuestos</div><div style={{fontSize:10,color:"#475569"}}>Elimina todos los montos de presupuesto definidos</div></div></div>
+            <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid #f8717122",borderRadius:13,padding:"11px 13px",marginBottom:9}}>
+              <div style={{fontSize:10,color:"#f87171",fontWeight:700,marginBottom:9}}>⚠ Zona de operaciones críticas — úsalas con cuidado</div>
+              <div style={{cursor:"pointer",marginBottom:7}} onClick={()=>{setShowReset(true);setResetPhase(1);setResetInput("");}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{...S.menuIco,background:"rgba(248,113,113,0.15)",flexShrink:0}}><span>🗑</span></div>
+                  <div><div style={{fontSize:12,fontWeight:700,color:"#f87171"}}>Eliminar movimientos</div><div style={{fontSize:10,color:"#475569"}}>Borra todos los movimientos registrados</div></div>
+                </div>
+              </div>
+              <div style={{cursor:"pointer",marginBottom:7}} onClick={()=>setShowResetPresupuestos(true)}>
+                <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(251,191,36,0.08)",border:"1px solid #fbbf2433",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{...S.menuIco,background:"rgba(251,191,36,0.15)",flexShrink:0}}><span>🎯</span></div>
+                  <div><div style={{fontSize:12,fontWeight:700,color:"#fbbf24"}}>Limpiar presupuestos</div><div style={{fontSize:10,color:"#475569"}}>Elimina todos los montos de presupuesto definidos</div></div>
+                </div>
+              </div>
+              <div style={{cursor:"pointer"}} onClick={()=>{setRepararResult(null);setShowRepararVinculos(true);}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(96,165,250,0.08)",border:"1px solid #60a5fa33",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{...S.menuIco,background:"rgba(96,165,250,0.15)",flexShrink:0}}><span>🔗</span></div>
+                  <div><div style={{fontSize:12,fontWeight:700,color:"#60a5fa"}}>Reparar vínculos de cartera</div><div style={{fontSize:10,color:"#475569"}}>Detecta y corrige movimientos vinculados que no aparecen en Acreedores, Deudores o Ingresos Extraordinarios</div></div>
+                </div>
+              </div>
             </div>
 
             <div style={S.sTit}>RESPALDO JSON</div>
@@ -4894,6 +4924,89 @@ function App(){
             </div>
           </div>
         )}
+
+        {showRepararVinculos&&(()=>{
+          // Detectar vínculos rotos: movimientos con vinculoTipo/vinculoId que no están en movIdsVinculados del registro
+          const rotos=[];
+          movs.forEach(m=>{
+            if(!m.vinculoTipo||!m.vinculoId) return;
+            let arr=null;
+            if(m.vinculoTipo==="acreedores") arr=acreedores;
+            else if(m.vinculoTipo==="deudores") arr=deudores;
+            else if(m.vinculoTipo==="ingresosExt") arr=ingresosExt;
+            if(!arr) return;
+            const reg=arr.find(x=>x.id===m.vinculoId);
+            if(reg&&!(reg.movIdsVinculados||[]).includes(m.id)){
+              rotos.push({movId:m.id,concepto:m.concepto,fecha:m.fecha,tipo:m.vinculoTipo,regId:m.vinculoId,regNombre:reg.nombre||reg.concepto||"#"+reg.id});
+            }
+          });
+          const reparar=()=>{
+            if(rotos.length===0) return;
+            const rota_acr=rotos.filter(r=>r.tipo==="acreedores");
+            const rota_deu=rotos.filter(r=>r.tipo==="deudores");
+            const rota_ing=rotos.filter(r=>r.tipo==="ingresosExt");
+            const aplicar=(setter,lista)=>{
+              if(lista.length===0) return;
+              setter(p=>p.map(x=>{
+                const ids=lista.filter(r=>r.regId===x.id).map(r=>r.movId);
+                if(ids.length===0) return x;
+                const yaVinc=x.movIdsVinculados||[];
+                const nuevos=ids.filter(id=>!yaVinc.includes(id));
+                return nuevos.length>0?{...x,movIdsVinculados:[...yaVinc,...nuevos]}:x;
+              }));
+            };
+            aplicar(setAcreedores,rota_acr);
+            aplicar(setDeudores,rota_deu);
+            aplicar(setIngresosExt,rota_ing);
+            setRepararResult(rotos.length);
+          };
+          return(
+            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget){setShowRepararVinculos(false);setRepararResult(null);}}}>
+              <div style={S.mBox}>
+                <div style={S.mTit}>🔗 REPARAR VÍNCULOS</div>
+                {repararResult===null?(
+                  <>
+                    <div style={{fontSize:11,color:"#94a3b8",marginBottom:13,lineHeight:1.7}}>
+                      Esta herramienta escanea todos los movimientos que tienen un vínculo asignado (Acreedor, Deudor o Ingreso Extraordinario) y verifica que estén correctamente registrados en el registro correspondiente.
+                    </div>
+                    {rotos.length===0?(
+                      <div style={{...S.infoBx("#22c55e"),marginBottom:13}}>
+                        <span>✓</span><span>No se detectaron vínculos rotos. Todo está correcto.</span>
+                      </div>
+                    ):(
+                      <>
+                        <div style={{background:"rgba(251,191,36,0.1)",border:"1px solid #fbbf2433",borderRadius:10,padding:"10px 12px",marginBottom:11}}>
+                          <div style={{fontSize:11,fontWeight:700,color:"#fbbf24",marginBottom:7}}>⚠ {rotos.length} vínculo{rotos.length!==1?"s":""} roto{rotos.length!==1?"s":""} detectado{rotos.length!==1?"s":""}</div>
+                          <div style={{maxHeight:180,overflowY:"auto"}}>
+                            {rotos.map((r,i)=>(
+                              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"5px 0",borderBottom:"1px solid #1e293b",fontSize:10}}>
+                                <div>
+                                  <div style={{color:"#e2e8f0",fontWeight:600}}>{r.concepto}</div>
+                                  <div style={{color:"#475569"}}>{r.fecha} · {r.tipo==="acreedores"?"Acreedor":r.tipo==="deudores"?"Deudor":"Ing. Ext."}: {r.regNombre}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <button style={{...S.saveB,background:"linear-gradient(135deg,#60a5fa,#2563eb)"}} onClick={reparar}>
+                          Reparar {rotos.length} vínculo{rotos.length!==1?"s":""}
+                        </button>
+                      </>
+                    )}
+                    <button style={S.cancB} onClick={()=>{setShowRepararVinculos(false);setRepararResult(null);}}>Cerrar</button>
+                  </>
+                ):(
+                  <>
+                    <div style={{...S.infoBx("#22c55e"),marginBottom:13}}>
+                      <span>✓</span><span><strong>{repararResult} vínculo{repararResult!==1?"s":""}</strong> reparado{repararResult!==1?"s":""} correctamente.</span>
+                    </div>
+                    <button style={S.saveB} onClick={()=>{setShowRepararVinculos(false);setRepararResult(null);}}>Listo</button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {showExportModal&&(
           <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowExportModal(false);}}>
