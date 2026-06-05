@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="theme-color" content="#080810"/>
-  <title>Nexus CRM</title>
+  <title>Nexus Flow</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet"/>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
@@ -35,7 +35,7 @@
   <div id="loading">
     <div class="ncfp-title">NEXUS</div>
     <div class="ncfp-by">Partners</div>
-    <div class="ncfp-sub">Sistema Integral Comercial</div>
+    <div class="ncfp-sub">Sistema Integral de Gestión</div>
     <div class="ncfp-dots"><span></span><span></span><span></span></div>
   </div>
   <div id="root"></div>
@@ -57,6 +57,31 @@ const SOL_ANCLA=[
   {v:"Seguro Flotillas",l:"Seguro Flotillas"},{v:"Consultoria Seguridad",l:"Consultoría Seguridad"},
   {v:"Seguro Vida",l:"Seguro Vida"},{v:"Less Salt",l:"Less Salt"},
 ];
+
+/* migración de escalas codificadas a texto del catálogo (idempotente) */
+const CAP_MAP={AA:"Alta",A:"Alta",B:"Media",C:"Baja"};
+const CER_MAP={AA:"Muy Cercano",A:"Cercano",B:"Medianamente Cercano",C:"No Cercano"};
+function migra(cs){return (cs||[]).map(c=>({...c,
+  capacidadRef: CAP_MAP[c.capacidadRef]||c.capacidadRef,
+  cercania: CER_MAP[c.cercania]||c.cercania }));}
+
+function exportBackup(contactos,empresas){
+  try{
+    const cs=contactos.map(c=>({Nombre:c.nombreCompleto,Alias:c.alias||"",Actividad:c.actividad||"",
+      Empresa:((empresas.find(e=>e.id===c.empresaId)||{}).nombre)||"",Rol:c.rolEmpresa||"",
+      Telefono:c.telefono||"",Correo:c.correo||"",Circulo:c.circulo||"",Relacion:c.relacion||"",
+      NivelDeCercania:c.cercania||"",NivelEconomico:c.nivelEconomico||"",Potencial:c.potencial||"",CapacidadReferidor:c.capacidadRef||"",
+      EtapaPrincipal:c.etapaPrincipal||"",EtapaEspecifica:c.etapaEspecifica||"",TipoPersona:c.tipoPersona||"",
+      Giros:(c.giros||[]).join(", "),GiroPrincipal:c.giroPrincipal||"",SolucionesAncla:(c.solucionesAncla||[]).join(", "),
+      AcercamientoPixan:c.acercamientoPixan?"Sí":"No",EtapaPixan:c.etapaPixan||"",
+      UltimoContacto:c.fechaUltimoContacto||"",ResumenAvance:c.resumenAvance||"",Observaciones:c.obs||""}));
+    const es=empresas.map(e=>({Nombre:e.nombre,Giro:e.giro||"",Tamano:e.tamano||"",Telefono:e.telefono||"",Correo:e.correo||"",Domicilio:e.domicilio||"",Observaciones:e.obs||""}));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cs),"Contactos");
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(es),"Empresas");
+    XLSX.writeFile(wb,"Nexus_CFC_respaldo.xlsx");
+  }catch(e){alert("No se pudo exportar: "+e.message);}
+}
 
 /* ─── estilos (heredados del CFP) ─── */
 const GOLD="#C9A84C";
@@ -114,8 +139,9 @@ function CatSelect({cat,value,onChange,placeholder}){
 }
 
 /* ════════ MODAL CONTACTO ════════ */
-function ContactoModal({init,catalogos,empresas,onSave,onClose}){
+function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose}){
   const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],...init}));
+  const[nuevaEmp,setNuevaEmp]=useState(null);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const espDisp=(catalogos.etapaEspecifica||[]).filter(e=>!f.etapaPrincipal||e.principal===f.etapaPrincipal);
   const toggleGiro=(g)=>setF(p=>{const has=p.giros.includes(g);const giros=has?p.giros.filter(x=>x!==g):[...p.giros,g];
@@ -129,14 +155,17 @@ function ContactoModal({init,catalogos,empresas,onSave,onClose}){
       <div style={S.mTit}>{init.id?"Editar contacto":"Nuevo contacto"}</div>
 
       <div style={S.sTit}>Identidad</div>
-      <div style={{...S.g2,marginBottom:12}}>
+      <div style={S.g2}>
+        <Field label="Alias"><input style={S.inp} value={f.alias||""} onChange={e=>set("alias",e.target.value||null)}/></Field>
         <Field label="Nombre"><input style={S.inp} value={f.nombre||""} onChange={e=>set("nombre",e.target.value)}/></Field>
-        <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
       </div>
-      <Field label="Alias"><input style={S.inp} value={f.alias||""} onChange={e=>set("alias",e.target.value||null)}/></Field>
+      <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
 
       <div style={S.sTit}>Generales</div>
-      <Field label="Actividad principal"><input style={S.inp} value={f.actividad||""} onChange={e=>set("actividad",e.target.value||null)} placeholder="A qué se dedica…"/></Field>
+      <Field label="Actividad principal">
+        <input style={S.inp} list="actlist" value={f.actividad||""} onChange={e=>set("actividad",e.target.value||null)} placeholder="Elige una existente o escribe nueva…"/>
+        <datalist id="actlist">{(catalogos.actividadPrincipal||[]).map(o=><option key={o.id} value={o.nombre}/>)}</datalist>
+      </Field>
       <div style={S.g2}>
         <Field label="Teléfono"><input style={S.inp} value={f.telefono||""} onChange={e=>set("telefono",e.target.value||null)}/></Field>
         <Field label="Correo"><input style={S.inp} value={f.correo||""} onChange={e=>set("correo",e.target.value||null)}/></Field>
@@ -144,10 +173,13 @@ function ContactoModal({init,catalogos,empresas,onSave,onClose}){
       <Field label="Domicilio"><input style={S.inp} value={f.domicilio||""} onChange={e=>set("domicilio",e.target.value||null)}/></Field>
       <div style={S.g2}>
         <Field label="Empresa vinculada">
-          <select style={S.sel} value={f.empresaId||""} onChange={e=>set("empresaId",e.target.value||null)}>
-            <option value="">— Sin empresa —</option>
-            {empresas.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
-          </select>
+          <div style={{display:"flex",gap:6}}>
+            <select style={{...S.sel,flex:1}} value={f.empresaId||""} onChange={e=>set("empresaId",e.target.value||null)}>
+              <option value="">— Sin empresa —</option>
+              {empresas.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+            <button style={{...S.pill(true,"#3b82f6"),fontSize:14,padding:"0 12px"}} onClick={()=>setNuevaEmp({})} title="Nueva empresa">＋</button>
+          </div>
         </Field>
         <Field label="Rol en la empresa"><CatSelect cat={catalogos.rolEmpresa} value={f.rolEmpresa} onChange={v=>set("rolEmpresa",v)}/></Field>
       </div>
@@ -209,15 +241,17 @@ function ContactoModal({init,catalogos,empresas,onSave,onClose}){
 
       <div style={S.sTit}>Perfil estratégico</div>
       <Field label="Tipo de persona"><CatSelect cat={catalogos.tipoPersona} value={f.tipoPersona} onChange={v=>set("tipoPersona",v)}/></Field>
-      <Field label="Giros (multi · toca el principal para marcarlo ★)">
+      <Field label="Giros (toca para seleccionar o quitar)">
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
           {(catalogos.giro||[]).map(o=>{const a=f.giros.includes(o.nombre);const p=f.giroPrincipal===o.nombre;
-            return <span key={o.id} onClick={()=>a?set("giroPrincipal",o.nombre):toggleGiro(o.nombre)}
-              onDoubleClick={()=>toggleGiro(o.nombre)}
-              style={S.chip(a,p?GOLD:"#3b82f6")}>{p?"★ ":""}{o.nombre}</span>;})}
+            return <span key={o.id} onClick={()=>toggleGiro(o.nombre)} style={S.chip(a,p?GOLD:"#3b82f6")}>{p?"★ ":""}{o.nombre}</span>;})}
         </div>
-        <div style={{fontSize:9,color:"#475569",marginTop:2}}>Un toque agrega/marca principal · doble toque quita</div>
       </Field>
+      {f.giros.length>0&&<Field label="Giro principal">
+        <select style={S.sel} value={f.giroPrincipal||""} onChange={e=>set("giroPrincipal",e.target.value||null)}>
+          {f.giros.map(g=><option key={g} value={g}>{g}</option>)}
+        </select>
+      </Field>}
 
       <div style={S.sTit}>Soluciones ancla viables</div>
       <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
@@ -229,6 +263,11 @@ function ContactoModal({init,catalogos,empresas,onSave,onClose}){
       <button style={S.saveB} onClick={save}>Guardar</button>
       <button style={S.cancB} onClick={onClose}>Cancelar</button>
     </div>
+    {nuevaEmp&&<div onClick={e=>e.stopPropagation()}>
+      <EmpresaModal init={nuevaEmp} catalogos={catalogos}
+        onSave={(d)=>{const nid=onCreateEmpresa(d);set("empresaId",nid);setNuevaEmp(null);}}
+        onClose={()=>setNuevaEmp(null)}/>
+    </div>}
   </div>;
 }
 
@@ -267,7 +306,7 @@ function ContactoDetalle({c,catalogos,empresas,actividades,onEdit,onDelete,onBac
         <div style={S.sTit}>Relación</div>
         <Row k="Círculo" v={c.circulo}/>
         <Row k="Relación" v={c.relacion}/>
-        <Row k="Cercanía" v={c.cercania}/>
+        <Row k="Nivel de cercanía" v={c.cercania}/>
         <Row k="Nivel económico" v={c.nivelEconomico}/>
         <Row k="Referidor" v={c.referidor}/>
         <Row k="Capacidad referidor" v={c.capacidadRef}/>
@@ -276,10 +315,12 @@ function ContactoDetalle({c,catalogos,empresas,actividades,onEdit,onDelete,onBac
 
       <div style={S.card()}>
         <div style={S.sTit}>Avance Nexus</div>
+        <Row k="Etapa principal" v={c.etapaPrincipal}/>
+        <Row k="Etapa específica" v={c.etapaEspecifica}/>
         <Row k="Presentación Nexus" v={c.cuentaPresentacion?"Sí":"No"}/>
-        <Row k="Último contacto" v={c.fechaUltimoContacto}/>
+        <div style={S.detRow}><span style={S.detK}>Último contacto</span><span style={S.detV}>{c.fechaUltimoContacto||"Sin fecha"}</span></div>
         {c.resumenAvance&&<div style={{fontSize:12,color:"#cbd5e1",marginTop:8,lineHeight:1.6,whiteSpace:"pre-wrap"}}>{c.resumenAvance}</div>}
-        {!c.resumenAvance&&<div style={{fontSize:11,color:"#475569"}}>Sin resumen de avance.</div>}
+        {!c.resumenAvance&&<div style={{fontSize:11,color:"#475569",marginTop:6}}>Sin resumen de avance.</div>}
       </div>
 
       {(c.acercamientoPixan||c.etapaPixan)&&<div style={S.card("#a78bfa44")}>
@@ -314,14 +355,15 @@ function ContactoDetalle({c,catalogos,empresas,actividades,onEdit,onDelete,onBac
 }
 
 /* ════════ LISTA CONTACTOS ════════ */
-function Contactos({contactos,catalogos,empresas,setContactos}){
+function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos}){
   const[q,setQ]=useState("");
   const[fEtapa,setFEtapa]=useState("");
   const[fGiro,setFGiro]=useState("");
   const[fSol,setFSol]=useState("");
   const[fPot,setFPot]=useState("");
-  const[sel,setSel]=useState(null);     // id detalle
-  const[modal,setModal]=useState(null);  // obj edición o {} nuevo
+  const[sel,setSel]=useState(initialSel||null);
+  const[modal,setModal]=useState(null);
+  const createEmpresa=(d)=>{const nid="e"+(Math.max(0,...empresas.map(e=>parseInt((e.id||"e0").slice(1))||0))+1);setEmpresas(prev=>[...prev,{...d,id:nid}]);return nid;};
 
   const list=useMemo(()=>contactos.filter(c=>{
     if(q&&!(c.nombreCompleto||"").toLowerCase().includes(q.toLowerCase()))return false;
@@ -333,6 +375,8 @@ function Contactos({contactos,catalogos,empresas,setContactos}){
   }).sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")),[contactos,q,fEtapa,fGiro,fSol,fPot]);
 
   const save=(data)=>{
+    if(data.actividad){const ex=(catalogos.actividadPrincipal||[]).some(o=>(o.nombre||"").toLowerCase()===data.actividad.toLowerCase());
+      if(!ex&&setCatalogos)setCatalogos(p=>({...p,actividadPrincipal:[...(p.actividadPrincipal||[]),{id:"act"+Date.now(),nombre:data.actividad}]}));}
     setContactos(prev=>{
       if(data.id)return prev.map(c=>c.id===data.id?data:c);
       const nid="c"+(Math.max(0,...prev.map(c=>parseInt((c.id||"c0").slice(1))||0))+1);
@@ -348,7 +392,7 @@ function Contactos({contactos,catalogos,empresas,setContactos}){
     return <>
       <ContactoDetalle c={c} catalogos={catalogos} empresas={empresas}
         onEdit={()=>setModal(c)} onDelete={()=>del(c.id)} onBack={()=>setSel(null)}/>
-      {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onSave={save} onClose={()=>setModal(null)}/>}
+      {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onCreateEmpresa={createEmpresa} onSave={save} onClose={()=>setModal(null)}/>}
     </>;
   }
 
@@ -391,7 +435,7 @@ function Contactos({contactos,catalogos,empresas,setContactos}){
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin resultados.</div>}
     </div>
     <button style={S.fab} onClick={()=>setModal({})}>+</button>
-    {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onSave={save} onClose={()=>setModal(null)}/>}
+    {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onCreateEmpresa={createEmpresa} onSave={save} onClose={()=>setModal(null)}/>}
   </div>;
 }
 
@@ -472,7 +516,7 @@ const CAT_LABEL={circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cerc
   potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",etapaPrincipal:"Etapa principal de contacto",
   etapaEspecifica:"Etapa específica de contacto",areaEstrategica:"Área estratégica",solucion:"Solución de intervención",
   tipoAccion:"Tipo de acción",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
-  pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor"};
+  pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal"};
 function Catalogos({catalogos,setCatalogos}){
   const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");
   if(open){
@@ -516,21 +560,21 @@ function Inicio({contactos,empresas,setView}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
-      <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral Comercial y Financiero</div>
+      <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
         style={{...S.card("#22c55e44"),textAlign:"center",padding:"22px 16px",cursor:"pointer"}}>
         <div style={{fontSize:30,marginBottom:6}}>💰</div>
-        <div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>Control Financiero Personal</div>
-        <div style={{fontSize:10,color:"#475569",marginTop:4}}>Nexus CFP · se unifica aquí en el próximo bloque</div>
+        <div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>Nexus CFP</div>
+        <div style={{fontSize:10,color:"#475569",marginTop:4}}>Control Financiero Personal · se unifica próximamente</div>
       </div>
       <div onClick={()=>setView("contactos")}
         style={{...S.card(GOLD+"66"),textAlign:"center",padding:"22px 16px",cursor:"pointer"}}>
         <div style={{fontSize:30,marginBottom:6}}>🤝</div>
-        <div style={{fontSize:15,fontWeight:800,color:GOLD}}>Control Comercial Nexus</div>
-        <div style={{fontSize:10,color:"#475569",marginTop:4}}>Contactos, empresas, oportunidades</div>
+        <div style={{fontSize:15,fontWeight:800,color:GOLD}}>Nexus CFC</div>
+        <div style={{fontSize:10,color:"#475569",marginTop:4}}>Control de Flujo Comercial</div>
       </div>
     </div>
     <div style={S.sec}>
@@ -548,30 +592,42 @@ function Inicio({contactos,empresas,setView}){
           </div>;})}
       </div>
     </div>
+    <div style={S.sec}>
+      <button style={{...S.cancB,borderColor:GOLD+"55",color:GOLD,marginTop:0}} onClick={()=>exportBackup(contactos,empresas)}>⬇ Exportar respaldo (Excel)</button>
+    </div>
   </div>;
 }
 
 /* ════════ APP ════════ */
 function App(){
   const[view,setView]=useState("inicio");
-  const[contactos,setContactos]=useState(()=>loadLS("contactos",null)||SEED.contactos);
+  const[contactos,setContactos]=useState(()=>migra(loadLS("contactos",null)||SEED.contactos));
   const[empresas,setEmpresas]=useState(()=>loadLS("empresas",null)||SEED.empresas);
-  const[catalogos,setCatalogos]=useState(()=>loadLS("catalogos",null)||SEED.catalogos);
-  const[jumpContacto,setJumpContacto]=useState(null);
+  const[catalogos,setCatalogos]=useState(()=>{
+    const base=loadLS("catalogos",null)||SEED.catalogos;
+    if(!base.actividadPrincipal){
+      const src=loadLS("contactos",null)||SEED.contactos;
+      const acts=[...new Set((src||[]).map(c=>c.actividad).filter(Boolean))];
+      base.actividadPrincipal=acts.map((a,i)=>({id:"act"+i,nombre:a}));
+    }
+    return base;
+  });
+  const[openContacto,setOpenContacto]=useState(null);
 
   useEffect(()=>saveLS("contactos",contactos),[contactos]);
   useEffect(()=>saveLS("empresas",empresas),[empresas]);
   useEffect(()=>saveLS("catalogos",catalogos),[catalogos]);
   useEffect(()=>{const l=document.getElementById("loading");if(l){l.classList.add("fade-out");setTimeout(()=>l.remove(),350);}},[]);
 
+  const go=(k)=>{setOpenContacto(null);setView(k);};
   const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["catalogos","Catálogos","☰"]];
   return <div style={S.app}>
-    {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} setView={setView}/>}
-    {view==="contactos"&&<Contactos key={jumpContacto||"list"} contactos={contactos} catalogos={catalogos} empresas={empresas} setContactos={setContactos}/>}
-    {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setView("contactos");}}/>}
+    {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} setView={go}/>}
+    {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos}/>}
+    {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos}/>}
     <div style={S.nav}>
-      {NAV.map(([k,lab,ico])=><button key={k} style={S.navB(view===k)} onClick={()=>setView(k)}>
+      {NAV.map(([k,lab,ico])=><button key={k} style={S.navB(view===k)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>)}
     </div>
   </div>;
