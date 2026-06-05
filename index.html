@@ -2634,13 +2634,13 @@ function App(){
                 <div key={row.id} data-movid={row.id}
                   style={{...S.movWrap(isActive,isOver,isRet,isNeg),outline:isSel?"2px solid #C9A84C":row.simExcluido?"2px solid #f8717166":"none",opacity:row.simExcluido?0.45:1}} data-fecha={row.fecha||""}
                   onDragOver={e=>{e.preventDefault();drag.enter(row.id);}} onDrop={drag.commit}
-                  onClick={multiMode?()=>toggleSelect(row.id):simMode?()=>toggleSimExcluir(row.id):()=>setViewMov(row)}>
+                  onClick={multiMode?()=>toggleSelect(row.id):simMode&&!["PAGADO","INGRESADO"].includes(row.estatus)?()=>toggleSimExcluir(row.id):()=>setViewMov(row)}>
                   {multiMode
                     ?<div style={{...S.handle,color:isSel?"#C9A84C":"#334155",fontSize:16}}>{isSel?"☑":"☐"}</div>
                     :simMode
-                      ?<div style={{...S.handle,fontSize:16,cursor:"pointer",color:row.simExcluido?"#f87171":"#334155"}}
-                          onClick={e=>{e.stopPropagation();toggleSimExcluir(row.id);}}>
-                          {row.simExcluido?"⊗":"⊙"}
+                      ?<div style={{...S.handle,fontSize:16,cursor:["PAGADO","INGRESADO"].includes(row.estatus)?"default":"pointer",color:row.simExcluido?"#f87171":["PAGADO","INGRESADO"].includes(row.estatus)?"#1e293b":"#334155"}}
+                          onClick={e=>{e.stopPropagation();if(!["PAGADO","INGRESADO"].includes(row.estatus))toggleSimExcluir(row.id);}}>
+                          {row.simExcluido?"⊗":["PAGADO","INGRESADO"].includes(row.estatus)?"—":"⊙"}
                         </div>
                       :<div style={S.handle} draggable onDragStart={()=>drag.start(row.id,withSaldos)} onDragEnd={drag.commit} onTouchStart={e=>{e.stopPropagation();drag.start(row.id,withSaldos);}}>☰</div>
                   }
