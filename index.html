@@ -14,7 +14,7 @@
     #root{min-height:100vh;}
     #loading{position:fixed;inset:0;background:#080810;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:24px;transition:opacity 0.3s ease;}
     #loading.fade-out{opacity:0;}
-    #loading .isotipo-wrap{margin-bottom:20px;}
+    #loading .isotipo-wrap{margin-bottom:20px;mix-blend-mode:screen;}
     #loading .ncfp-title{font-size:28px;font-weight:700;letter-spacing:6px;color:#C9A84C;margin-bottom:3px;font-family:'Cinzel',Georgia,serif;text-transform:uppercase;}
     #loading .ncfp-by{font-size:9px;color:#C9A84C88;letter-spacing:3px;margin-bottom:5px;text-transform:uppercase;font-family:'Cinzel',Georgia,serif;}
     #loading .ncfp-sub{font-size:9px;color:#334155;letter-spacing:2px;text-transform:uppercase;margin-bottom:24px;}
@@ -4504,7 +4504,7 @@ function App(){
             <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CONFIGURACIÓN</span></div>
             <div style={S.sTit}>EXPORTAR</div>
             <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setShowExportModal(true)}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(34,197,94,0.12)"}}><span>📥</span></div><div><div style={{fontSize:12,fontWeight:700}}>Exportar a Excel</div><div style={{fontSize:10,color:"#475569"}}>Selecciona el período a exportar</div></div></div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(34,197,94,0.12)"}}><span>📥</span></div><div><div style={{fontSize:12,fontWeight:700}}>Exportar a Excel</div><div style={{fontSize:10,color:"#475569"}}>Exporta los movimientos del período seleccionado</div></div></div>
             </div>
             <div style={S.sTit}>FONDO DE ESTABILIDAD FINANCIERA</div>
             <div style={S.card()}>
