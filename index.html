@@ -294,8 +294,10 @@ function generarFechas(rec){
 }
 
 // ─── SALDOS ──────────────────────────────────────────────────
-function calcConsolidado(movs,pI,pE,cuentasRef,incluirProy){
+function calcConsolidado(movs,pI,pE,cuentasRef,incluirProy,excludedIds){
   // incluirProy: si true, PROYECTADO opera igual que PROGRAMADO en el consolidado
+  // excludedIds: Set de IDs excluidos del saldo (modo simulación)
+  const excl=excludedIds instanceof Set?excludedIds:new Set();
   const sorted=[...movs].filter(r=>r.fecha).sort((a,b)=>a.fecha!==b.fecha?a.fecha.localeCompare(b.fecha):a.orden-b.orden);
   let s=(cuentasRef||[]).filter(c=>c.esReferencia).reduce((acc,c)=>acc+(c.saldoInicial||0),0);
   return sorted.map(r=>{
@@ -310,12 +312,15 @@ function calcConsolidado(movs,pI,pE,cuentasRef,incluirProy){
       if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&((pE||5)>=5||r.prioridad<=(pE||5)))cuenta=true;
       if(r.tipoOp==="Pago Tarjeta")cuenta=true;
     }
+    // Simulación: excluir del cálculo aunque cumpla las reglas
+    const simExcluido=excl.has(r.id);
+    if(simExcluido) cuenta=false;
     if(cuenta){
       if(r.tipoOp==="Ingreso") s+=r.monto||0;
       else if(r.tipoOp==="Egreso"&&!r.usaTarjeta) s-=r.monto||0;
       else if(r.tipoOp==="Pago Tarjeta") s-=r.monto||0;
     }
-    return{...r,saldoConsolidado:s,enProyeccion:cuenta,esProy:proy&&!prog};
+    return{...r,saldoConsolidado:s,enProyeccion:cuenta,esProy:proy&&!prog,simExcluido};
   });
 }
 function calcCuentaSaldos(cuentas,movs){
@@ -1257,6 +1262,13 @@ function App(){
   const[newSubName,setNewSubName]=useState("");
   const[addingSubTo,setAddingSubTo]=useState(null);
 
+  // ── MODO SIMULACIÓN ──
+  const[simMode,setSimMode]=useState(false);
+  const[simExcluidos,setSimExcluidos]=useState(new Set()); // IDs excluidos de saldo
+  const toggleSimExcluir=(id)=>setSimExcluidos(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const limpiarSim=()=>{setSimExcluidos(new Set());};
+  const salirSim=()=>{setSimMode(false);setSimExcluidos(new Set());};
+
   // estadísticas
   const[statTab,setStatTab]=useState("gastos");
   const[statOpenCat,setStatOpenCat]=useState(null);
@@ -1337,7 +1349,7 @@ function App(){
   const tdStr=todayStr();
 
   const retrasados=useMemo(()=>movs.filter(r=>r.fecha&&r.fecha<tdStr&&(r.estatus==="PROGRAMADO"||r.estatus==="PROYECTADO")),[movs,tdStr]);
-  const withSaldos=useMemo(()=>calcConsolidado(movs,prioI,prioE,cuentas,incluirProy),[movs,prioI,prioE,cuentas,incluirProy]);
+  const withSaldos=useMemo(()=>calcConsolidado(movs,prioI,prioE,cuentas,incluirProy,simExcluidos),[movs,prioI,prioE,cuentas,incluirProy,simExcluidos]);
   const cuentaSaldos=useMemo(()=>calcCuentaSaldos(cuentas,movs),[cuentas,movs]);
   const tarjetaSaldos=useMemo(()=>calcTarjetaSaldos(tarjetas,movs),[tarjetas,movs]);
 
@@ -2503,6 +2515,8 @@ function App(){
                 🏦 Cuentas{(filterCuentas.size+filterTarjetasFiltro.size)>0?" ("+(filterCuentas.size+filterTarjetasFiltro.size)+")":""}
               </button>
               <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
+              <button style={{...S.prioTag(simMode),color:simMode?"#fbbf24":"#64748b",borderColor:simMode?"#fbbf24":"#334155",background:simMode?"rgba(251,191,36,0.15)":"none"}}
+                onClick={()=>{if(simMode)salirSim();else setSimMode(true);}}>⚗ Simular{simMode?" ●":""}</button>
             </div>
             {showPrioPanel&&(
               <div style={S.prioPanel}>
@@ -2587,6 +2601,16 @@ function App(){
               )}
             </div>
 
+            {/* Banner Modo Simulación */}
+            {simMode&&(
+              <div style={{background:"rgba(251,191,36,0.12)",border:"1px solid #fbbf2466",borderRadius:10,padding:"8px 12px",marginBottom:9,display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:10,color:"#fbbf24",fontWeight:700,flex:1}}>
+                  ⚗ SIMULACIÓN ACTIVA — {simExcluidos.size} excluido{simExcluidos.size!==1?"s":""}
+                </span>
+                {simExcluidos.size>0&&<button style={{fontSize:9,padding:"3px 8px",borderRadius:6,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer"}} onClick={limpiarSim}>Limpiar</button>}
+                <button style={{fontSize:9,padding:"3px 8px",borderRadius:6,border:"1px solid #f8717144",background:"#f8717111",color:"#f87171",cursor:"pointer"}} onClick={salirSim}>✕ Salir</button>
+              </div>
+            )}
             <div style={{fontSize:9,color:"#334155",marginBottom:9,display:"flex",gap:5}}>
               {multiMode?<span style={{color:"#C9A84C"}}>{selected.size} selec.</span>:<span>☰ arrastra para reordenar</span>}
               <span style={{marginLeft:"auto"}}>{filtered.length} movimientos</span>
@@ -2608,12 +2632,17 @@ function App(){
               const catNom=(row.tipoOp==="Ingreso"?catIng:catEg).find(c=>c.id===row.cat)?.nombre;
               return(
                 <div key={row.id} data-movid={row.id}
-                  style={{...S.movWrap(isActive,isOver,isRet,isNeg),outline:isSel?"2px solid #C9A84C":"none"}} data-fecha={row.fecha||""}
+                  style={{...S.movWrap(isActive,isOver,isRet,isNeg),outline:isSel?"2px solid #C9A84C":row.simExcluido?"2px solid #f8717166":"none",opacity:row.simExcluido?0.45:1}} data-fecha={row.fecha||""}
                   onDragOver={e=>{e.preventDefault();drag.enter(row.id);}} onDrop={drag.commit}
-                  onClick={multiMode?()=>toggleSelect(row.id):()=>setViewMov(row)}>
+                  onClick={multiMode?()=>toggleSelect(row.id):simMode?()=>toggleSimExcluir(row.id):()=>setViewMov(row)}>
                   {multiMode
                     ?<div style={{...S.handle,color:isSel?"#C9A84C":"#334155",fontSize:16}}>{isSel?"☑":"☐"}</div>
-                    :<div style={S.handle} draggable onDragStart={()=>drag.start(row.id,withSaldos)} onDragEnd={drag.commit} onTouchStart={e=>{e.stopPropagation();drag.start(row.id,withSaldos);}}>☰</div>
+                    :simMode
+                      ?<div style={{...S.handle,fontSize:16,cursor:"pointer",color:row.simExcluido?"#f87171":"#334155"}}
+                          onClick={e=>{e.stopPropagation();toggleSimExcluir(row.id);}}>
+                          {row.simExcluido?"⊗":"⊙"}
+                        </div>
+                      :<div style={S.handle} draggable onDragStart={()=>drag.start(row.id,withSaldos)} onDragEnd={drag.commit} onTouchStart={e=>{e.stopPropagation();drag.start(row.id,withSaldos);}}>☰</div>
                   }
                   <div style={S.movBody(row.estatus)}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:2}}>
