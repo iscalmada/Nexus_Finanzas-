@@ -59,7 +59,8 @@ const SOL_ANCLA=[
 ];
 
 /* migración de escalas codificadas a texto del catálogo (idempotente) */
-const CAP_MAP={AA:"Alta",A:"Alta",B:"Media",C:"Baja"};
+const AA_IDS=["c68","c160","c203","c264","c320","c349","c520"];
+const CAP_MAP={AA:"Muy Alta",A:"Alta",B:"Media",C:"Baja"};
 const CER_MAP={AA:"Muy Cercano",A:"Cercano",B:"Medianamente Cercano",C:"No Cercano"};
 function migra(cs){return (cs||[]).map(c=>({...c,
   capacidadRef: CAP_MAP[c.capacidadRef]||c.capacidadRef,
@@ -272,7 +273,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
 }
 
 /* ════════ DETALLE CONTACTO ════════ */
-function ContactoDetalle({c,catalogos,empresas,actividades,onEdit,onDelete,onBack}){
+function ContactoDetalle({c,catalogos,empresas,actividades,onAddAct,onEditAct,onEdit,onDelete,onBack}){
   const emp=empresas.find(e=>e.id===c.empresaId);
   const Row=({k,v})=> v?<div style={S.detRow}><span style={S.detK}>{k}</span><span style={S.detV}>{v}</span></div>:null;
   return <div>
@@ -349,18 +350,32 @@ function ContactoDetalle({c,catalogos,empresas,actividades,onEdit,onDelete,onBac
 
       {c.obs&&<div style={S.card()}><div style={S.sTit}>Observaciones</div><div style={{fontSize:12,color:"#94a3b8",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{c.obs}</div></div>}
 
+      <div style={S.card()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+          <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Actividades</div>
+          <button style={S.pill(true,GOLD)} onClick={()=>onAddAct(c.id)}>+ Registrar</button>
+        </div>
+        <ActividadesList acts={(actividades||[]).filter(a=>a.contactoId===c.id)} contactos={[c]} showContacto={false} onTap={(a)=>onEditAct(a)}/>
+      </div>
+
       <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={onDelete}>Eliminar contacto</button>
     </div>
   </div>;
 }
 
 /* ════════ LISTA CONTACTOS ════════ */
-function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos}){
+function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct}){
   const[q,setQ]=useState("");
   const[fEtapa,setFEtapa]=useState("");
+  const[fEsp,setFEsp]=useState("");
   const[fGiro,setFGiro]=useState("");
   const[fSol,setFSol]=useState("");
   const[fPot,setFPot]=useState("");
+  const[fCer,setFCer]=useState("");
+  const[fEco,setFEco]=useState("");
+  const[fPres,setFPres]=useState("");
+  const[fPix,setFPix]=useState("");
+  const[panel,setPanel]=useState(false);
   const[sel,setSel]=useState(initialSel||null);
   const[modal,setModal]=useState(null);
   const createEmpresa=(d)=>{const nid="e"+(Math.max(0,...empresas.map(e=>parseInt((e.id||"e0").slice(1))||0))+1);setEmpresas(prev=>[...prev,{...d,id:nid}]);return nid;};
@@ -368,11 +383,18 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   const list=useMemo(()=>contactos.filter(c=>{
     if(q&&!(c.nombreCompleto||"").toLowerCase().includes(q.toLowerCase()))return false;
     if(fEtapa&&c.etapaPrincipal!==fEtapa)return false;
+    if(fEsp&&c.etapaEspecifica!==fEsp)return false;
     if(fGiro&&!(c.giros||[]).includes(fGiro))return false;
     if(fSol&&!(c.solucionesAncla||[]).includes(fSol))return false;
     if(fPot&&c.potencial!==fPot)return false;
+    if(fCer&&c.cercania!==fCer)return false;
+    if(fEco&&c.nivelEconomico!==fEco)return false;
+    if(fPres&&(c.cuentaPresentacion?"si":"no")!==fPres)return false;
+    if(fPix&&(c.acercamientoPixan?"si":"no")!==fPix)return false;
     return true;
-  }).sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")),[contactos,q,fEtapa,fGiro,fSol,fPot]);
+  }).sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")),[contactos,q,fEtapa,fEsp,fGiro,fSol,fPot,fCer,fEco,fPres,fPix]);
+  const activos=[fEtapa,fEsp,fGiro,fSol,fPot,fCer,fEco,fPres,fPix].filter(Boolean).length;
+  const limpiar=()=>{setFEtapa("");setFEsp("");setFGiro("");setFSol("");setFPot("");setFCer("");setFEco("");setFPres("");setFPix("");};
 
   const save=(data)=>{
     if(data.actividad){const ex=(catalogos.actividadPrincipal||[]).some(o=>(o.nombre||"").toLowerCase()===data.actividad.toLowerCase());
@@ -390,7 +412,9 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     const c=contactos.find(x=>x.id===sel);
     if(!c){setSel(null);return null;}
     return <>
-      <ContactoDetalle c={c} catalogos={catalogos} empresas={empresas}
+      <ContactoDetalle c={c} catalogos={catalogos} empresas={empresas} actividades={actividades}
+        onAddAct={(cid)=>openAct({contactoId:cid,estatus:"Programada",fecha:hoyISO()},cid)}
+        onEditAct={(a)=>openAct(a,a.contactoId)}
         onEdit={()=>setModal(c)} onDelete={()=>del(c.id)} onBack={()=>setSel(null)}/>
       {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onCreateEmpresa={createEmpresa} onSave={save} onClose={()=>setModal(null)}/>}
     </>;
@@ -401,35 +425,79 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     <div style={S.line}/>
     <div style={S.sec}>
       <input style={S.srch} placeholder="Buscar por nombre…" value={q} onChange={e=>setQ(e.target.value)}/>
-      <div style={{...S.chips,marginTop:10}}>
-        <span style={S.chip(!fEtapa)} onClick={()=>setFEtapa("")}>Todas etapas</span>
-        {(catalogos.etapaPrincipal||[]).map(o=><span key={o.id} style={S.chip(fEtapa===o.nombre,ec(o.nombre))} onClick={()=>setFEtapa(fEtapa===o.nombre?"":o.nombre)}>{o.nombre}</span>)}
+      <div style={{display:"flex",gap:8,marginTop:10,alignItems:"center"}}>
+        <button style={{...S.pill(panel||activos>0,GOLD),flex:1,padding:"9px 0",fontWeight:700}} onClick={()=>setPanel(p=>!p)}>⚙ Filtros{activos>0?` (${activos})`:""}</button>
+        {activos>0&&<button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar</button>}
       </div>
-      <div style={S.chips}>
-        <span style={S.chip(!fPot)} onClick={()=>setFPot("")}>Potencial</span>
-        {(catalogos.potencial||[]).map(o=><span key={o.id} style={S.chip(fPot===o.nombre,POT_COLOR[o.nombre])} onClick={()=>setFPot(fPot===o.nombre?"":o.nombre)}>{o.nombre}</span>)}
-      </div>
-      <div style={S.chips}>
-        <span style={S.chip(!fSol,GOLD)} onClick={()=>setFSol("")}>Solución ancla</span>
-        {SOL_ANCLA.map(s=><span key={s.v} style={S.chip(fSol===s.v,GOLD)} onClick={()=>setFSol(fSol===s.v?"":s.v)}>{s.l}</span>)}
-      </div>
-      <select style={{...S.sel,marginBottom:6}} value={fGiro} onChange={e=>setFGiro(e.target.value)}>
-        <option value="">Todos los giros</option>
-        {(catalogos.giro||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
-      </select>
+      {panel&&<div style={{...S.card(),marginTop:10}}>
+        <div style={S.fl}>Etapa principal</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          <span style={S.chip(!fEtapa)} onClick={()=>setFEtapa("")}>Todas</span>
+          {(catalogos.etapaPrincipal||[]).map(o=><span key={o.id} style={S.chip(fEtapa===o.nombre,ec(o.nombre))} onClick={()=>setFEtapa(fEtapa===o.nombre?"":o.nombre)}>{o.nombre}</span>)}
+        </div>
+        <div style={S.fl}>Potencial Nexus</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          <span style={S.chip(!fPot)} onClick={()=>setFPot("")}>Todos</span>
+          {(catalogos.potencial||[]).map(o=><span key={o.id} style={S.chip(fPot===o.nombre,POT_COLOR[o.nombre])} onClick={()=>setFPot(fPot===o.nombre?"":o.nombre)}>{o.nombre}</span>)}
+        </div>
+        <div style={S.fl}>Solución ancla</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          <span style={S.chip(!fSol,GOLD)} onClick={()=>setFSol("")}>Todas</span>
+          {SOL_ANCLA.map(s=><span key={s.v} style={S.chip(fSol===s.v,GOLD)} onClick={()=>setFSol(fSol===s.v?"":s.v)}>{s.l}</span>)}
+        </div>
+        <div style={S.g2}>
+          <div><div style={S.fl}>Etapa específica</div>
+            <select style={S.sel} value={fEsp} onChange={e=>setFEsp(e.target.value)}>
+              <option value="">Todas</option>
+              {(catalogos.etapaEspecifica||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
+            </select></div>
+          <div><div style={S.fl}>Giro</div>
+            <select style={S.sel} value={fGiro} onChange={e=>setFGiro(e.target.value)}>
+              <option value="">Todos</option>
+              {(catalogos.giro||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
+            </select></div>
+        </div>
+        <div style={{...S.g2,marginTop:10}}>
+          <div><div style={S.fl}>Nivel de cercanía</div>
+            <select style={S.sel} value={fCer} onChange={e=>setFCer(e.target.value)}>
+              <option value="">Todos</option>
+              {(catalogos.cercania||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
+            </select></div>
+          <div><div style={S.fl}>Nivel económico</div>
+            <select style={S.sel} value={fEco} onChange={e=>setFEco(e.target.value)}>
+              <option value="">Todos</option>
+              {(catalogos.nivelEconomico||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
+            </select></div>
+        </div>
+        <div style={{...S.g2,marginTop:10}}>
+          <div><div style={S.fl}>Presentación Nexus</div>
+            <div style={{display:"flex",gap:5}}>
+              <button style={{...S.pill(!fPres),flex:1}} onClick={()=>setFPres("")}>Todos</button>
+              <button style={{...S.pill(fPres==="si","#22c55e"),flex:1}} onClick={()=>setFPres("si")}>Sí</button>
+              <button style={{...S.pill(fPres==="no"),flex:1}} onClick={()=>setFPres("no")}>No</button>
+            </div></div>
+          <div><div style={S.fl}>Acercamiento Pixán</div>
+            <div style={{display:"flex",gap:5}}>
+              <button style={{...S.pill(!fPix),flex:1}} onClick={()=>setFPix("")}>Todos</button>
+              <button style={{...S.pill(fPix==="si","#a78bfa"),flex:1}} onClick={()=>setFPix("si")}>Sí</button>
+              <button style={{...S.pill(fPix==="no"),flex:1}} onClick={()=>setFPix("no")}>No</button>
+            </div></div>
+        </div>
+      </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
       {list.map(c=>{const emp=empresas.find(e=>e.id===c.empresaId);return (
         <div key={c.id} style={S.cCard(ec(c.etapaPrincipal))} onClick={()=>setSel(c.id)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
             <div style={{fontSize:14,fontWeight:700}}>{c.nombreCompleto}</div>
-            {c.potencial&&c.potencial!=="Desconocido"&&<span style={S.tag(POT_COLOR[c.potencial])}>{c.potencial}</span>}
+            {c.potencial&&<span style={S.tag(POT_COLOR[c.potencial]||"#475569")}>{c.potencial}</span>}
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
             {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}</span>}
+            {c.etapaEspecifica&&<span style={S.tag("#94a3b8")}>{c.etapaEspecifica}</span>}
             {c.circulo&&<span style={S.tag("#64748b")}>{c.circulo}</span>}
             {emp&&<span style={S.tag("#3b82f6")}>{emp.nombre}</span>}
-            {(c.solucionesAncla||[]).length>0&&<span style={S.tag(GOLD)}>★ {c.solucionesAncla.length} sol.</span>}
+            {(c.solucionesAncla||[]).length>0&&<span style={S.tag(GOLD)}>★ {c.solucionesAncla.length} Ancla</span>}
           </div>
         </div>);})}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin resultados.</div>}
@@ -463,6 +531,10 @@ function EmpresaModal({init,catalogos,onSave,onClose}){
 function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
   const[sel,setSel]=useState(null);const[modal,setModal]=useState(null);const[q,setQ]=useState("");
   const save=(d)=>{setEmpresas(prev=>{if(d.id)return prev.map(e=>e.id===d.id?d:e);const nid="e"+(Math.max(0,...prev.map(e=>parseInt((e.id||"e0").slice(1))||0))+1);return[...prev,{...d,id:nid}];});setModal(null);};
+  const del=(e)=>{const n=contactos.filter(c=>c.empresaId===e.id).length;
+    if(n>0){alert(`Esta empresa tiene ${n} contacto(s) vinculado(s). Desvincúlalos o reasígnalos primero (desde cada contacto, en "Empresa vinculada").`);return;}
+    if(window.confirm("¿Eliminar esta empresa? Esta acción no se puede deshacer."))
+      {setEmpresas(prev=>prev.filter(x=>x.id!==e.id));setSel(null);}};
   const list=empresas.filter(e=>!q||(e.nombre||"").toLowerCase().includes(q.toLowerCase())).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
   if(sel){
     const e=empresas.find(x=>x.id===sel);if(!e){setSel(null);return null;}
@@ -486,6 +558,7 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
             <span style={{fontWeight:600}}>{c.nombreCompleto}</span><span style={{...S.detK}}>{c.rolEmpresa||""}</span></div>)}
           {vinc.length===0&&<div style={{fontSize:11,color:"#475569"}}>Aún sin contactos vinculados.</div>}
         </div>
+        <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>del(e)}>Eliminar empresa</button>
       </div>
       {modal&&<EmpresaModal init={modal} catalogos={catalogos} onSave={save} onClose={()=>setModal(null)}/>}
     </div>;
@@ -525,13 +598,19 @@ function Catalogos({catalogos,setCatalogos}){
       setCatalogos(p=>({...p,[open]:[...p[open],{id:nid,nombre:nuevo.trim()}]}));setNuevo("");};
     const rename=(id,v)=>setCatalogos(p=>({...p,[open]:p[open].map(o=>o.id===id?{...o,nombre:v}:o)}));
     const remove=(id)=>setCatalogos(p=>({...p,[open]:p[open].filter(o=>o.id!==id)}));
+    const move=(idx,dir)=>{const j=idx+dir;if(j<0||j>=items.length)return;
+      setCatalogos(p=>{const arr=[...p[open]];const t=arr[idx];arr[idx]=arr[j];arr[j]=t;return {...p,[open]:arr};});};
     return <div>
       <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <button style={S.back} onClick={()=>setOpen(null)}>‹ Catálogos</button>
       </div>
       <div style={S.sec}>
         <div style={{fontSize:17,fontWeight:800,marginBottom:10}}>{CAT_LABEL[open]||open}</div>
-        {items.map(o=><div key={o.id} style={{display:"flex",gap:8,marginBottom:7,alignItems:"center"}}>
+        {items.map((o,idx)=><div key={o.id} style={{display:"flex",gap:6,marginBottom:7,alignItems:"center"}}>
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            <button style={{...S.pill(false,"#64748b"),padding:"0 7px",fontSize:11,opacity:idx===0?0.3:1}} disabled={idx===0} onClick={()=>move(idx,-1)}>↑</button>
+            <button style={{...S.pill(false,"#64748b"),padding:"0 7px",fontSize:11,opacity:idx===items.length-1?0.3:1}} disabled={idx===items.length-1} onClick={()=>move(idx,1)}>↓</button>
+          </div>
           <input style={{...S.inp,fontSize:13}} value={o.nombre} onChange={e=>rename(o.id,e.target.value)}/>
           {o.principal&&<span style={S.tag("#64748b")}>{o.principal}</span>}
           <button style={S.pill(false,"#f87171")} onClick={()=>remove(o.id)}>✕</button>
@@ -598,11 +677,101 @@ function Inicio({contactos,empresas,setView}){
   </div>;
 }
 
+/* ════════ ACTIVIDADES ════════ */
+const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
+const hoyISO=()=>new Date().toISOString().slice(0,10);
+
+function ActividadModal({init,contactos,catalogos,fixedContacto,onSave,onClose}){
+  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),...init}));
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const cont=contactos.find(c=>c.id===(f.contactoId||fixedContacto));
+  const save=()=>{
+    const cid=f.contactoId||fixedContacto;
+    if(!cid){alert("Selecciona un contacto");return;}
+    if(!f.fecha){alert("Indica la fecha");return;}
+    if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
+    onSave({...f,contactoId:cid});
+    if(f.estatus==="Cerrada"&&window.confirm("Actividad cerrada. ¿Agendar la siguiente acción para este contacto?")){
+      setF({contactoId:cid,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",tipoAccion:"",servicioSolucion:null,intencionResultado:""});
+      return;
+    }
+    onClose();
+  };
+  return <div style={S.modal} onClick={onClose}><div style={S.mBox} onClick={e=>e.stopPropagation()}>
+    <div style={S.mTit}>{init&&init.id?"Editar actividad":"Nueva actividad"}</div>
+    {fixedContacto
+      ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b>{cont&&cont.etapaPrincipal?` · ${cont.etapaPrincipal}`:""}</div>
+      : <Field label="Contacto">
+          <select style={S.sel} value={f.contactoId||""} onChange={e=>set("contactoId",e.target.value||null)}>
+            <option value="">— Selecciona —</option>
+            {contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+          </select>
+        </Field>}
+    <div style={S.g2}>
+      <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
+      <Field label="Estatus">
+        <select style={S.sel} value={f.estatus||"Programada"} onChange={e=>set("estatus",e.target.value)}>
+          {(catalogos.estatusAccion||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
+        </select>
+      </Field>
+    </div>
+    <Field label="Tipo de acción"><CatSelect cat={catalogos.tipoAccion} value={f.tipoAccion} onChange={v=>set("tipoAccion",v)}/></Field>
+    <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
+    <Field label="Intención / resultado"><textarea style={S.ta} value={f.intencionResultado||""} onChange={e=>set("intencionResultado",e.target.value||null)} placeholder="Qué se busca o qué resultó…"/></Field>
+    {/* Oportunidad: campo preparado, se activará con el módulo de Oportunidades */}
+    <button style={S.saveB} onClick={save}>Guardar</button>
+    <button style={S.cancB} onClick={onClose}>Cancelar</button>
+  </div></div>;
+}
+
+function ActividadesList({acts,contactos,showContacto,onTap}){
+  const sorted=acts.slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  if(sorted.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades registradas.</div>;
+  return <div>{sorted.map(a=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";
+    return <div key={a.id} onClick={()=>onTap&&onTap(a)} style={{background:"#10101e",border:`1px solid ${col}33`,borderLeft:`3px solid ${col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"pointer"}}>
+      <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
+        <div style={{fontSize:12,fontWeight:700}}>{a.tipoAccion||"Actividad"}</div>
+        <span style={S.tag(col)}>{a.estatus}</span>
+      </div>
+      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?` · ${c.nombreCompleto}`:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}</div>
+      {a.intencionResultado&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencionResultado}</div>}
+    </div>;})}</div>;
+}
+
+function Agenda({actividades,contactos,catalogos,openAct}){
+  const[filtro,setFiltro]=useState("Programada");
+  const list=actividades.filter(a=>filtro==="Todas"?true:a.estatus===filtro);
+  const ordenadas=filtro==="Programada"
+    ? list.slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""))
+    : list.slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  return <div>
+    <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{actividades.length} actividades</div></div></div>
+    <div style={S.line}/>
+    <div style={S.sec}>
+      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+        {["Programada","En Proceso","Cerrada","Todas"].map(t=><span key={t} style={S.chip(filtro===t,EST_COLOR[t]||GOLD)} onClick={()=>setFiltro(t)}>{t}</span>)}
+      </div>
+    </div>
+    <div style={{...S.sec,paddingTop:4}}>
+      <ActividadesList acts={ordenadas} contactos={contactos} showContacto={true} onTap={(a)=>openAct(a,a.contactoId)}/>
+    </div>
+    <button style={S.fab} onClick={()=>openAct({estatus:"Programada",fecha:hoyISO()},null)}>+</button>
+  </div>;
+}
+
 /* ════════ APP ════════ */
 function App(){
   const[view,setView]=useState("inicio");
-  const[contactos,setContactos]=useState(()=>migra(loadLS("contactos",null)||SEED.contactos));
+  const[contactos,setContactos]=useState(()=>{
+    let cs=migra(loadLS("contactos",null)||SEED.contactos);
+    if(!localStorage.getItem(PFX+"migAA")){
+      cs=cs.map(c=>AA_IDS.includes(c.id)?{...c,capacidadRef:"Muy Alta"}:c);
+      try{localStorage.setItem(PFX+"migAA","1");}catch(e){}
+    }
+    return cs;
+  });
   const[empresas,setEmpresas]=useState(()=>loadLS("empresas",null)||SEED.empresas);
+  const[actividades,setActividades]=useState(()=>loadLS("actividades",null)||[]);
   const[catalogos,setCatalogos]=useState(()=>{
     const base=loadLS("catalogos",null)||SEED.catalogos;
     if(!base.actividadPrincipal){
@@ -610,26 +779,45 @@ function App(){
       const acts=[...new Set((src||[]).map(c=>c.actividad).filter(Boolean))];
       base.actividadPrincipal=acts.map((a,i)=>({id:"act"+i,nombre:a}));
     }
+    if(!(base.capacidadRef||[]).some(o=>o.nombre==="Muy Alta")){
+      base.capacidadRef=[{id:"capMA",nombre:"Muy Alta"},...(base.capacidadRef||[])];
+    }
     return base;
   });
   const[openContacto,setOpenContacto]=useState(null);
+  const[actModal,setActModal]=useState(null);
 
   useEffect(()=>saveLS("contactos",contactos),[contactos]);
   useEffect(()=>saveLS("empresas",empresas),[empresas]);
+  useEffect(()=>saveLS("actividades",actividades),[actividades]);
   useEffect(()=>saveLS("catalogos",catalogos),[catalogos]);
   useEffect(()=>{const l=document.getElementById("loading");if(l){l.classList.add("fade-out");setTimeout(()=>l.remove(),350);}},[]);
 
+  const openAct=(init,fixed)=>setActModal({init,fixed:fixed||null});
+  const saveAct=(data)=>{
+    setActividades(prev=>{
+      if(data.id)return prev.map(a=>a.id===data.id?data:a);
+      const nid="a"+(Math.max(0,...prev.map(a=>parseInt((a.id||"a0").slice(1))||0))+1);
+      return [...prev,{...data,id:nid}];
+    });
+    if(data.contactoId&&data.fecha){
+      setContactos(prev=>prev.map(c=>(c.id===data.contactoId&&(!c.fechaUltimoContacto||data.fecha>c.fechaUltimoContacto))?{...c,fechaUltimoContacto:data.fecha}:c));
+    }
+  };
+
   const go=(k)=>{setOpenContacto(null);setView(k);};
-  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["catalogos","Catálogos","☰"]];
+  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["agenda","Agenda","🗓"],["catalogos","Catálogos","☰"]];
   return <div style={S.app}>
     {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} setView={go}/>}
-    {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos}/>}
+    {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
+    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} openAct={openAct}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos}/>}
     <div style={S.nav}>
       {NAV.map(([k,lab,ico])=><button key={k} style={S.navB(view===k)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>)}
     </div>
+    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} onSave={saveAct} onClose={()=>setActModal(null)}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
