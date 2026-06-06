@@ -66,6 +66,14 @@ function migra(cs){return (cs||[]).map(c=>({...c,
   capacidadRef: CAP_MAP[c.capacidadRef]||c.capacidadRef,
   cercania: CER_MAP[c.cercania]||c.cercania }));}
 
+const LOW_WORDS=["de","del","la","las","los","y","e","da","do"];
+function titleCase(s){
+  if(!s)return s;
+  return String(s).toLowerCase().split(/\s+/).filter(Boolean).map((w,i)=>
+    (i>0&&LOW_WORDS.includes(w))?w:(w.charAt(0).toUpperCase()+w.slice(1))
+  ).join(" ");
+}
+
 function exportBackup(contactos,empresas,oportunidades){
   try{
     const cs=contactos.map(c=>({Nombre:c.nombreCompleto,Alias:c.alias||"",Actividad:c.actividad||"",
@@ -649,7 +657,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   const[limite,setLimite]=useState("");
   const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
   const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada");
-  const opMonto=opAb.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
+  const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
@@ -677,7 +685,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
       </div>
       <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setView("oportunidades")}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-          <div><div style={S.lbl}>Pipeline abierto</div><div style={S.big("#fbbf24")}>{money(opMonto)}</div></div>
+          <div><div style={S.lbl}>Comisión estimada</div><div style={S.big("#fbbf24")}>{money(opComision)}</div></div>
           <div style={{textAlign:"right"}}><div style={S.lbl}>Oportunidades</div><div style={{fontSize:18,fontWeight:800,color:"#e2e8f0"}}>{opAb.length}</div></div>
         </div>
       </div>
@@ -930,6 +938,10 @@ function App(){
     if(!localStorage.getItem(PFX+"migTipo")){
       cs=cs.map(c=>c.tipoContacto?c:{...c,tipoContacto:"Prospecto"});
       try{localStorage.setItem(PFX+"migTipo","1");}catch(e){}
+    }
+    if(!localStorage.getItem(PFX+"migCaps")){
+      cs=cs.map(c=>({...c,nombre:titleCase(c.nombre),apellido:titleCase(c.apellido),nombreCompleto:titleCase(c.nombreCompleto)}));
+      try{localStorage.setItem(PFX+"migCaps","1");}catch(e){}
     }
     return cs;
   });
