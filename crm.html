@@ -175,6 +175,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
 
       <div style={S.sTit}>Generales</div>
+      <Field label="Tipo de contacto"><CatSelect cat={catalogos.tipoContacto} value={f.tipoContacto} onChange={v=>set("tipoContacto",v)}/></Field>
       <Field label="Actividad principal">
         <input style={S.inp} list="actlist" value={f.actividad||""} onChange={e=>set("actividad",e.target.value||null)} placeholder="Elige una existente o escribe nueva…"/>
         <datalist id="actlist">{(catalogos.actividadPrincipal||[]).map(o=><option key={o.id} value={o.nombre}/>)}</datalist>
@@ -285,7 +286,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
 }
 
 /* ════════ DETALLE CONTACTO ════════ */
-function ContactoDetalle({c,catalogos,empresas,actividades,oportunidades,onAddAct,onEditAct,onAddOpo,onEditOpo,onEdit,onDelete,onBack}){
+function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidades,onAddAct,onEditAct,onAddOpo,onEditOpo,onEdit,onDelete,onBack}){
   const emp=empresas.find(e=>e.id===c.empresaId);
   const Row=({k,v})=> v?<div style={S.detRow}><span style={S.detK}>{k}</span><span style={S.detV}>{v}</span></div>:null;
   return <div>
@@ -299,6 +300,7 @@ function ContactoDetalle({c,catalogos,empresas,actividades,oportunidades,onAddAc
       <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{c.nombreCompleto}</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
         {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}{c.etapaEspecifica?` · ${c.etapaEspecifica}`:""}</span>}
+        {c.tipoContacto&&<span style={S.tag("#7dd3fc")}>{c.tipoContacto}</span>}
         {c.potencial&&<span style={S.tag(POT_COLOR[c.potencial]||"#64748b")}>Potencial {c.potencial}</span>}
       </div>
     </div>
@@ -367,8 +369,8 @@ function ContactoDetalle({c,catalogos,empresas,actividades,oportunidades,onAddAc
           <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Oportunidades</div>
           <button style={S.pill(true,"#fbbf24")} onClick={()=>onAddOpo(c.id)}>+ Detonar</button>
         </div>
-        {(oportunidades||[]).filter(o=>o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={[c]} empresas={empresas} onTap={(x)=>onEditOpo(x)}/>)}
-        {(oportunidades||[]).filter(o=>o.contactoId===c.id).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
+        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} onTap={(x)=>onEditOpo(x)}/>)}
+        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
       </div>
 
       <div style={S.card()}>
@@ -394,6 +396,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   const[fPot,setFPot]=useState([]);
   const[fCer,setFCer]=useState([]);
   const[fEco,setFEco]=useState([]);
+  const[fTipo,setFTipo]=useState([]);
   const[fPres,setFPres]=useState("");
   const[fPix,setFPix]=useState("");
   const[panel,setPanel]=useState(false);
@@ -411,12 +414,13 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     if(fPot.length&&!fPot.includes(c.potencial))return false;
     if(fCer.length&&!fCer.includes(c.cercania))return false;
     if(fEco.length&&!fEco.includes(c.nivelEconomico))return false;
+    if(fTipo.length&&!fTipo.includes(c.tipoContacto))return false;
     if(fPres&&(c.cuentaPresentacion?"si":"no")!==fPres)return false;
     if(fPix&&(c.acercamientoPixan?"si":"no")!==fPix)return false;
     return true;
-  }).sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")),[contactos,q,fEtapa,fEsp,fGiro,fSol,fPot,fCer,fEco,fPres,fPix]);
-  const activos=[...fEtapa,...fEsp,...fGiro,...fSol,...fPot,...fCer,...fEco].length+(fPres?1:0)+(fPix?1:0);
-  const limpiar=()=>{setFEtapa([]);setFEsp([]);setFGiro([]);setFSol([]);setFPot([]);setFCer([]);setFEco([]);setFPres("");setFPix("");};
+  }).sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")),[contactos,q,fEtapa,fEsp,fGiro,fSol,fPot,fCer,fEco,fTipo,fPres,fPix]);
+  const activos=[...fEtapa,...fEsp,...fGiro,...fSol,...fPot,...fCer,...fEco,...fTipo].length+(fPres?1:0)+(fPix?1:0);
+  const limpiar=()=>{setFEtapa([]);setFEsp([]);setFGiro([]);setFSol([]);setFPot([]);setFCer([]);setFEco([]);setFTipo([]);setFPres("");setFPix("");};
   const espOpts=fEtapa.length?(catalogos.etapaEspecifica||[]).filter(e=>fEtapa.includes(e.principal)):(catalogos.etapaEspecifica||[]);
 
   const save=(data)=>{
@@ -435,11 +439,11 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     const c=contactos.find(x=>x.id===sel);
     if(!c){setSel(null);return null;}
     return <>
-      <ContactoDetalle c={c} catalogos={catalogos} empresas={empresas} actividades={actividades} oportunidades={oportunidades}
+      <ContactoDetalle c={c} contactos={contactos} catalogos={catalogos} empresas={empresas} actividades={actividades} oportunidades={oportunidades}
         onAddAct={(cid)=>openAct({contactoId:cid,estatus:"Programada",fecha:hoyISO()},cid)}
         onEditAct={(a)=>openAct(a,a.contactoId)}
-        onAddOpo={(cid)=>openOpo({contactoId:cid},cid)}
-        onEditOpo={(o)=>openOpo(o,o.contactoId)}
+        onAddOpo={(cid)=>openOpo({contactoPrincipalId:cid},cid)}
+        onEditOpo={(o)=>openOpo(o,o.contactoPrincipalId||o.contactoId)}
         onEdit={()=>setModal(c)} onDelete={()=>del(c.id)} onBack={()=>setSel(null)}/>
       {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onCreateEmpresa={createEmpresa} onSave={save} onClose={()=>setModal(null)}/>}
     </>;
@@ -455,6 +459,8 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
         {activos>0&&<button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar</button>}
       </div>
       {panel&&<div style={{...S.card(),marginTop:10}}>
+        <div style={S.fl}>Tipo de contacto</div>
+        <ChipMulti opts={catalogos.tipoContacto||[]} sel={fTipo} setSel={setFTipo} color="#7dd3fc"/>
         <div style={S.fl}>Etapa principal</div>
         <ChipMulti opts={catalogos.etapaPrincipal||[]} sel={fEtapa} setSel={setFEtapa} color={ec}/>
         <div style={S.fl}>Etapa específica{fEtapa.length?" (de las principales elegidas)":""}</div>
@@ -496,6 +502,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
             {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}</span>}
+            {c.tipoContacto&&c.tipoContacto!=="Prospecto"&&<span style={S.tag("#7dd3fc")}>{c.tipoContacto}</span>}
             {c.etapaEspecifica&&<span style={S.tag("#94a3b8")}>{c.etapaEspecifica}</span>}
             {c.circulo&&<span style={S.tag("#64748b")}>{c.circulo}</span>}
             {emp&&<span style={S.tag("#3b82f6")}>{emp.nombre}</span>}
@@ -591,7 +598,7 @@ const CAT_LABEL={circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cerc
   potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",etapaPrincipal:"Etapa principal de contacto",
   etapaEspecifica:"Etapa específica de contacto",areaEstrategica:"Área estratégica",solucion:"Solución de intervención",
   tipoAccion:"Tipo de acción",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
-  pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal"};
+  pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal",tipoContacto:"Tipo de contacto"};
 function Catalogos({catalogos,setCatalogos}){
   const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");
   if(open){
@@ -705,7 +712,7 @@ function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,on
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const cid=f.contactoId||fixedContacto;
   const cont=contactos.find(c=>c.id===cid);
-  const opsCont=(oportunidades||[]).filter(o=>o.contactoId===cid);
+  const opsCont=(oportunidades||[]).filter(o=>o.contactoPrincipalId===cid||o.contactoOperativoId===cid||o.contactoId===cid);
   const save=()=>{
     const cid=f.contactoId||fixedContacto;
     if(!cid){alert("Selecciona un contacto");return;}
@@ -800,15 +807,15 @@ const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
 
 function OportunidadModal({init,contactos,empresas,catalogos,fixedContacto,onSave,onDelete,onClose}){
   const eo=catalogos.etapaOportunidad||[];
-  const[f,setF]=useState(()=>({recurrencia:"Única",etapa:(eo[0]?eo[0].nombre:""),...init}));
+  const[f,setF]=useState(()=>{const b={recurrencia:"Única",etapa:(eo[0]?eo[0].nombre:""),...init};if(b.contactoId&&!b.contactoPrincipalId)b.contactoPrincipalId=b.contactoId;return b;});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const cid=f.contactoId||fixedContacto;
-  const cont=contactos.find(c=>c.id===cid);
-  useEffect(()=>{ if(cont&&cont.empresaId&&!f.empresaId)set("empresaId",cont.empresaId); },[cid]);
+  const csort=contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||""));
+  const principal=contactos.find(c=>c.id===f.contactoPrincipalId);
+  useEffect(()=>{ if(principal&&principal.empresaId&&!f.empresaId)set("empresaId",principal.empresaId); },[f.contactoPrincipalId]);
   const save=()=>{
     if(!f.concepto){alert("Indica un concepto");return;}
-    if(!cid){alert("Selecciona el contacto");return;}
-    const data={...f,contactoId:cid};
+    if(!f.contactoPrincipalId){alert("Selecciona el contacto principal");return;}
+    const data={...f};
     if(data.etapa==="Oportunidad Concretada"&&!data.fechaConcretada)data.fechaConcretada=hoyISO();
     if(!data.movIdsVinculados)data.movIdsVinculados=[];
     onSave(data);onClose();
@@ -816,14 +823,18 @@ function OportunidadModal({init,contactos,empresas,catalogos,fixedContacto,onSav
   return <div style={S.modal} onClick={onClose}><div style={S.mBox} onClick={e=>e.stopPropagation()}>
     <div style={S.mTit}>{init&&init.id?"Editar oportunidad":"Nueva oportunidad"}</div>
     <Field label="Concepto"><input style={S.inp} value={f.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Ej. Fianza de cumplimiento…"/></Field>
-    {fixedContacto
-      ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b></div>
-      : <Field label="Contacto">
-          <select style={S.sel} value={f.contactoId||""} onChange={e=>set("contactoId",e.target.value||null)}>
-            <option value="">— Selecciona —</option>
-            {contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
-          </select>
-        </Field>}
+    <Field label="Contacto principal">
+      <select style={S.sel} value={f.contactoPrincipalId||""} onChange={e=>set("contactoPrincipalId",e.target.value||null)}>
+        <option value="">— Selecciona —</option>
+        {csort.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+      </select>
+    </Field>
+    <Field label="Contacto operativo (opcional)">
+      <select style={S.sel} value={f.contactoOperativoId||""} onChange={e=>set("contactoOperativoId",e.target.value||null)}>
+        <option value="">— Ninguno —</option>
+        {csort.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+      </select>
+    </Field>
     <Field label="Empresa (opcional)">
       <select style={S.sel} value={f.empresaId||""} onChange={e=>set("empresaId",e.target.value||null)}>
         <option value="">— Sin empresa —</option>
@@ -856,16 +867,20 @@ function OportunidadModal({init,contactos,empresas,catalogos,fixedContacto,onSav
 }
 
 function OpoCard({o,contactos,empresas,onTap}){
-  const c=contactos.find(x=>x.id===o.contactoId);const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
+  const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
+  const op=contactos.find(x=>x.id===o.contactoOperativoId);
+  const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
+  const monto=o.comisionEstimada||o.montoEstimado;
   return <div onClick={()=>onTap&&onTap(o)} style={S.cCard(col)}>
     <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
       <div style={{fontSize:14,fontWeight:700}}>{o.concepto}</div>
-      {o.montoEstimado?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(o.montoEstimado)}</div>:null}
+      {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
     </div>
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
       <span style={S.tag(col)}>{(o.etapa||"").replace("Oportunidad ","")}</span>
       {o.probabilidad&&<span style={S.tag(PROB_COLOR[o.probabilidad])}>{o.probabilidad}</span>}
       {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
+      {op&&<span style={S.tag("#64748b")}>op: {op.nombreCompleto}</span>}
       {e&&<span style={S.tag("#3b82f6")}>{e.nombre}</span>}
       {o.solucionNexus&&<span style={S.tag(GOLD)}>{o.solucionNexus.length>22?o.solucionNexus.slice(0,22)+"…":o.solucionNexus}</span>}
     </div>
@@ -912,6 +927,10 @@ function App(){
       cs=cs.map(c=>(c.etapaPixan&&c.etapaPixan!=="Sin Historia")?{...c,acercamientoPixan:true}:c);
       try{localStorage.setItem(PFX+"migPix","1");}catch(e){}
     }
+    if(!localStorage.getItem(PFX+"migTipo")){
+      cs=cs.map(c=>c.tipoContacto?c:{...c,tipoContacto:"Prospecto"});
+      try{localStorage.setItem(PFX+"migTipo","1");}catch(e){}
+    }
     return cs;
   });
   const[empresas,setEmpresas]=useState(()=>loadLS("empresas",null)||SEED.empresas);
@@ -925,6 +944,9 @@ function App(){
     }
     if(!(base.capacidadRef||[]).some(o=>o.nombre==="Muy Alta")){
       base.capacidadRef=[{id:"capMA",nombre:"Muy Alta"},...(base.capacidadRef||[])];
+    }
+    if(!base.tipoContacto){
+      base.tipoContacto=["Prospecto","Enlace operativo","Referidor","Otro"].map((n,i)=>({id:"tc"+i,nombre:n}));
     }
     return base;
   });
