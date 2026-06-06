@@ -83,7 +83,7 @@ function exportBackup(contactos,empresas,oportunidades,catalogos){
       EtapaPrincipal:c.etapaPrincipal||"",EtapaEspecifica:c.etapaEspecifica||"",TipoPersona:c.tipoPersona||"",
       Giros:(c.giros||[]).join(", "),GiroPrincipal:c.giroPrincipal||"",SolucionesAncla:(c.solucionesAncla||[]).join(", "),
       AcercamientoPixan:c.acercamientoPixan?"Sí":"No",EtapaPixan:c.etapaPixan||"",
-      TipoAliado:c.tipoAliado||"",EstatusAliado:c.estatusAliado||"",SolucionesAliado:(c.solucionesAliado||[]).map(id=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||id).join(", "),CondicionesComision:c.esquemaParticipacion||"",AvanceTrato:c.avanceTrato||"",
+      TipoAliado:(c.tiposAliado||[]).join(", "),EstatusAliado:c.estatusAliado||"",SolucionesAliado:(c.solucionesAliado||[]).map(id=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||id).join(", "),CondicionesComision:c.esquemaParticipacion||"",AvanceTrato:c.avanceTrato||"",
       UltimoContacto:c.fechaUltimoContacto||"",ResumenAvance:c.resumenAvance||"",Observaciones:c.obs||""}));
     const es=empresas.map(e=>({Nombre:e.nombre,Giro:e.giro||"",Tamano:e.tamano||"",Telefono:e.telefono||"",Correo:e.correo||"",Domicilio:e.domicilio||"",Observaciones:e.obs||""}));
     const os=(oportunidades||[]).map(o=>({Concepto:o.concepto,Contacto:((contactos.find(c=>c.id===o.contactoId)||{}).nombreCompleto)||"",
@@ -162,7 +162,7 @@ function ChipMulti({opts,sel,setSel,color}){
 
 /* ════════ MODAL CONTACTO ════════ */
 function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose}){
-  const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],...init}));
+  const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],tiposAliado:[],solucionesAliado:[],...init}));
   const[nuevaEmp,setNuevaEmp]=useState(null);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const espDisp=(catalogos.etapaEspecifica||[]).filter(e=>!f.etapaPrincipal||e.principal===f.etapaPrincipal);
@@ -224,12 +224,15 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <Field label="Nota sobre la relación"><input style={S.inp} value={f.notaRelacion||""} onChange={e=>set("notaRelacion",e.target.value||null)}/></Field>
 
       <div style={S.sTit}>Alianza estratégica / comercial</div>
-      <div style={{fontSize:9,color:"#475569",marginTop:-4,marginBottom:8,lineHeight:1.4}}>Asigna un Tipo de aliado para registrar a este contacto como aliado; así aparecerá en la pestaña Aliados. Déjalo vacío si no lo es.</div>
-      <div style={S.g2}>
-        <Field label="Tipo de aliado"><CatSelect cat={catalogos.tipoAliado} value={f.tipoAliado} onChange={v=>set("tipoAliado",v)} placeholder="— No es aliado —"/></Field>
+      <div style={{fontSize:9,color:"#475569",marginTop:-4,marginBottom:8,lineHeight:1.4}}>Marca uno o ambos tipos para registrar a este contacto como aliado (puede ser estratégico y comercial a la vez); así aparecerá en la pestaña Aliados. Sin tipo, no es aliado.</div>
+      <Field label="Tipo de aliado">
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          {(catalogos.tipoAliado||[]).map(o=>{const on=(f.tiposAliado||[]).includes(o.nombre);
+            return <span key={o.id} style={S.chip(on,"#2dd4bf")} onClick={()=>set("tiposAliado",on?(f.tiposAliado||[]).filter(x=>x!==o.nombre):[...(f.tiposAliado||[]),o.nombre])}>{o.nombre}</span>;})}
+        </div>
+      </Field>
+      {(f.tiposAliado&&f.tiposAliado.length>0)&&<>
         <Field label="Estatus de la alianza"><CatSelect cat={catalogos.estatusAliado} value={f.estatusAliado} onChange={v=>set("estatusAliado",v)}/></Field>
-      </div>
-      {f.tipoAliado&&<>
         <Field label="Soluciones en las que es aliado">
           <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
             {(catalogos.solucion||[]).map(o=>{const on=(f.solucionesAliado||[]).includes(o.id);
@@ -237,7 +240,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
           </div>
           {(catalogos.solucion||[]).length===0&&<div style={{fontSize:9,color:"#475569"}}>No hay soluciones en el catálogo todavía.</div>}
         </Field>
-        <Field label="Condiciones de comisión"><input style={S.inp} value={f.esquemaParticipacion||""} onChange={e=>set("esquemaParticipacion",e.target.value||null)} placeholder="Ej. 20% comisión, honorario fijo…"/></Field>
+        <Field label="Condiciones Económicas de la Alianza"><textarea style={{...S.inp,minHeight:54,resize:"vertical",fontFamily:"inherit"}} value={f.esquemaParticipacion||""} onChange={e=>set("esquemaParticipacion",e.target.value||null)} placeholder="Ej. 20% comisión, honorario fijo, esquema escalonado…"/></Field>
         <Field label="Avance del trato"><textarea style={{...S.inp,minHeight:54,resize:"vertical",fontFamily:"inherit"}} value={f.avanceTrato||""} onChange={e=>set("avanceTrato",e.target.value||null)} placeholder="Avance de la negociación hacia activarlo…"/></Field>
       </>}
 
@@ -389,8 +392,8 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
         </div>
       </div>}
 
-      {c.tipoAliado&&<div style={S.card("#2dd4bf44")}>
-        <div style={S.sTit}>Alianza · {c.tipoAliado}{c.estatusAliado?` — ${c.estatusAliado}`:""}</div>
+      {(c.tiposAliado&&c.tiposAliado.length>0)&&<div style={S.card("#2dd4bf44")}>
+        <div style={S.sTit}>Alianza · {c.tiposAliado.join(" + ")}{c.estatusAliado?` — ${c.estatusAliado}`:""}</div>
         {(c.solucionesAliado||[]).length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
           {c.solucionesAliado.map(id=>{const s=(catalogos.solucion||[]).find(x=>x.id===id);return <span key={id} style={S.tag("#2dd4bf")}>{s?s.nombre:id}</span>;})}
         </div>}
@@ -436,6 +439,9 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   const[fTipo,setFTipo]=useState([]);
   const[fPres,setFPres]=useState("");
   const[fPix,setFPix]=useState("");
+  const[fEsAliado,setFEsAliado]=useState("");
+  const[fTipoAliado,setFTipoAliado]=useState([]);
+  const[fEstatusAliado,setFEstatusAliado]=useState([]);
   const[panel,setPanel]=useState(false);
   const[sel,setSel]=useState(initialSel||null);
   const[vistaAliados,setVistaAliados]=useState("aliado");
@@ -445,7 +451,8 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   useEffect(()=>{ if(fEsp.length&&fEtapa.length) setFEsp(prev=>prev.filter(n=>(catalogos.etapaEspecifica||[]).some(e=>e.nombre===n&&fEtapa.includes(e.principal)))); },[fEtapa]);
 
   const list=useMemo(()=>contactos.filter(c=>{
-    if(aliadosOnly&&!c.tipoAliado)return false;
+    const esAliado=!!(c.tiposAliado&&c.tiposAliado.length);
+    if(aliadosOnly&&!esAliado)return false;
     if(q&&!(c.nombreCompleto||"").toLowerCase().includes(q.toLowerCase()))return false;
     if(fEtapa.length&&!fEtapa.includes(c.etapaPrincipal))return false;
     if(fEsp.length&&!fEsp.includes(c.etapaEspecifica))return false;
@@ -455,12 +462,15 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     if(fCer.length&&!fCer.includes(c.cercania))return false;
     if(fEco.length&&!fEco.includes(c.nivelEconomico))return false;
     if(fTipo.length&&!fTipo.includes(c.tipoContacto))return false;
+    if(fEsAliado&&(esAliado?"si":"no")!==fEsAliado)return false;
+    if(fTipoAliado.length&&!(c.tiposAliado||[]).some(t=>fTipoAliado.includes(t)))return false;
+    if(fEstatusAliado.length&&!fEstatusAliado.includes(c.estatusAliado))return false;
     if(fPres&&(c.cuentaPresentacion?"si":"no")!==fPres)return false;
     if(fPix&&(c.acercamientoPixan?"si":"no")!==fPix)return false;
     return true;
-  }).sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")),[contactos,q,fEtapa,fEsp,fGiro,fSol,fPot,fCer,fEco,fTipo,fPres,fPix]);
-  const activos=[...fEtapa,...fEsp,...fGiro,...fSol,...fPot,...fCer,...fEco,...fTipo].length+(fPres?1:0)+(fPix?1:0);
-  const limpiar=()=>{setFEtapa([]);setFEsp([]);setFGiro([]);setFSol([]);setFPot([]);setFCer([]);setFEco([]);setFTipo([]);setFPres("");setFPix("");};
+  }).sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")),[contactos,q,fEtapa,fEsp,fGiro,fSol,fPot,fCer,fEco,fTipo,fEsAliado,fTipoAliado,fEstatusAliado,fPres,fPix,aliadosOnly]);
+  const activos=[...fEtapa,...fEsp,...fGiro,...fSol,...fPot,...fCer,...fEco,...fTipo,...fTipoAliado,...fEstatusAliado].length+(fPres?1:0)+(fPix?1:0)+(fEsAliado?1:0);
+  const limpiar=()=>{setFEtapa([]);setFEsp([]);setFGiro([]);setFSol([]);setFPot([]);setFCer([]);setFEco([]);setFTipo([]);setFEsAliado("");setFTipoAliado([]);setFEstatusAliado([]);setFPres("");setFPix("");};
   const espOpts=fEtapa.length?(catalogos.etapaEspecifica||[]).filter(e=>fEtapa.includes(e.principal)):(catalogos.etapaEspecifica||[]);
 
   const save=(data)=>{
@@ -521,6 +531,17 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
         <ChipMulti opts={catalogos.cercania||[]} sel={fCer} setSel={setFCer} color="#a78bfa"/>
         <div style={S.fl}>Nivel económico</div>
         <ChipMulti opts={catalogos.nivelEconomico||[]} sel={fEco} setSel={setFEco} color="#22c55e"/>
+        <div style={{height:1,background:"#1e293b",margin:"10px 0"}}/>
+        {!aliadosOnly&&<div><div style={S.fl}>Es aliado</div>
+          <div style={{display:"flex",gap:5,marginBottom:4}}>
+            <button style={{...S.pill(!fEsAliado),flex:1}} onClick={()=>setFEsAliado("")}>Todos</button>
+            <button style={{...S.pill(fEsAliado==="si","#2dd4bf"),flex:1}} onClick={()=>setFEsAliado("si")}>Sí</button>
+            <button style={{...S.pill(fEsAliado==="no"),flex:1}} onClick={()=>setFEsAliado("no")}>No</button>
+          </div></div>}
+        <div style={S.fl}>Tipo de aliado</div>
+        <ChipMulti opts={catalogos.tipoAliado||[]} sel={fTipoAliado} setSel={setFTipoAliado} color="#2dd4bf"/>
+        <div style={S.fl}>Estatus de aliado</div>
+        <ChipMulti opts={catalogos.estatusAliado||[]} sel={fEstatusAliado} setSel={setFEstatusAliado} color="#2dd4bf"/>
         <div style={{...S.g2,marginTop:6}}>
           <div><div style={S.fl}>Presentación Nexus</div>
             <div style={{display:"flex",gap:5}}>
@@ -547,7 +568,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
             {al.map(c=><div key={c.id} onClick={()=>setSel(c.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"7px 0",borderTop:"1px solid #1e293b",cursor:"pointer"}}>
               <span style={{fontSize:13,fontWeight:600}}>{c.nombreCompleto}</span>
               <span style={{display:"flex",gap:5,flexShrink:0}}>
-                {c.tipoAliado&&<span style={S.tag("#2dd4bf")}>{c.tipoAliado}</span>}
+                {(c.tiposAliado||[]).map(t=><span key={t} style={S.tag("#2dd4bf")}>{t}</span>)}
                 {c.estatusAliado&&<span style={S.tag("#64748b")}>{c.estatusAliado}</span>}
               </span>
             </div>)}
@@ -569,16 +590,16 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
             {c.circulo&&<span style={S.tag("#64748b")}>{c.circulo}</span>}
             {emp&&<span style={S.tag("#3b82f6")}>{emp.nombre}</span>}
             {(c.solucionesAncla||[]).length>0&&<span style={S.tag(GOLD)}>★ {c.solucionesAncla.length} Ancla</span>}
-            {c.tipoAliado&&<span style={S.tag("#2dd4bf")}>Aliado {c.tipoAliado}</span>}
+            {(c.tiposAliado&&c.tiposAliado.length>0)&&<span style={S.tag("#2dd4bf")}>Aliado {c.tiposAliado.join(" + ")}</span>}
             {aliadosOnly&&c.estatusAliado&&<span style={S.tag("#64748b")}>{c.estatusAliado}</span>}
-            {c.tipoAliado&&(c.solucionesAliado||[]).slice(0,3).map(sid=>{const sn=solName(sid);return sn?<span key={sid} style={S.tag("#0e7490")}>{sn.length>16?sn.slice(0,16)+"…":sn}</span>:null;})}
-            {c.tipoAliado&&(c.solucionesAliado||[]).length>3&&<span style={S.tag("#0e7490")}>+{(c.solucionesAliado||[]).length-3}</span>}
+            {(c.tiposAliado&&c.tiposAliado.length>0)&&(c.solucionesAliado||[]).slice(0,3).map(sid=>{const sn=solName(sid);return sn?<span key={sid} style={S.tag("#0e7490")}>{sn.length>16?sn.slice(0,16)+"…":sn}</span>:null;})}
+            {(c.tiposAliado&&c.tiposAliado.length>0)&&(c.solucionesAliado||[]).length>3&&<span style={S.tag("#0e7490")}>+{(c.solucionesAliado||[]).length-3}</span>}
           </div>
         </div>);})}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>{aliadosOnly?"Aún no hay aliados. Toca + para registrar el primero.":"Sin resultados."}</div>}
       </>)}
     </div>
-    <button style={S.fab} onClick={()=>setModal(aliadosOnly?{tipoAliado:((catalogos.tipoAliado||[])[0]||{}).nombre||"Estratégico",estatusAliado:"Por invitar"}:{})}>+</button>
+    <button style={S.fab} onClick={()=>setModal(aliadosOnly?{tiposAliado:[((catalogos.tipoAliado||[])[0]||{}).nombre||"Estratégico"],estatusAliado:"Por invitar"}:{})}>+</button>
     {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onCreateEmpresa={createEmpresa} onSave={save} onClose={()=>setModal(null)}/>}
   </div>;
 }
@@ -722,7 +743,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v10</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v11</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -1007,6 +1028,10 @@ function App(){
     if(!localStorage.getItem(PFX+"migCaps")){
       cs=cs.map(c=>({...c,nombre:titleCase(c.nombre),apellido:titleCase(c.apellido),nombreCompleto:titleCase(c.nombreCompleto)}));
       try{localStorage.setItem(PFX+"migCaps","1");}catch(e){}
+    }
+    if(!localStorage.getItem(PFX+"migAliadoTipo")){
+      cs=cs.map(c=>{ if(c.tipoAliado&&!c.tiposAliado){const{tipoAliado,...rest}=c;return {...rest,tiposAliado:[tipoAliado]};} return c; });
+      try{localStorage.setItem(PFX+"migAliadoTipo","1");}catch(e){}
     }
     return cs;
   });
