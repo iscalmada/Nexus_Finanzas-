@@ -66,7 +66,7 @@ function migra(cs){return (cs||[]).map(c=>({...c,
   capacidadRef: CAP_MAP[c.capacidadRef]||c.capacidadRef,
   cercania: CER_MAP[c.cercania]||c.cercania }));}
 
-function exportBackup(contactos,empresas){
+function exportBackup(contactos,empresas,oportunidades){
   try{
     const cs=contactos.map(c=>({Nombre:c.nombreCompleto,Alias:c.alias||"",Actividad:c.actividad||"",
       Empresa:((empresas.find(e=>e.id===c.empresaId)||{}).nombre)||"",Rol:c.rolEmpresa||"",
@@ -77,9 +77,15 @@ function exportBackup(contactos,empresas){
       AcercamientoPixan:c.acercamientoPixan?"Sí":"No",EtapaPixan:c.etapaPixan||"",
       UltimoContacto:c.fechaUltimoContacto||"",ResumenAvance:c.resumenAvance||"",Observaciones:c.obs||""}));
     const es=empresas.map(e=>({Nombre:e.nombre,Giro:e.giro||"",Tamano:e.tamano||"",Telefono:e.telefono||"",Correo:e.correo||"",Domicilio:e.domicilio||"",Observaciones:e.obs||""}));
+    const os=(oportunidades||[]).map(o=>({Concepto:o.concepto,Contacto:((contactos.find(c=>c.id===o.contactoId)||{}).nombreCompleto)||"",
+      Empresa:((empresas.find(e=>e.id===o.empresaId)||{}).nombre)||"",Solucion:o.solucionNexus||"",Etapa:o.etapa||"",
+      MontoEstimado:Number(o.montoEstimado)||0,ComisionEstimada:Number(o.comisionEstimada)||0,Probabilidad:o.probabilidad||"",
+      FechaEstimadaCierre:o.fechaEstimadaCierre||"",Recurrencia:o.recurrencia||"",FechaConcretada:o.fechaConcretada||"",
+      Condiciones:o.condiciones||"",Notas:o.notas||""}));
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(cs),"Contactos");
     XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(es),"Empresas");
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(os.length?os:[{Concepto:""}]),"Oportunidades");
     XLSX.writeFile(wb,"Nexus_CFC_respaldo.xlsx");
   }catch(e){alert("No se pudo exportar: "+e.message);}
 }
@@ -183,7 +189,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
           <div style={{display:"flex",gap:6}}>
             <select style={{...S.sel,flex:1}} value={f.empresaId||""} onChange={e=>set("empresaId",e.target.value||null)}>
               <option value="">— Sin empresa —</option>
-              {empresas.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
+              {empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select>
             <button style={{...S.pill(true,"#3b82f6"),fontSize:14,padding:"0 12px"}} onClick={()=>setNuevaEmp({})} title="Nueva empresa">＋</button>
           </div>
@@ -279,7 +285,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
 }
 
 /* ════════ DETALLE CONTACTO ════════ */
-function ContactoDetalle({c,catalogos,empresas,actividades,onAddAct,onEditAct,onEdit,onDelete,onBack}){
+function ContactoDetalle({c,catalogos,empresas,actividades,oportunidades,onAddAct,onEditAct,onAddOpo,onEditOpo,onEdit,onDelete,onBack}){
   const emp=empresas.find(e=>e.id===c.empresaId);
   const Row=({k,v})=> v?<div style={S.detRow}><span style={S.detK}>{k}</span><span style={S.detV}>{v}</span></div>:null;
   return <div>
@@ -358,6 +364,15 @@ function ContactoDetalle({c,catalogos,empresas,actividades,onAddAct,onEditAct,on
 
       <div style={S.card()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
+          <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Oportunidades</div>
+          <button style={S.pill(true,"#fbbf24")} onClick={()=>onAddOpo(c.id)}>+ Detonar</button>
+        </div>
+        {(oportunidades||[]).filter(o=>o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={[c]} empresas={empresas} onTap={(x)=>onEditOpo(x)}/>)}
+        {(oportunidades||[]).filter(o=>o.contactoId===c.id).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
+      </div>
+
+      <div style={S.card()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
           <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Actividades</div>
           <button style={S.pill(true,GOLD)} onClick={()=>onAddAct(c.id)}>+ Registrar</button>
         </div>
@@ -370,7 +385,7 @@ function ContactoDetalle({c,catalogos,empresas,actividades,onAddAct,onEditAct,on
 }
 
 /* ════════ LISTA CONTACTOS ════════ */
-function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct}){
+function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct,oportunidades,openOpo}){
   const[q,setQ]=useState("");
   const[fEtapa,setFEtapa]=useState([]);
   const[fEsp,setFEsp]=useState([]);
@@ -420,9 +435,11 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     const c=contactos.find(x=>x.id===sel);
     if(!c){setSel(null);return null;}
     return <>
-      <ContactoDetalle c={c} catalogos={catalogos} empresas={empresas} actividades={actividades}
+      <ContactoDetalle c={c} catalogos={catalogos} empresas={empresas} actividades={actividades} oportunidades={oportunidades}
         onAddAct={(cid)=>openAct({contactoId:cid,estatus:"Programada",fecha:hoyISO()},cid)}
         onEditAct={(a)=>openAct(a,a.contactoId)}
+        onAddOpo={(cid)=>openOpo({contactoId:cid},cid)}
+        onEditOpo={(o)=>openOpo(o,o.contactoId)}
         onEdit={()=>setModal(c)} onDelete={()=>del(c.id)} onBack={()=>setSel(null)}/>
       {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onCreateEmpresa={createEmpresa} onSave={save} onClose={()=>setModal(null)}/>}
     </>;
@@ -620,10 +637,12 @@ function Catalogos({catalogos,setCatalogos}){
 }
 
 /* ════════ INICIO (shell) ════════ */
-function Inicio({contactos,empresas,actividades,openAct,setView}){
+function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   const[limite,setLimite]=useState("");
   const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+  const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada");
+  const opMonto=opAb.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
@@ -649,6 +668,12 @@ function Inicio({contactos,empresas,actividades,openAct,setView}){
         <div style={S.card()}><div style={S.lbl}>Contactos</div><div style={S.big()}>{contactos.length}</div></div>
         <div style={S.card()}><div style={S.lbl}>Empresas</div><div style={S.big("#3b82f6")}>{empresas.length}</div></div>
       </div>
+      <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setView("oportunidades")}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
+          <div><div style={S.lbl}>Pipeline abierto</div><div style={S.big("#fbbf24")}>{money(opMonto)}</div></div>
+          <div style={{textAlign:"right"}}><div style={S.lbl}>Oportunidades</div><div style={{fontSize:18,fontWeight:800,color:"#e2e8f0"}}>{opAb.length}</div></div>
+        </div>
+      </div>
       <div style={S.card()}>
         <div style={S.sTit}>Por etapa</div>
         {["Candidato","Contacto","Prospecto","Cliente"].map(et=>{const n=stat(et);const pct=contactos.length?Math.round(n/contactos.length*100):0;
@@ -666,7 +691,7 @@ function Inicio({contactos,empresas,actividades,openAct,setView}){
       <ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} onTap={(a)=>openAct(a,a.contactoId)}/>
     </div>
     <div style={S.sec}>
-      <button style={{...S.cancB,borderColor:GOLD+"55",color:GOLD,marginTop:0}} onClick={()=>exportBackup(contactos,empresas)}>⬇ Exportar respaldo (Excel)</button>
+      <button style={{...S.cancB,borderColor:GOLD+"55",color:GOLD,marginTop:0}} onClick={()=>exportBackup(contactos,empresas,oportunidades)}>⬇ Exportar respaldo (Excel)</button>
     </div>
   </div>;
 }
@@ -675,10 +700,12 @@ function Inicio({contactos,empresas,actividades,openAct,setView}){
 const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
 const hoyISO=()=>new Date().toISOString().slice(0,10);
 
-function ActividadModal({init,contactos,catalogos,fixedContacto,onSave,onDelete,onClose}){
+function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,onSave,onDelete,onClose}){
   const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const cont=contactos.find(c=>c.id===(f.contactoId||fixedContacto));
+  const cid=f.contactoId||fixedContacto;
+  const cont=contactos.find(c=>c.id===cid);
+  const opsCont=(oportunidades||[]).filter(o=>o.contactoId===cid);
   const save=()=>{
     const cid=f.contactoId||fixedContacto;
     if(!cid){alert("Selecciona un contacto");return;}
@@ -711,6 +738,12 @@ function ActividadModal({init,contactos,catalogos,fixedContacto,onSave,onDelete,
     </div>
     <Field label="Tipo de acción"><CatSelect cat={catalogos.tipoAccion} value={f.tipoAccion} onChange={v=>set("tipoAccion",v)}/></Field>
     <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
+    {opsCont.length>0&&<Field label="Oportunidad ligada (opcional)">
+      <select style={S.sel} value={f.oportunidadId||""} onChange={e=>set("oportunidadId",e.target.value||null)}>
+        <option value="">— Seguimiento de contacto —</option>
+        {opsCont.map(o=><option key={o.id} value={o.id}>{o.concepto}</option>)}
+      </select>
+    </Field>}
     <Field label="Intención (al programar)"><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="Qué se busca lograr…"/></Field>
     {(f.estatus==="Cerrada"||f.resultado)&&<Field label="Resultado (al concluir)"><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
     {/* Oportunidad: campo preparado, se activará con el módulo de Oportunidades */}
@@ -729,7 +762,7 @@ function ActividadesList({acts,contactos,showContacto,onTap,asc}){
         <div style={{fontSize:12,fontWeight:700}}>{a.tipoAccion||"Actividad"}</div>
         <span style={S.tag(col)}>{a.estatus}</span>
       </div>
-      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?` · ${c.nombreCompleto}`:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}</div>
+      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?` · ${c.nombreCompleto}`:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
       {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
     </div>;})}</div>;
@@ -756,6 +789,116 @@ function Agenda({actividades,contactos,catalogos,openAct}){
   </div>;
 }
 
+/* ════════ OPORTUNIDADES ════════ */
+const OPO_COLOR={"Oportunidad Identificada":"#60a5fa","Oportunidad en Preparación":"#a78bfa","Propuesta Presentada":"#fbbf24","Oportunidad Aceptada":"#2dd4bf","Oportunidad Concretada":"#22c55e","Oportunidad Rechazada":"#64748b"};
+const oc=(n)=>OPO_COLOR[n]||"#64748b";
+const RECUR=["Única","Mensual","Anual"];
+const PROB=["Alta","Media","Baja"];
+const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
+const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
+const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
+
+function OportunidadModal({init,contactos,empresas,catalogos,fixedContacto,onSave,onDelete,onClose}){
+  const eo=catalogos.etapaOportunidad||[];
+  const[f,setF]=useState(()=>({recurrencia:"Única",etapa:(eo[0]?eo[0].nombre:""),...init}));
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const cid=f.contactoId||fixedContacto;
+  const cont=contactos.find(c=>c.id===cid);
+  useEffect(()=>{ if(cont&&cont.empresaId&&!f.empresaId)set("empresaId",cont.empresaId); },[cid]);
+  const save=()=>{
+    if(!f.concepto){alert("Indica un concepto");return;}
+    if(!cid){alert("Selecciona el contacto");return;}
+    const data={...f,contactoId:cid};
+    if(data.etapa==="Oportunidad Concretada"&&!data.fechaConcretada)data.fechaConcretada=hoyISO();
+    if(!data.movIdsVinculados)data.movIdsVinculados=[];
+    onSave(data);onClose();
+  };
+  return <div style={S.modal} onClick={onClose}><div style={S.mBox} onClick={e=>e.stopPropagation()}>
+    <div style={S.mTit}>{init&&init.id?"Editar oportunidad":"Nueva oportunidad"}</div>
+    <Field label="Concepto"><input style={S.inp} value={f.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Ej. Fianza de cumplimiento…"/></Field>
+    {fixedContacto
+      ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b></div>
+      : <Field label="Contacto">
+          <select style={S.sel} value={f.contactoId||""} onChange={e=>set("contactoId",e.target.value||null)}>
+            <option value="">— Selecciona —</option>
+            {contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+          </select>
+        </Field>}
+    <Field label="Empresa (opcional)">
+      <select style={S.sel} value={f.empresaId||""} onChange={e=>set("empresaId",e.target.value||null)}>
+        <option value="">— Sin empresa —</option>
+        {empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
+      </select>
+    </Field>
+    <Field label="Solución Nexus"><CatSelect cat={catalogos.solucion} value={f.solucionNexus} onChange={v=>set("solucionNexus",v)}/></Field>
+    <Field label="Etapa"><CatSelect cat={catalogos.etapaOportunidad} value={f.etapa} onChange={v=>set("etapa",v)} placeholder="—"/></Field>
+    <div style={S.g2}>
+      <Field label="Monto estimado"><input type="number" inputMode="numeric" style={S.inp} value={f.montoEstimado||""} onChange={e=>set("montoEstimado",e.target.value)} placeholder="0"/></Field>
+      <Field label="Comisión estimada"><input type="number" inputMode="numeric" style={S.inp} value={f.comisionEstimada||""} onChange={e=>set("comisionEstimada",e.target.value)} placeholder="0"/></Field>
+    </div>
+    <Field label="Probabilidad de cierre">
+      <div style={{display:"flex",gap:6}}>
+        {PROB.map(p=><button key={p} style={{...S.pill(f.probabilidad===p,PROB_COLOR[p]),flex:1}} onClick={()=>set("probabilidad",f.probabilidad===p?null:p)}>{p}</button>)}
+      </div>
+    </Field>
+    <div style={S.g2}>
+      <Field label="Fecha estimada cierre"><input type="date" style={S.inp} value={f.fechaEstimadaCierre||""} onChange={e=>set("fechaEstimadaCierre",e.target.value||null)}/></Field>
+      <Field label="Recurrencia">
+        <select style={S.sel} value={f.recurrencia||"Única"} onChange={e=>set("recurrencia",e.target.value)}>{RECUR.map(r=><option key={r} value={r}>{r}</option>)}</select>
+      </Field>
+    </div>
+    <Field label="Condiciones"><textarea style={S.ta} value={f.condiciones||""} onChange={e=>set("condiciones",e.target.value||null)}/></Field>
+    <Field label="Notas"><textarea style={S.ta} value={f.notas||""} onChange={e=>set("notas",e.target.value||null)}/></Field>
+    <button style={S.saveB} onClick={save}>Guardar</button>
+    {init&&init.id&&<button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{if(window.confirm("¿Eliminar esta oportunidad?")){onDelete(init.id);onClose();}}}>Eliminar oportunidad</button>}
+    <button style={S.cancB} onClick={onClose}>Cancelar</button>
+  </div></div>;
+}
+
+function OpoCard({o,contactos,empresas,onTap}){
+  const c=contactos.find(x=>x.id===o.contactoId);const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
+  return <div onClick={()=>onTap&&onTap(o)} style={S.cCard(col)}>
+    <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
+      <div style={{fontSize:14,fontWeight:700}}>{o.concepto}</div>
+      {o.montoEstimado?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(o.montoEstimado)}</div>:null}
+    </div>
+    <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
+      <span style={S.tag(col)}>{(o.etapa||"").replace("Oportunidad ","")}</span>
+      {o.probabilidad&&<span style={S.tag(PROB_COLOR[o.probabilidad])}>{o.probabilidad}</span>}
+      {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
+      {e&&<span style={S.tag("#3b82f6")}>{e.nombre}</span>}
+      {o.solucionNexus&&<span style={S.tag(GOLD)}>{o.solucionNexus.length>22?o.solucionNexus.slice(0,22)+"…":o.solucionNexus}</span>}
+    </div>
+  </div>;
+}
+
+function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
+  const[fEt,setFEt]=useState("");
+  const list=oportunidades.filter(o=>!fEt||o.etapa===fEt).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  const abiertas=oportunidades.filter(ABIERTA);
+  const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
+  const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
+  return <div>
+    <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div><div style={S.sub}>{oportunidades.length} en total · {abiertas.length} abiertas</div></div></div>
+    <div style={S.line}/>
+    <div style={S.sec}>
+      <div style={S.g2}>
+        <div style={S.card()}><div style={S.lbl}>Monto abierto</div><div style={S.big()}>{money(totalAb)}</div></div>
+        <div style={S.card()}><div style={S.lbl}>Comisión abierta</div><div style={S.big("#22c55e")}>{money(totalCom)}</div></div>
+      </div>
+      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+        <span style={S.chip(!fEt)} onClick={()=>setFEt("")}>Todas</span>
+        {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEt===o.nombre,oc(o.nombre))} onClick={()=>setFEt(fEt===o.nombre?"":o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
+      </div>
+    </div>
+    <div style={{...S.sec,paddingTop:4}}>
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
+    </div>
+    <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
+  </div>;
+}
+
 /* ════════ APP ════════ */
 function App(){
   const[view,setView]=useState("inicio");
@@ -764,6 +907,10 @@ function App(){
     if(!localStorage.getItem(PFX+"migAA")){
       cs=cs.map(c=>AA_IDS.includes(c.id)?{...c,capacidadRef:"Muy Alta"}:c);
       try{localStorage.setItem(PFX+"migAA","1");}catch(e){}
+    }
+    if(!localStorage.getItem(PFX+"migPix")){
+      cs=cs.map(c=>(c.etapaPixan&&c.etapaPixan!=="Sin Historia")?{...c,acercamientoPixan:true}:c);
+      try{localStorage.setItem(PFX+"migPix","1");}catch(e){}
     }
     return cs;
   });
@@ -781,12 +928,15 @@ function App(){
     }
     return base;
   });
+  const[oportunidades,setOportunidades]=useState(()=>loadLS("oportunidades",null)||[]);
   const[openContacto,setOpenContacto]=useState(null);
   const[actModal,setActModal]=useState(null);
+  const[opoModal,setOpoModal]=useState(null);
 
   useEffect(()=>saveLS("contactos",contactos),[contactos]);
   useEffect(()=>saveLS("empresas",empresas),[empresas]);
   useEffect(()=>saveLS("actividades",actividades),[actividades]);
+  useEffect(()=>saveLS("oportunidades",oportunidades),[oportunidades]);
   useEffect(()=>saveLS("catalogos",catalogos),[catalogos]);
   useEffect(()=>{const l=document.getElementById("loading");if(l){l.classList.add("fade-out");setTimeout(()=>l.remove(),350);}},[]);
 
@@ -803,20 +953,29 @@ function App(){
   };
 
   const delAct=(id)=>setActividades(prev=>prev.filter(a=>a.id!==id));
+  const openOpo=(init,fixed)=>setOpoModal({init,fixed:fixed||null});
+  const saveOpo=(data)=>{setOportunidades(prev=>{
+    if(data.id)return prev.map(o=>o.id===data.id?data:o);
+    const nid="o"+(Math.max(0,...prev.map(o=>parseInt((o.id||"o0").slice(1))||0))+1);
+    return [...prev,{...data,id:nid}];
+  });};
+  const delOpo=(id)=>{setOportunidades(prev=>prev.filter(o=>o.id!==id));setActividades(prev=>prev.map(a=>a.oportunidadId===id?{...a,oportunidadId:null}:a));};
 
   const go=(k)=>{setOpenContacto(null);setView(k);};
-  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["agenda","Agenda","🗓"],["catalogos","Catálogos","☰"]];
+  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["catalogos","Catál.","☰"]];
   return <div style={S.app}>
-    {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} actividades={actividades} openAct={openAct} setView={go}/>}
-    {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct}/>}
+    {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} actividades={actividades} oportunidades={oportunidades} openAct={openAct} openOpo={openOpo} setView={go}/>}
+    {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
+    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} openAct={openAct}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos}/>}
     <div style={S.nav}>
       {NAV.map(([k,lab,ico])=><button key={k} style={S.navB(view===k)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>)}
     </div>
-    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} onSave={saveAct} onDelete={delAct} onClose={()=>setActModal(null)}/>}
+    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onClose={()=>setActModal(null)}/>}
+    {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} onSave={saveOpo} onDelete={delOpo} onClose={()=>setOpoModal(null)}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
