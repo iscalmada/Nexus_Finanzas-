@@ -83,6 +83,7 @@ function exportBackup(contactos,empresas,oportunidades){
       EtapaPrincipal:c.etapaPrincipal||"",EtapaEspecifica:c.etapaEspecifica||"",TipoPersona:c.tipoPersona||"",
       Giros:(c.giros||[]).join(", "),GiroPrincipal:c.giroPrincipal||"",SolucionesAncla:(c.solucionesAncla||[]).join(", "),
       AcercamientoPixan:c.acercamientoPixan?"Sí":"No",EtapaPixan:c.etapaPixan||"",
+      TipoAliado:c.tipoAliado||"",EstatusAliado:c.estatusAliado||"",EsquemaParticipacion:c.esquemaParticipacion||"",AportacionAliado:c.aportacionAliado||"",
       UltimoContacto:c.fechaUltimoContacto||"",ResumenAvance:c.resumenAvance||"",Observaciones:c.obs||""}));
     const es=empresas.map(e=>({Nombre:e.nombre,Giro:e.giro||"",Tamano:e.tamano||"",Telefono:e.telefono||"",Correo:e.correo||"",Domicilio:e.domicilio||"",Observaciones:e.obs||""}));
     const os=(oportunidades||[]).map(o=>({Concepto:o.concepto,Contacto:((contactos.find(c=>c.id===o.contactoId)||{}).nombreCompleto)||"",
@@ -221,6 +222,15 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       </div>
       <Field label="Referidor del contacto"><input style={S.inp} value={f.referidor||""} onChange={e=>set("referidor",e.target.value||null)} placeholder="Quién lo refirió…"/></Field>
       <Field label="Nota sobre la relación"><input style={S.inp} value={f.notaRelacion||""} onChange={e=>set("notaRelacion",e.target.value||null)}/></Field>
+
+      <div style={S.sTit}>Alianza estratégica / comercial</div>
+      <div style={{fontSize:9,color:"#475569",marginTop:-4,marginBottom:8,lineHeight:1.4}}>Asigna un Tipo de aliado para registrar a este contacto como aliado; así aparecerá en la pestaña Aliados. Déjalo vacío si no lo es.</div>
+      <div style={S.g2}>
+        <Field label="Tipo de aliado"><CatSelect cat={catalogos.tipoAliado} value={f.tipoAliado} onChange={v=>set("tipoAliado",v)} placeholder="— No es aliado —"/></Field>
+        <Field label="Estatus de la alianza"><CatSelect cat={catalogos.estatusAliado} value={f.estatusAliado} onChange={v=>set("estatusAliado",v)}/></Field>
+      </div>
+      <Field label="Esquema de participación"><input style={S.inp} value={f.esquemaParticipacion||""} onChange={e=>set("esquemaParticipacion",e.target.value||null)} placeholder="Ej. 20% comisión, honorario fijo…"/></Field>
+      <Field label="Aportación / especialidad"><input style={S.inp} value={f.aportacionAliado||""} onChange={e=>set("aportacionAliado",e.target.value||null)} placeholder="Qué aporta a Nexus…"/></Field>
 
       <div style={S.sTit}>Avance Nexus</div>
       <div style={S.g2}>
@@ -395,7 +405,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
 }
 
 /* ════════ LISTA CONTACTOS ════════ */
-function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct,oportunidades,openOpo}){
+function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct,oportunidades,openOpo,aliadosOnly}){
   const[q,setQ]=useState("");
   const[fEtapa,setFEtapa]=useState([]);
   const[fEsp,setFEsp]=useState([]);
@@ -414,6 +424,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   useEffect(()=>{ if(fEsp.length&&fEtapa.length) setFEsp(prev=>prev.filter(n=>(catalogos.etapaEspecifica||[]).some(e=>e.nombre===n&&fEtapa.includes(e.principal)))); },[fEtapa]);
 
   const list=useMemo(()=>contactos.filter(c=>{
+    if(aliadosOnly&&!c.tipoAliado)return false;
     if(q&&!(c.nombreCompleto||"").toLowerCase().includes(q.toLowerCase()))return false;
     if(fEtapa.length&&!fEtapa.includes(c.etapaPrincipal))return false;
     if(fEsp.length&&!fEsp.includes(c.etapaEspecifica))return false;
@@ -458,7 +469,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   }
 
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Contactos</div><div style={S.sub}>{list.length} de {contactos.length}</div></div></div>
+    <div style={S.hdr}><div><div style={S.logo}>{aliadosOnly?"Aliados":"Contactos"}</div><div style={S.sub}>{aliadosOnly?`${list.length} aliado${list.length===1?"":"s"} registrado${list.length===1?"":"s"}`:`${list.length} de ${contactos.length}`}</div></div></div>
     <div style={S.line}/>
     <div style={S.sec}>
       <input style={S.srch} placeholder="Buscar por nombre…" value={q} onChange={e=>setQ(e.target.value)}/>
@@ -515,11 +526,13 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
             {c.circulo&&<span style={S.tag("#64748b")}>{c.circulo}</span>}
             {emp&&<span style={S.tag("#3b82f6")}>{emp.nombre}</span>}
             {(c.solucionesAncla||[]).length>0&&<span style={S.tag(GOLD)}>★ {c.solucionesAncla.length} Ancla</span>}
+            {c.tipoAliado&&<span style={S.tag("#2dd4bf")}>Aliado {c.tipoAliado}</span>}
+            {aliadosOnly&&c.estatusAliado&&<span style={S.tag("#64748b")}>{c.estatusAliado}</span>}
           </div>
         </div>);})}
-      {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin resultados.</div>}
+      {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>{aliadosOnly?"Aún no hay aliados. Toca + para registrar el primero.":"Sin resultados."}</div>}
     </div>
-    <button style={S.fab} onClick={()=>setModal({})}>+</button>
+    <button style={S.fab} onClick={()=>setModal(aliadosOnly?{tipoAliado:((catalogos.tipoAliado||[])[0]||{}).nombre||"Estratégico",estatusAliado:"En evaluación"}:{})}>+</button>
     {modal&&<ContactoModal init={modal} catalogos={catalogos} empresas={empresas} onCreateEmpresa={createEmpresa} onSave={save} onClose={()=>setModal(null)}/>}
   </div>;
 }
@@ -606,7 +619,7 @@ const CAT_LABEL={circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cerc
   potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",etapaPrincipal:"Etapa principal de contacto",
   etapaEspecifica:"Etapa específica de contacto",areaEstrategica:"Área estratégica",solucion:"Solución de intervención",
   tipoAccion:"Tipo de acción",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
-  pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal",tipoContacto:"Tipo de contacto"};
+  pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal",tipoContacto:"Tipo de contacto",tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado"};
 function Catalogos({catalogos,setCatalogos}){
   const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");
   if(open){
@@ -658,10 +671,12 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
   const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada");
   const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
+  const opCuant=opAb.filter(o=>(Number(o.comisionEstimada)||0)>0);
+  const opPorCuant=opAb.length-opCuant.length;
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v9</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -687,6 +702,10 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
           <div><div style={S.lbl}>Comisión estimada</div><div style={S.big("#fbbf24")}>{money(opComision)}</div></div>
           <div style={{textAlign:"right"}}><div style={S.lbl}>Oportunidades</div><div style={{fontSize:18,fontWeight:800,color:"#e2e8f0"}}>{opAb.length}</div></div>
+        </div>
+        <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+          <span style={S.tag("#fbbf24")}>{opCuant.length} cuantificada{opCuant.length===1?"":"s"}</span>
+          {opPorCuant>0&&<span style={S.tag("#64748b")}>{opPorCuant} por cuantificar</span>}
         </div>
       </div>
       <div style={S.card()}>
@@ -960,6 +979,12 @@ function App(){
     if(!base.tipoContacto){
       base.tipoContacto=["Prospecto","Enlace operativo","Referidor","Otro"].map((n,i)=>({id:"tc"+i,nombre:n}));
     }
+    if(!base.tipoAliado){
+      base.tipoAliado=["Estratégico","Comercial"].map((n,i)=>({id:"tal"+i,nombre:n}));
+    }
+    if(!base.estatusAliado){
+      base.estatusAliado=["Activo","En evaluación","Inactivo"].map((n,i)=>({id:"eal"+i,nombre:n}));
+    }
     return base;
   });
   const[oportunidades,setOportunidades]=useState(()=>loadLS("oportunidades",null)||[]);
@@ -996,11 +1021,12 @@ function App(){
   const delOpo=(id)=>{setOportunidades(prev=>prev.filter(o=>o.id!==id));setActividades(prev=>prev.map(a=>a.oportunidadId===id?{...a,oportunidadId:null}:a));};
 
   const go=(k)=>{setOpenContacto(null);setView(k);};
-  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["catalogos","Catál.","☰"]];
+  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["aliados","Aliados","🤝"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["catalogos","Catál.","☰"]];
   return <div style={S.app}>
     {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} actividades={actividades} oportunidades={oportunidades} openAct={openAct} openOpo={openOpo} setView={go}/>}
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
+    {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} openAct={openAct}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos}/>}
