@@ -765,10 +765,8 @@ function ProductoModal({init,catalogos,onSave,onClose,onDelete}){
         {(catalogos.solucion||[]).map(o=><option key={o.id} value={o.id}>{o.nombre}</option>)}
       </select>
     </Field>
-    <div style={S.g2}>
-      <Field label="Tipo"><input style={S.inp} value={f.tipo||""} onChange={e=>set("tipo",e.target.value||null)} placeholder="Cliente / producto / equipo…"/></Field>
-      <Field label="Categoría"><input style={S.inp} value={f.categoria||""} onChange={e=>set("categoria",e.target.value||null)} placeholder="Opcional"/></Field>
-    </div>
+    <Field label="Tipo"><textarea style={{...S.inp,minHeight:46,resize:"vertical",fontFamily:"inherit"}} value={f.tipo||""} onChange={e=>set("tipo",e.target.value||null)} placeholder="Tipo de cliente / producto / equipo, según la solución…"/></Field>
+    <Field label="Categoría"><input style={S.inp} value={f.categoria||""} onChange={e=>set("categoria",e.target.value||null)} placeholder="Opcional"/></Field>
     <div style={S.g2}>
       <Field label="Monto de negocio promedio"><input type="number" inputMode="decimal" style={S.inp} value={f.montoNegocio??""} onChange={e=>set("montoNegocio",e.target.value===""?null:Number(e.target.value))}/></Field>
       <Field label="Índice % de comisión"><input type="number" inputMode="decimal" style={S.inp} value={f.indiceComision??""} onChange={e=>set("indiceComision",e.target.value===""?null:Number(e.target.value))}/></Field>
@@ -781,6 +779,7 @@ function ProductoModal({init,catalogos,onSave,onClose,onDelete}){
         <button style={{...S.pill(f.recurrente===false,"#fbbf24"),flex:1}} onClick={()=>set("recurrente",false)}>Único</button>
       </div>
     </Field>
+    <Field label="Notas"><textarea style={{...S.inp,minHeight:54,resize:"vertical",fontFamily:"inherit"}} value={f.notas||""} onChange={e=>set("notas",e.target.value||null)} placeholder="Notas abiertas sobre el producto…"/></Field>
     <button style={S.saveB} onClick={save}>Guardar</button>
     {init&&init.id&&<button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{if(window.confirm("¿Eliminar este producto?")){onDelete(init.id);onClose();}}}>Eliminar producto</button>}
     <button style={S.cancB} onClick={onClose}>Cancelar</button>
@@ -841,7 +840,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v12</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v12.1</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -969,20 +968,57 @@ function ActividadesList({acts,contactos,showContacto,onTap,asc}){
 
 function Agenda({actividades,contactos,catalogos,openAct}){
   const[filtro,setFiltro]=useState("Programada");
-  const list=actividades.filter(a=>filtro==="Todas"?true:a.estatus===filtro);
+  const[modo,setModo]=useState("lista");
+  const[desde,setDesde]=useState("");
+  const[hasta,setHasta]=useState("");
+  const fmtF=(f)=>f?f.split("-").reverse().join("/"):"—";
+  const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"—";
+  const base=actividades.filter(a=>{
+    if(filtro!=="Todas"&&a.estatus!==filtro)return false;
+    if(desde&&(a.fecha||"")<desde)return false;
+    if(hasta&&(a.fecha||"")>hasta)return false;
+    return true;
+  });
   const ordenadas=filtro==="Programada"
-    ? list.slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""))
-    : list.slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+    ? base.slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""))
+    : base.slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{actividades.length} actividades</div></div></div>
+    <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
     <div style={S.sec}>
+      <div style={{display:"flex",gap:6,marginBottom:10}}>
+        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("lista")}>Lista</button>
+        <button style={{...S.pill(modo==="reporte",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("reporte")}>Reporte</button>
+      </div>
       <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
         {["Programada","En Proceso","Cerrada","Todas"].map(t=><span key={t} style={S.chip(filtro===t,EST_COLOR[t]||GOLD)} onClick={()=>setFiltro(t)}>{t}</span>)}
       </div>
+      {modo==="reporte"&&<div style={{...S.g2,marginTop:10}}>
+        <div><div style={S.fl}>Desde</div><input type="date" style={S.inp} value={desde} onChange={e=>setDesde(e.target.value)}/></div>
+        <div><div style={S.fl}>Hasta</div><input type="date" style={S.inp} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+      </div>}
+      {modo==="reporte"&&(desde||hasta)&&<div style={{textAlign:"right",marginTop:6}}><button style={S.pill(false,"#f87171")} onClick={()=>{setDesde("");setHasta("");}}>Limpiar fechas</button></div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      <ActividadesList acts={ordenadas} contactos={contactos} showContacto={true} asc={filtro==="Programada"} onTap={(a)=>openAct(a,a.contactoId)}/>
+      {modo==="lista"
+        ? <ActividadesList acts={ordenadas} contactos={contactos} showContacto={true} asc={filtro==="Programada"} onTap={(a)=>openAct(a,a.contactoId)}/>
+        : (ordenadas.length===0
+            ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
+            : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
+                <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:0.5,textTransform:"uppercase",padding:"8px 10px",borderBottom:"1px solid #1e293b"}}>
+                  <div style={{width:62,flexShrink:0}}>Fecha</div>
+                  <div style={{flex:1,minWidth:0}}>Acción</div>
+                  <div style={{flex:1,minWidth:0}}>Contacto</div>
+                  <div style={{width:70,flexShrink:0,textAlign:"right"}}>Estatus</div>
+                </div>
+                {ordenadas.map(a=>{const col=EST_COLOR[a.estatus]||"#64748b";return (
+                  <div key={a.id} onClick={()=>openAct(a,a.contactoId)} style={{display:"flex",fontSize:11,padding:"8px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start"}}>
+                    <div style={{width:62,flexShrink:0,color:"#94a3b8"}}>{fmtF(a.fecha)}</div>
+                    <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word"}}>{a.tipoAccion||"Actividad"}</div>
+                    <div style={{flex:1,minWidth:0,color:"#cbd5e1",paddingRight:4,wordBreak:"break-word"}}>{cn(a.contactoId)}</div>
+                    <div style={{width:70,flexShrink:0,textAlign:"right"}}><span style={{...S.tag(col),fontSize:8}}>{a.estatus}</span></div>
+                  </div>);})}
+              </div>)}
     </div>
     <button style={S.fab} onClick={()=>openAct({estatus:"Programada",fecha:hoyISO()},null)}>+</button>
   </div>;
