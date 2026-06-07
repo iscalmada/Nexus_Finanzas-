@@ -23,6 +23,7 @@ const {useState,useEffect}=React;
 const GOLD="#C9A84C";
 const lsCFP=(k,d)=>{try{const v=localStorage.getItem('nexus_'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
 const lsCFC=(k,d)=>{try{const v=localStorage.getItem('nexus_crm_'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
+const hashPin=p=>p.split('').reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0).toString(36);
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX",{minimumFractionDigits:0,maximumFractionDigits:0});
 const comResultProd=(p)=>(p.comisionDirecta!=null&&p.comisionDirecta!=="")?Number(p.comisionDirecta):((Number(p.montoNegocio)||0)*(Number(p.indiceComision)||0)/100);
 const mesActual=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
@@ -57,7 +58,7 @@ function Lock({onOk}){
   const pinApp=String(lsCFP('pinApp',''));
   const[v,setV]=useState("");const[err,setErr]=useState(false);
   const press=(d)=>{ if(v.length>=(pinApp.length||4))return; const n=v+d; setV(n); setErr(false);
-    if(n.length>=pinApp.length){ if(n===pinApp){onOk();} else {setErr(true);setTimeout(()=>{setV("");setErr(false);},700);} } };
+    if(n.length>=(pinApp.length||4)){ if(hashPin(n)===pinApp){onOk();} else {setErr(true);setTimeout(()=>{setV("");setErr(false);},700);} } };
   const del=()=>setV(v.slice(0,-1));
   const dots=Array.from({length:Math.max(pinApp.length||4,v.length)});
   const key={fontSize:24,fontWeight:600,padding:"18px 0",background:"#10101e",border:"1px solid #1e293b",borderRadius:14,color:"#e2e8f0",cursor:"pointer"};
