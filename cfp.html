@@ -252,6 +252,7 @@ const INIT_PRESUPUESTOS = {};
 
 // ─── HELPERS ─────────────────────────────────────────────────
 const fmt      = n=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN",minimumFractionDigits:2}).format(n||0);
+const lsCRM=(k,d)=>{try{const v=localStorage.getItem('nexus_crm_'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
 const fmtShort = n=>{const v=Math.abs(n||0);if(v>=1000000)return`$${(v/1e6).toFixed(1)}M`;if(v>=1000)return`$${(v/1000).toFixed(1)}k`;return fmt(n);};
 const fmtDate  = d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
 const todayStr = ()=>{
@@ -1191,6 +1192,8 @@ function App(){
   useEffect(()=>{ saveLS('factorFEF', factorFEF); }, [factorFEF]);
   useEffect(()=>{ saveLS('etapasAvance', etapasAvance); }, [etapasAvance]);
   useEffect(()=>{ saveLS('solucionesNexus', solucionesNexus); }, [solucionesNexus]);
+  useEffect(()=>{const h=(e)=>{if(!e.key||e.key.indexOf('nexus_crm_')===0)setCrmTick(t=>t+1);};window.addEventListener('storage',h);return ()=>window.removeEventListener('storage',h);},[]);
+  useEffect(()=>{ if(view==="oportunidades") setCrmTick(t=>t+1); },[view]);
   useEffect(()=>{ saveLS('aliadosEst', aliadosEst); }, [aliadosEst]);
   useEffect(()=>{ saveLS('aliadosCom', aliadosCom); }, [aliadosCom]);
   useEffect(()=>{ saveLS('deudores', deudores); }, [deudores]);
@@ -1314,6 +1317,8 @@ function App(){
   const[editOpoId,setEditOpoId]=useState(null);
   const[formOpo,setFormOpo]=useState({});
   const[viewOpo,setViewOpo]=useState(null);
+  const[crmTick,setCrmTick]=useState(0); // refresco del reflejo CFC
+  const[verRef,setVerRef]=useState(null); // detalle de oportunidad reflejada
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[pinInput,setPinInput]=useState('');
   const[pinError,setPinError]=useState(false);
@@ -3208,538 +3213,78 @@ function App(){
 
 
         {/* ── OPORTUNIDADES NEXUS ── */}
-        {view==="oportunidades"&&(
-          <div style={S.sec}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:11}}>
-              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                <button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button>
-                <span style={{...S.sTit,margin:0}}>OPORTUNIDADES NEXUS</span>
+        {view==="oportunidades"&&(()=>{
+          const opos=lsCRM('oportunidades',[]);
+          const cat=lsCRM('catalogos',{})||{};
+          const sols=cat.solucion||[]; const etps=cat.etapaOportunidad||[];
+          const conts=lsCRM('contactos',[]); const emps=lsCRM('empresas',[]);
+          const solName=(id)=>(sols.find(s=>s.id===id)||{}).nombre||"";
+          const contName=(id)=>(conts.find(c=>c.id===id)||{}).nombreCompleto||"";
+          const empName=(id)=>(emps.find(e=>e.id===id)||{}).nombre||"";
+          const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
+          const etColor=(et)=>et==="Oportunidad Concretada"?"#C9A84C":et==="Oportunidad Rechazada"?"#475569":"#22c55e";
+          const abiertas=opos.filter(ABIERTA);
+          const concret=opos.filter(o=>o.etapa==="Oportunidad Concretada");
+          const comAb=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
+          const comCon=concret.reduce((s,o)=>s+(Number(o.comisionEstimada)||Number(o.montoEstimado)||0),0);
+          const lista=opos.filter(o=>!opoFiltroEtapa||o.etapa===opoFiltroEtapa).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+          const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
+          const cardS={background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8};
+          return (
+            <div style={{padding:"0 14px 90px"}}>
+              <div style={{padding:"14px 2px 8px"}}>
+                <div style={{fontSize:18,fontWeight:800,color:"#e2e8f0"}}>Oportunidades</div>
+                <div style={{fontSize:10,color:"#64748b",marginTop:2}}>{opos.length} en total · {abiertas.length} abiertas · reflejo del CFC</div>
               </div>
-              <button style={{...S.smBtn("#C9A84C"),fontSize:9,padding:"5px 10px"}} onClick={()=>setShowOpoCatalogos(true)}>⚙ Catálogos</button>
-            </div>
-
-            {/* Resumen Pipeline */}
-            {(()=>{
-              const activas=oportunidades.filter(o=>{const e=getEtapa(o.etapaId,etapasAvance);return e.pctAvance>0&&e.pctAvance<100;});
-              const concretadas=oportunidades.filter(o=>o.etapaId==="ea5");
-              const montoActivas=activas.reduce((s,o)=>s+(o.montoEstimado||0),0);
-              const montoAltaProb=activas.filter(o=>{const e=getEtapa(o.etapaId,etapasAvance);return e.pctAvance>=80;}).reduce((s,o)=>s+(o.montoEstimado||0),0);
-              const montoConcretadas=concretadas.reduce((s,o)=>s+(o.montoEstimado||0),0);
-              return(
-                <div style={{...S.card("rgba(201,168,76,0.25)"),marginBottom:11}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:5}}>
-                    <div style={{textAlign:"center"}}>
-                      <div style={S.lbl}>Pipeline activo</div>
-                      <div style={{fontSize:14,fontWeight:800,color:"#C9A84C"}}>{fmt(montoActivas)}</div>
-                      <div style={{fontSize:9,color:"#475569"}}>{activas.length} ops</div>
-                    </div>
-                    <div style={{textAlign:"center"}}>
-                      <div style={S.lbl}>Prob. Alta</div>
-                      <div style={{fontSize:14,fontWeight:800,color:"#22c55e"}}>{fmt(montoAltaProb)}</div>
-                    </div>
-                    <div style={{textAlign:"center"}}>
-                      <div style={S.lbl}>Concretadas</div>
-                      <div style={{fontSize:14,fontWeight:800,color:"#C9A84C"}}>{fmt(montoConcretadas)}</div>
-                      <div style={{fontSize:9,color:"#475569"}}>{concretadas.length} ops</div>
-                    </div>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Comisión abierta</div><div style={{fontSize:17,fontWeight:800,color:"#22c55e"}}>{fmt(comAb)}</div></div>
+                <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Comisión concretada</div><div style={{fontSize:17,fontWeight:800,color:"#C9A84C"}}>{fmt(comCon)}</div></div>
+              </div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
+                {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
+              </div>
+              {lista.map(o=>{ const monto=o.comisionEstimada||o.montoEstimado; return (
+                <div key={o.id} style={{...cardS,cursor:"pointer",borderColor:etColor(o.etapa)+"55"}} onClick={()=>setVerRef(o)}>
+                  <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
+                    <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{o.concepto}</div>
+                    {monto?<div style={{fontSize:13,fontWeight:800,color:"#C9A84C",whiteSpace:"nowrap"}}>{fmt(monto)}</div>:null}
+                  </div>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
+                    <span style={tag(etColor(o.etapa))}>{(o.etapa||"").replace("Oportunidad ","")}</span>
+                    {o.solucionId&&<span style={tag("#C9A84C")}>◈ {solName(o.solucionId)}</span>}
+                    {(o.contactoPrincipalId||o.contactoId)&&<span style={tag("#94a3b8")}>{contName(o.contactoPrincipalId||o.contactoId)}</span>}
+                    {o.empresaId&&<span style={tag("#3b82f6")}>{empName(o.empresaId)}</span>}
                   </div>
                 </div>
-              );
-            })()}
-
-            {/* Filtros */}
-            <div style={{...S.chips,marginBottom:5}}>
-              <button style={S.chip(opoFiltroEtapa===null)} onClick={()=>setOpoFiltroEtapa(null)}>Todas las etapas</button>
-              {etapasAvance.filter(e=>e.pctAvance>0&&e.pctAvance<100).map(e=>(
-                <button key={e.id} style={S.chip(opoFiltroEtapa===e.id,opoColor(e.pctAvance))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.id?null:e.id)}>{e.nombre}</button>
-              ))}
-            </div>
-            {(aliadosEst.length>0||aliadosCom.length>0||solucionesNexus.length>0)&&(
-              <div style={{display:"flex",gap:6,marginBottom:5,flexWrap:"wrap"}}>
-                {aliadosEst.length>0&&(
-                  <div style={{position:"relative"}}>
-                    <button style={S.chip(opoFiltroAliEst.size>0,"#a78bfa")} onClick={()=>{setShowOpoFiltroAliEst(v=>!v);setShowOpoFiltroAliCom(false);setShowOpoFiltroSol(false);}}>
-                      ⚡ Aliado Est.{opoFiltroAliEst.size>0?" ("+opoFiltroAliEst.size+")":""}
-                    </button>
-                    {showOpoFiltroAliEst&&(
-                      <div style={{position:"absolute",top:"100%",left:0,zIndex:150,background:"#0d0d1a",border:"1px solid #a78bfa44",borderRadius:10,padding:"8px 10px",minWidth:170,boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
-                        <div style={{fontSize:8,color:"#a78bfa",fontWeight:700,marginBottom:6}}>ALIADO ESTRATÉGICO</div>
-                        {aliadosEst.map(a=>{const sel=opoFiltroAliEst.has(a.id);return(
-                          <div key={a.id} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setOpoFiltroAliEst(prev=>{const n=new Set(prev);n.has(a.id)?n.delete(a.id):n.add(a.id);return n;})}>
-                            <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?"#a78bfa":"#334155"),background:sel?"#a78bfa":"transparent",flexShrink:0}}/>
-                            <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b"}}>{a.nombre}</span>
-                          </div>
-                        );})}
-                        <button style={{...S.smBtn("#475569"),width:"100%",marginTop:6,fontSize:8}} onClick={()=>{setOpoFiltroAliEst(new Set());setShowOpoFiltroAliEst(false);}}>Limpiar</button>
+              );})}
+              {lista.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>No hay oportunidades en el CFC.</div>}
+              <div style={{fontSize:10,color:"#475569",textAlign:"center",marginTop:6}}>Las oportunidades se crean y editan en el CFC.</div>
+              {verRef&&(()=>{
+                const o=opos.find(x=>x.id===verRef.id)||verRef;
+                const row=(l,v)=>v?<div style={{display:"flex",justifyContent:"space-between",gap:10,padding:"7px 0",borderBottom:"1px solid #14141f"}}><span style={{fontSize:11,color:"#64748b"}}>{l}</span><span style={{fontSize:12,color:"#e2e8f0",textAlign:"right"}}>{v}</span></div>:null;
+                return (
+                  <div style={{position:"fixed",inset:0,background:"rgba(8,8,16,0.7)",zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setVerRef(null)}>
+                    <div style={{width:"100%",maxWidth:480,background:"#0b0b16",borderTop:"2px solid #C9A84C",borderRadius:"16px 16px 0 0",padding:"18px 18px 28px",maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                        <div style={{fontSize:16,fontWeight:800,color:"#e2e8f0"}}>{o.concepto}</div>
+                        <button onClick={()=>setVerRef(null)} style={{background:"transparent",border:"none",color:"#64748b",fontSize:20,cursor:"pointer"}}>✕</button>
                       </div>
-                    )}
-                  </div>
-                )}
-                {aliadosCom.length>0&&(
-                  <div style={{position:"relative"}}>
-                    <button style={S.chip(opoFiltroAliCom.size>0,"#38bdf8")} onClick={()=>{setShowOpoFiltroAliCom(v=>!v);setShowOpoFiltroAliEst(false);setShowOpoFiltroSol(false);}}>
-                      🤝 Aliado Com.{opoFiltroAliCom.size>0?" ("+opoFiltroAliCom.size+")":""}
-                    </button>
-                    {showOpoFiltroAliCom&&(
-                      <div style={{position:"absolute",top:"100%",left:0,zIndex:150,background:"#0d0d1a",border:"1px solid #38bdf844",borderRadius:10,padding:"8px 10px",minWidth:170,boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
-                        <div style={{fontSize:8,color:"#38bdf8",fontWeight:700,marginBottom:6}}>ALIADO COMERCIAL</div>
-                        {aliadosCom.map(a=>{const sel=opoFiltroAliCom.has(a.id);return(
-                          <div key={a.id} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setOpoFiltroAliCom(prev=>{const n=new Set(prev);n.has(a.id)?n.delete(a.id):n.add(a.id);return n;})}>
-                            <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?"#38bdf8":"#334155"),background:sel?"#38bdf8":"transparent",flexShrink:0}}/>
-                            <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b"}}>{a.nombre}</span>
-                          </div>
-                        );})}
-                        <button style={{...S.smBtn("#475569"),width:"100%",marginTop:6,fontSize:8}} onClick={()=>{setOpoFiltroAliCom(new Set());setShowOpoFiltroAliCom(false);}}>Limpiar</button>
+                      <span style={tag(etColor(o.etapa))}>{(o.etapa||"").replace("Oportunidad ","")}</span>
+                      <div style={{marginTop:12}}>
+                        {row("Solución",solName(o.solucionId))}
+                        {row("Contacto",contName(o.contactoPrincipalId||o.contactoId))}
+                        {row("Empresa",empName(o.empresaId))}
+                        {row("Monto estimado",o.montoEstimado?fmt(o.montoEstimado):null)}
+                        {row("Comisión estimada",o.comisionEstimada?fmt(o.comisionEstimada):null)}
+                        {row("Cierre estimado",o.fechaEstimadaCierre?fmtDate(o.fechaEstimadaCierre):null)}
+                        {row("Concretada",o.fechaConcretada?fmtDate(o.fechaConcretada):null)}
                       </div>
-                    )}
-                  </div>
-                )}
-                {solucionesNexus.length>0&&(
-                  <div style={{position:"relative"}}>
-                    <button style={S.chip(opoFiltroSol.size>0,"#C9A84C")} onClick={()=>{setShowOpoFiltroSol(v=>!v);setShowOpoFiltroAliEst(false);setShowOpoFiltroAliCom(false);}}>
-                      ◈ Solución{opoFiltroSol.size>0?" ("+opoFiltroSol.size+")":""}
-                    </button>
-                    {showOpoFiltroSol&&(
-                      <div style={{position:"absolute",top:"100%",left:0,zIndex:150,background:"#0d0d1a",border:"1px solid #C9A84C44",borderRadius:10,padding:"8px 10px",minWidth:170,boxShadow:"0 4px 20px rgba(0,0,0,0.6)"}}>
-                        <div style={{fontSize:8,color:"#C9A84C",fontWeight:700,marginBottom:6}}>SOLUCIÓN NEXUS</div>
-                        {solucionesNexus.map(s=>{const sel=opoFiltroSol.has(s.id);return(
-                          <div key={s.id} style={{display:"flex",alignItems:"center",gap:7,padding:"5px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setOpoFiltroSol(prev=>{const n=new Set(prev);n.has(s.id)?n.delete(s.id):n.add(s.id);return n;})}>
-                            <div style={{width:13,height:13,borderRadius:3,border:"2px solid "+(sel?"#C9A84C":"#334155"),background:sel?"#C9A84C":"transparent",flexShrink:0}}/>
-                            <span style={{fontSize:10,color:sel?"#e2e8f0":"#64748b"}}>{s.nombre}</span>
-                          </div>
-                        );})}
-                        <button style={{...S.smBtn("#475569"),width:"100%",marginTop:6,fontSize:8}} onClick={()=>{setOpoFiltroSol(new Set());setShowOpoFiltroSol(false);}}>Limpiar</button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Tabs + orden */}
-            <div style={{display:"flex",alignItems:"center",borderBottom:"1px solid #1e293b",marginBottom:11}}>
-              {[["activas","🟡 Activas"],["concretadas","✅ Concretadas"],["rechazadas","❌ Rechazadas"]].map(([k,l])=>(
-                <button key={k} style={{flex:1,padding:"8px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
-                  color:opoTab===k?"#C9A84C":"#334155",borderBottom:opoTab===k?"2px solid #C9A84C":"2px solid transparent"}}
-                  onClick={()=>setOpoTab(k)}>{l}</button>
-              ))}
-              <button style={{...S.smBtn("#475569"),fontSize:8,marginLeft:6,flexShrink:0,padding:"4px 7px"}}
-                onClick={()=>setOpoOrden(o=>o==="fechaCierre"?"pctAvance":"fechaCierre")}>
-                {opoOrden==="fechaCierre"?"📅 Fecha":"📊 Avance"}
-              </button>
-            </div>
-
-            {/* Lista */}
-            {(()=>{
-              let lista=oportunidades.filter(o=>{
-                const e=getEtapa(o.etapaId,etapasAvance);
-                if(opoTab==="activas")     return e.pctAvance>0&&e.pctAvance<100;
-                if(opoTab==="concretadas") return o.etapaId==="ea5";
-                return e.pctAvance===0; // rechazadas
-              });
-              if(opoFiltroEtapa)  lista=lista.filter(o=>o.etapaId===opoFiltroEtapa);
-              if(opoFiltroAliEst.size>0) lista=lista.filter(o=>opoFiltroAliEst.has(o.aliadoEst));
-              if(opoFiltroAliCom.size>0) lista=lista.filter(o=>opoFiltroAliCom.has(o.aliadoCom));
-              if(opoFiltroSol.size>0)    lista=lista.filter(o=>opoFiltroSol.has(o.solucionNexus));
-              lista=lista.sort((a,b)=>{
-                if(opoOrden==="pctAvance"){
-                  const pa=getEtapa(a.etapaId,etapasAvance).pctAvance;
-                  const pb=getEtapa(b.etapaId,etapasAvance).pctAvance;
-                  return pb-pa;
-                }
-                return ((a.fechaEstimadaCierre||"9999")<(b.fechaEstimadaCierre||"9999")?-1:(a.fechaEstimadaCierre||"9999")>(b.fechaEstimadaCierre||"9999")?1:0);
-              });
-
-              if(lista.length===0) return(
-                <div style={{textAlign:"center",padding:"36px 0",color:"#334155",fontSize:12}}>
-                  {opoTab==="activas"?"Sin oportunidades activas":opoTab==="concretadas"?"Sin oportunidades concretadas":"Sin oportunidades rechazadas"}
-                </div>
-              );
-
-              return lista.map(opo=>{
-                const etapa=getEtapa(opo.etapaId,etapasAvance);
-                const color=opoColor(etapa.pctAvance);
-                const prob=opoProbLabel(etapa.pctAvance);
-                const sol=solucionesNexus.find(s=>s.id===opo.solucionNexus);
-                const aliEst=aliadosEst.find(a=>a.id===opo.aliadoEst);
-                const aliCom=aliadosCom.find(a=>a.id===opo.aliadoCom);
-                const sinMovimiento=opo.etapaId==="ea5"&&(opo.movIdsVinculados||[]).length===0;
-                return(
-                  <div key={opo.id} style={{...S.card(),borderLeft:"3px solid "+color,cursor:"pointer",marginBottom:8,
-                    outline:sinMovimiento?"1px solid #C9A84C44":"none"}}
-                    onClick={()=>setViewOpo(opo)}>
-                    {sinMovimiento&&<div style={{fontSize:8,color:"#C9A84C",fontWeight:700,marginBottom:5}}>⚠ Pendiente vincular movimiento de ingreso</div>}
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
-                      <div style={{flex:1,marginRight:10}}>
-                        <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3,flexWrap:"wrap"}}>
-                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:color+"22",color}}>{etapa.nombre}</span>
-                          <span style={{fontSize:8,padding:"2px 7px",borderRadius:6,fontWeight:700,background:prob.color+"18",color:prob.color}}>★ {prob.label}</span>
-                          {opo.recurrencia&&opo.recurrencia!=="Única"&&<span style={{fontSize:8,color:"#a78bfa",background:"rgba(167,139,250,0.1)",padding:"2px 6px",borderRadius:5}}>↻ {opo.recurrencia}</span>}
-                        </div>
-                        {(opo.empresa||opo.contacto)&&(
-                          <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0",marginBottom:1}}>
-                            {opo.empresa||opo.contacto}
-                            {opo.empresa&&opo.contacto&&<span style={{fontSize:10,fontWeight:400,color:"#94a3b8"}}> · {opo.contacto}</span>}
-                          </div>
-                        )}
-                        <div style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{opo.concepto}</div>
-                      </div>
-                      <div style={{textAlign:"right",flexShrink:0}}>
-                        <div style={{fontSize:9,color:"#64748b"}}>Estimado</div>
-                        <div style={{fontSize:15,fontWeight:800,color:"#C9A84C"}}>{fmt(opo.montoEstimado||0)}</div>
-                      </div>
-                    </div>
-                    {/* Barra de progreso por etapa */}
-                    <div style={{height:4,borderRadius:2,background:"#1e293b",overflow:"hidden",marginBottom:5}}>
-                      <div style={{height:"100%",borderRadius:2,background:color,width:etapa.pctAvance+"%",transition:"width 0.4s"}}/>
-                    </div>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:9,color:"#475569"}}>
-                      <div style={{display:"flex",gap:7}}>
-                        {aliEst&&<span style={{color:"#a78bfa"}}>⚡ {aliEst.nombre}</span>}
-                        {aliCom&&<span style={{color:"#38bdf8"}}>🤝 {aliCom.nombre}</span>}
-                        {sol&&<span style={{color:"#C9A84C"}}>◈ {sol.nombre}</span>}
-                      </div>
-                      <span style={{color}}>{etapa.pctAvance}% · {opo.fechaEstimadaCierre?fmtDate(opo.fechaEstimadaCierre):"Sin fecha"}</span>
+                      <div style={{fontSize:10,color:"#475569",textAlign:"center",marginTop:16}}>Reflejo del CFC · solo lectura</div>
                     </div>
                   </div>
                 );
-              });
-            })()}
-            <div style={{height:80}}/>
-            <button style={S.fab} onClick={()=>openOpoForm()}>+</button>
-          </div>
-        )}
-
-        {/* ── MODAL DETALLE OPORTUNIDAD ── */}
-        {viewOpo&&(()=>{
-          // Refrescar desde el array por si hubo cambios
-          const opo=oportunidades.find(o=>o.id===viewOpo.id)||viewOpo;
-          const etapa=getEtapa(opo.etapaId,etapasAvance);
-          const color=opoColor(etapa.pctAvance);
-          const prob=opoProbLabel(etapa.pctAvance);
-          const esConcretada=opo.etapaId==="ea5";
-          const esRechazada=etapa.pctAvance===0;
-          const esActiva=!esConcretada&&!esRechazada;
-          const sol=solucionesNexus.find(s=>s.id===opo.solucionNexus);
-          const aliEst=aliadosEst.find(a=>a.id===opo.aliadoEst);
-          const aliCom=aliadosCom.find(a=>a.id===opo.aliadoCom);
-          const movsVinc=movs.filter(m=>(opo.movIdsVinculados||[]).includes(m.id));
-          const totalVinc=movsVinc.filter(m=>["PAGADO","INGRESADO"].includes(m.estatus)).reduce((s,m)=>s+m.monto,0);
-          const totalProg=movsVinc.filter(m=>m.estatus==="PROGRAMADO"||m.estatus==="PROYECTADO").reduce((s,m)=>s+m.monto,0);
-          const pendiente=Math.max(0,(opo.montoEstimado||0)-totalVinc);
-          return(
-            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setViewOpo(null);}}>
-              <div style={S.mBox}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                  <div style={S.mTit}>🚀 OPORTUNIDAD</div>
-                  <button style={{background:"none",border:"none",color:"#475569",fontSize:18,cursor:"pointer"}} onClick={()=>setViewOpo(null)}>✕</button>
-                </div>
-
-                {/* Header */}
-                <div style={{background:"#13131f",borderRadius:11,padding:"12px 14px",marginBottom:11}}>
-                  <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:5,flexWrap:"wrap"}}>
-                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:color+"22",color}}>{etapa.nombre}</span>
-                    <span style={{fontSize:9,padding:"3px 9px",borderRadius:7,fontWeight:700,background:prob.color+"18",color:prob.color}}>★ {prob.label}</span>
-                    {opo.recurrencia&&opo.recurrencia!=="Única"&&<span style={{fontSize:9,color:"#a78bfa",background:"rgba(167,139,250,0.1)",padding:"2px 7px",borderRadius:5}}>↻ {opo.recurrencia}</span>}
-                  </div>
-                  <div style={{height:5,borderRadius:3,background:"#1e293b",overflow:"hidden",marginBottom:8}}>
-                    <div style={{height:"100%",borderRadius:3,background:color,width:etapa.pctAvance+"%",transition:"width 0.4s"}}/>
-                  </div>
-                  {(opo.empresa||opo.contacto)&&(
-                    <div style={{fontSize:15,fontWeight:800,color:"#e2e8f0",marginBottom:2}}>
-                      {opo.empresa||opo.contacto}
-                      {opo.empresa&&opo.contacto&&<span style={{fontSize:11,fontWeight:400,color:"#94a3b8"}}> · {opo.contacto}</span>}
-                    </div>
-                  )}
-                  <div style={{fontSize:11,color:"#94a3b8",marginBottom:4}}>{opo.concepto}</div>
-                  {etapa.descripcion&&<div style={{fontSize:9,color:"#475569",fontStyle:"italic",marginTop:5,borderTop:"1px solid #1e293b",paddingTop:5}}>{etapa.descripcion}</div>}
-                </div>
-
-                {/* Detalles */}
-                <div style={{background:"#13131f",borderRadius:9,padding:"10px 13px",marginBottom:11}}>
-                  {[
-                    sol&&["Solución Nexus",sol.nombre,"#C9A84C"],
-                    aliEst&&["Aliado Estratégico",aliEst.nombre,"#a78bfa"],
-                    aliCom&&["Aliado Comercial",aliCom.nombre,"#38bdf8"],
-                    opo.fechaEstimadaCierre&&["Cierre estimado",fmtDate(opo.fechaEstimadaCierre),"#64748b"],
-                    opo.condiciones&&["Condiciones",opo.condiciones,"#64748b"],
-                    opo.notas&&["Notas",opo.notas,"#64748b"],
-                  ].filter(Boolean).map(([lbl,val,c])=>(
-                    <div key={lbl} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"5px 0",borderBottom:"1px solid #1e293b11"}}>
-                      <span style={{fontSize:9,color:"#475569",flexShrink:0,marginRight:10}}>{lbl}</span>
-                      <span style={{fontSize:10,color:c,fontWeight:600,textAlign:"right",wordBreak:"break-word",maxWidth:"65%"}}>{val}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Monto y seguimiento de cobro */}
-                <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid #C9A84C33",borderRadius:9,padding:"11px 13px",marginBottom:11}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                    <div style={{fontSize:9,color:"#C9A84C",fontWeight:700}}>INGRESO ESTIMADO</div>
-                    <div style={{fontSize:20,fontWeight:800,color:"#C9A84C"}}>{fmt(opo.montoEstimado||0)}</div>
-                  </div>
-                  <div style={{display:"flex",gap:6,marginBottom:movsVinc.length>0?8:0}}>
-                    <div style={{flex:1,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
-                      <div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>Ingresado</div>
-                      <div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(totalVinc)}</div>
-                    </div>
-                    <div style={{flex:1,background:"rgba(167,139,250,0.1)",border:"1px solid #a78bfa33",borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
-                      <div style={{fontSize:7,color:"#a78bfa",fontWeight:700}}>Prog/Proy</div>
-                      <div style={{fontSize:12,fontWeight:800,color:"#a78bfa"}}>{fmt(totalProg)}</div>
-                    </div>
-                    <div style={{flex:1,background:pendiente>0?"rgba(251,191,36,0.1)":"rgba(34,197,94,0.1)",border:"1px solid "+(pendiente>0?"#fbbf2433":"#22c55e33"),borderRadius:7,padding:"6px 8px",textAlign:"center"}}>
-                      <div style={{fontSize:7,color:pendiente>0?"#fbbf24":"#22c55e",fontWeight:700}}>Pendiente</div>
-                      <div style={{fontSize:12,fontWeight:800,color:pendiente>0?"#fbbf24":"#22c55e"}}>{fmt(pendiente)}</div>
-                    </div>
-                  </div>
-                  {movsVinc.length>0&&(
-                    <div style={{borderTop:"1px solid #C9A84C22",paddingTop:8}}>
-                      <div style={{fontSize:8,color:"#C9A84C",fontWeight:700,letterSpacing:1,marginBottom:6}}>MOVIMIENTOS VINCULADOS</div>
-                      {movsVinc.map(m=>{
-                        const esIng=["INGRESADO","PAGADO"].includes(m.estatus);
-                        const c=esIng?"#22c55e":m.estatus==="PROYECTADO"?"#38bdf8":"#a78bfa";
-                        return(
-                          <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid #1e293b22"}}>
-                            <div>
-                              <span style={S.badge(m.estatus)}>{m.estatus}</span>
-                              <span style={{fontSize:10,color:"#94a3b8",marginLeft:6}}>{m.concepto}</span>
-                              {m.fecha&&<span style={{fontSize:9,color:"#475569",marginLeft:4}}>{fmtDate(m.fecha)}</span>}
-                            </div>
-                            <span style={{fontSize:12,fontWeight:800,color:c,marginLeft:8}}>{fmt(m.monto)}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {movsVinc.length===0&&<div style={{fontSize:9,color:"#475569",textAlign:"center",paddingTop:4}}>Sin movimientos vinculados</div>}
-                </div>
-
-                {/* Botón vincular movimiento — disponible en todas las etapas activas */}
-                {!esRechazada&&(
-                  <button style={{...S.saveB,
-                    background:esConcretada?"linear-gradient(135deg,#22c55e,#16a34a)":"rgba(201,168,76,0.15)",
-                    color:esConcretada?"#fff":"#C9A84C",
-                    border:esConcretada?"none":"1px solid #C9A84C44",
-                    marginBottom:7}}
-                    onClick={()=>{
-                      const opoActual=oportunidades.find(x=>x.id===opo.id)||opo;
-                      const movsActuales=movs.filter(m=>(opoActual.movIdsVinculados||[]).includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-                      const yaIng=movsActuales.reduce((s,m)=>s+m.monto,0);
-                      const pend=Math.max(0,(opoActual.montoEstimado||0)-yaIng);
-                      setViewOpo(null);
-                      setFormMov({...BLANK_MOV,
-                        tipoOp:"Ingreso",
-                        estatus:opoActual.etapaId==="ea5"?"PROGRAMADO":"PROYECTADO",
-                        concepto:opoActual.concepto,
-                        monto:String(pend||opoActual.montoEstimado||""),
-                        vinculoTipo:"oportunidades",
-                        vinculoId:opoActual.id,
-                      });
-                      setRecForm({...BLANK_REC,
-                        activo:opoActual.recurrencia!=="Única",
-                        recurrencia:opoActual.recurrencia==="Anual"?"Anual":"Mensual",
-                        fechaInicio:todayStr(),
-                      });
-                      setEditMovId(null);setSaveError("");setFieldErrors(null);
-                      setShowMov(true);
-                    }}>
-                    {esConcretada?"+ Vincular movimiento de ingreso":"+ Proyectar ingreso (no concretada)"}
-                  </button>
-                )}
-
-                {/* Acciones */}
-                <div style={{display:"flex",gap:7,marginBottom:7}}>
-                  <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(201,168,76,0.15)",color:"#C9A84C",border:"1px solid #C9A84C44"}}
-                    onClick={()=>{setViewOpo(null);openOpoForm(opo);}}>✏ Editar</button>
-                  {esActiva&&(
-                    <button style={{...S.saveB,flex:1,marginTop:0,background:"linear-gradient(135deg,#C9A84C,#8a6520)",color:"#080810"}}
-                      onClick={()=>concretarOportunidad(opo)}>✅ Concretar</button>
-                  )}
-                  {esActiva&&(
-                    <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(71,85,105,0.3)",color:"#94a3b8",border:"1px solid #47556933"}}
-                      onClick={()=>rechazarOportunidad(opo)}>❌ Rechazar</button>
-                  )}
-                </div>
-                <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717133",fontSize:10,marginBottom:5}} onClick={()=>{
-                  if(window.confirm("¿Eliminar esta oportunidad?")){
-                    setOportunidades(p=>p.filter(x=>x.id!==opo.id));
-                    setViewOpo(null);
-                  }
-                }}>🗑 Eliminar oportunidad</button>
-                <button style={S.cancB} onClick={()=>setViewOpo(null)}>Cerrar</button>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ── MODAL FORMULARIO OPORTUNIDAD ── */}
-        {showOpoForm&&(()=>{
-          const set=(k,v)=>setFormOpo(f=>({...f,[k]:v}));
-          return(
-            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowOpoForm(false);}}>
-              <div style={S.mBox}>
-                <div style={S.mTit}>{editOpoId?"✏ EDITAR":"+ NUEVA"} OPORTUNIDAD NEXUS</div>
-                <div style={S.fg}><label style={S.fl}>Concepto / Servicio</label>
-                  <input style={S.inp} value={formOpo.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="¿Qué se va a gestionar?"/>
-                </div>
-                <div style={{...S.r2,marginBottom:11}}>
-                  <div><label style={S.fl}>Empresa / Actividad</label>
-                    <input style={S.inp} value={formOpo.empresa||""} onChange={e=>set("empresa",e.target.value)} placeholder="Empresa…"/>
-                  </div>
-                  <div><label style={S.fl}>Contacto</label>
-                    <input style={S.inp} value={formOpo.contacto||""} onChange={e=>set("contacto",e.target.value)} placeholder="Nombre contacto…"/>
-                  </div>
-                </div>
-                <div style={S.fg}>
-                  <label style={S.fl}>Solución Nexus</label>
-                  <select style={S.sel} value={formOpo.solucionNexus||""} onChange={e=>set("solucionNexus",e.target.value)}>
-                    <option value="">— Sin especificar —</option>
-                    {solucionesNexus.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
-                  </select>
-                  {solucionesNexus.length===0&&<div style={{fontSize:9,color:"#475569",marginTop:2}}>Agrega soluciones en ⚙ Catálogos</div>}
-                </div>
-                <div style={{...S.r2,marginBottom:11}}>
-                  <div><label style={S.fl}>Aliado Estratégico</label>
-                    <select style={S.sel} value={formOpo.aliadoEst||""} onChange={e=>set("aliadoEst",e.target.value)}>
-                      <option value="">— N/A —</option>
-                      {aliadosEst.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
-                    </select>
-                  </div>
-                  <div><label style={S.fl}>Aliado Comercial</label>
-                    <select style={S.sel} value={formOpo.aliadoCom||""} onChange={e=>set("aliadoCom",e.target.value)}>
-                      <option value="">— N/A —</option>
-                      {aliadosCom.map(a=><option key={a.id} value={a.id}>{a.nombre}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div style={S.fg}>
-                  <label style={S.fl}>Etapa de Avance</label>
-                  <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                    {etapasAvance.filter(e=>e.pctAvance>0).map(e=>{
-                      const c=opoColor(e.pctAvance);
-                      const sel=formOpo.etapaId===e.id;
-                      return(
-                        <button key={e.id} onClick={()=>set("etapaId",e.id)}
-                          style={{display:"flex",alignItems:"center",gap:9,padding:"8px 11px",borderRadius:9,border:"1px solid "+(sel?c:"#1e293b"),background:sel?c+"18":"#13131f",cursor:"pointer",textAlign:"left"}}>
-                          <div style={{width:28,height:28,borderRadius:14,background:sel?c:"#1e293b",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:800,color:sel?"#080810":"#475569",flexShrink:0}}>{e.pctAvance}%</div>
-                          <div>
-                            <div style={{fontSize:11,fontWeight:sel?800:500,color:sel?c:"#94a3b8"}}>{e.nombre}</div>
-                            <div style={{fontSize:9,color:"#475569"}}>{e.descripcion}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div style={{...S.r2,marginBottom:11}}>
-                  <div><label style={S.fl}>Ingreso estimado $</label>
-                    <input style={S.inp} type="number" value={formOpo.montoEstimado||""} onChange={e=>set("montoEstimado",e.target.value)} placeholder="0.00"/>
-                  </div>
-                  <div><label style={S.fl}>Cierre estimado</label>
-                    <input style={S.inp} type="date" value={formOpo.fechaEstimadaCierre||""} onChange={e=>set("fechaEstimadaCierre",e.target.value)}/>
-                  </div>
-                </div>
-                <div style={S.fg}>
-                  <label style={S.fl}>Recurrencia del ingreso</label>
-                  <div style={{display:"flex",gap:7}}>
-                    {OPO_REC_OPTS.map(r=><button key={r} style={{...S.prioB2(formOpo.recurrencia===r,"#C9A84C"),flex:1,padding:"7px 0",fontSize:10}} onClick={()=>set("recurrencia",r)}>{r}</button>)}
-                  </div>
-                  {formOpo.recurrencia&&formOpo.recurrencia!=="Única"&&<div style={{fontSize:9,color:"#a78bfa",marginTop:3}}>↻ Al vincular movimiento, se ofrecerá generar la serie {formOpo.recurrencia.toLowerCase()}</div>}
-                </div>
-                <div style={S.fg}><label style={S.fl}>Condiciones</label>
-                  <textarea style={{...S.inp,minHeight:55,resize:"vertical",lineHeight:1.5}} value={formOpo.condiciones||""} onChange={e=>set("condiciones",e.target.value)} placeholder="Comisiones, plazos, condiciones particulares…"/>
-                </div>
-                <div style={S.fg}><label style={S.fl}>Notas generales</label>
-                  <textarea style={{...S.inp,minHeight:55,resize:"vertical",lineHeight:1.5}} value={formOpo.notas||""} onChange={e=>set("notas",e.target.value)} placeholder="Próximos pasos, contexto…"/>
-                </div>
-                <button style={S.saveB} onClick={saveOpo}>GUARDAR</button>
-                <button style={S.cancB} onClick={()=>setShowOpoForm(false)}>Cancelar</button>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ── MODAL CATÁLOGOS OPORTUNIDADES ── */}
-        {showOpoCatalogos&&(()=>{
-          const catActual=opoCatTab==="etapas"?etapasAvance:opoCatTab==="soluciones"?solucionesNexus:opoCatTab==="aliadosEst"?aliadosEst:aliadosCom;
-          const setCatActual=opoCatTab==="etapas"?setEtapasAvance:opoCatTab==="soluciones"?setSolucionesNexus:opoCatTab==="aliadosEst"?setAliadosEst:setAliadosCom;
-          const esEtapas=opoCatTab==="etapas";
-          const nextCatId=arr=>arr.length?"c"+Date.now():"c1";
-          return(
-            <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)setShowOpoCatalogos(false);}}>
-              <div style={S.mBox}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:13}}>
-                  <div style={S.mTit}>⚙ CATÁLOGOS NEXUS</div>
-                  <button style={{background:"none",border:"none",color:"#475569",fontSize:18,cursor:"pointer"}} onClick={()=>setShowOpoCatalogos(false)}>✕</button>
-                </div>
-                <div style={{display:"flex",gap:4,marginBottom:13,overflowX:"auto"}}>
-                  {[["etapas","📊 Etapas"],["soluciones","◈ Soluciones"],["aliadosEst","⚡ Ali. Est."],["aliadosCom","🤝 Ali. Com."]].map(([k,l])=>(
-                    <button key={k} style={{...S.chip(opoCatTab===k),flexShrink:0}} onClick={()=>{setOpoCatTab(k);setEditOpoCatId&&setEditOpoCatId(null);setEditOpoCatId(null);setNewOpoCatItem&&setNewOpoCatItem({nombre:"",descripcion:"",pctAvance:""});setNewOpoCatItem({nombre:"",descripcion:"",pctAvance:""});}}>{l}</button>
-                  ))}
-                </div>
-                {/* Lista de items */}
-                {catActual.map((item,idx)=>{
-                  const dragObj=opoCatTab==="etapas"?etapasDrag:opoCatTab==="soluciones"?solDrag:opoCatTab==="aliadosEst"?aliEstDrag:aliComDrag;
-                  const isActDrag=dragObj.aId===item.id;
-                  const isOvDrag=dragObj.oViz===item.id;
-                  return(
-                  <div key={item.id}
-                    draggable
-                    onDragStart={()=>dragObj.start(item.id)}
-                    onDragOver={e=>{e.preventDefault();dragObj.enter(item.id);}}
-                    onDrop={dragObj.commit}
-                    style={{background:isActDrag?"#1e2a1e":isOvDrag?"#1a2030":"#13131f",border:"1px solid "+(esEtapas?opoColor(item.pctAvance)+"33":"#1e293b"),borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"grab",transition:"background 0.15s"}}>
-                    {editOpoCatId===item.id?(
-                      <div>
-                        <input style={{...S.inp,marginBottom:6}} value={newOpoCatItem.nombre} onChange={e=>setNewOpoCatItem(f=>({...f,nombre:e.target.value}))} placeholder="Nombre…"/>
-                        {esEtapas&&<>
-                          <input style={{...S.inp,marginBottom:6}} value={newOpoCatItem.descripcion} onChange={e=>setNewOpoCatItem(f=>({...f,descripcion:e.target.value}))} placeholder="Descripción…"/>
-                          <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
-                            <label style={{...S.fl,marginBottom:0,minWidth:60}}>% Avance</label>
-                            <input style={{...S.inp,flex:1}} type="number" min="0" max="100" value={newOpoCatItem.pctAvance} onChange={e=>setNewOpoCatItem(f=>({...f,pctAvance:e.target.value}))}/>
-                          </div>
-                        </>}
-                        <div style={{display:"flex",gap:6}}>
-                          <button style={S.smBtn("#22c55e")} onClick={()=>{
-                            setCatActual(p=>p.map(x=>x.id===item.id?{...x,...newOpoCatItem,pctAvance:parseInt(newOpoCatItem.pctAvance)||x.pctAvance||0}:x));
-                            setEditOpoCatId(null);
-                        }}>✓ Guardar</button>
-                        <button style={S.smBtn("#475569")} onClick={()=>setEditOpoCatId(null)}>Cancelar</button>
-                        </div>
-                      </div>
-                    ):(
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <div style={{flex:1}}>
-                          <div style={{display:"flex",alignItems:"center",gap:6}}>
-                            {esEtapas&&<span style={{fontSize:9,padding:"1px 6px",borderRadius:5,fontWeight:700,background:`${opoColor(item.pctAvance)}22`,color:opoColor(item.pctAvance)}}>{item.pctAvance}%</span>}
-                            <span style={{fontSize:11,fontWeight:700,color:"#e2e8f0"}}>{item.nombre}</span>
-                          </div>
-                          {esEtapas&&item.descripcion&&<div style={{fontSize:9,color:"#475569",marginTop:2}}>{item.descripcion}</div>}
-                        </div>
-                        <div style={{display:"flex",gap:5}}>
-                          <button style={S.smBtn("#C9A84C")} onClick={()=>{setEditOpoCatId(item.id);setNewOpoCatItem({nombre:item.nombre,descripcion:item.descripcion||"",pctAvance:String(item.pctAvance||"")});}}>✏</button>
-                          {!esEtapas&&<button style={S.smBtn("#f87171")} onClick={()=>setCatActual(p=>p.filter(x=>x.id!==item.id))}>✕</button>}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-                })}
-                {/* Agregar nuevo */}
-                {!esEtapas&&(
-                  <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:9,padding:"10px 11px",marginTop:7}}>
-                    <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,marginBottom:7}}>+ AGREGAR</div>
-                    <input style={{...S.inp,marginBottom:6}} value={newOpoCatItem.nombre} onChange={e=>setNewOpoCatItem(f=>({...f,nombre:e.target.value}))} placeholder={"Nombre "+(opoCatTab==="soluciones"?"de la solucion":"del aliado")+"..."}/>
-                    <button style={S.saveB} onClick={()=>{
-                      if(!newOpoCatItem.nombre.trim()) return;
-                      setCatActual(p=>[...p,{id:nextCatId(p),nombre:newOpoCatItem.nombre.trim()}]);
-                      setNewOpoCatItem({nombre:"",descripcion:"",pctAvance:""});
-                    }}>Agregar</button>
-                  </div>
-                )}
-                {esEtapas&&<div style={{...S.infoBx("#475569"),marginTop:7}}><span>ℹ</span><span>Las etapas de avance son la base del pipeline. Edita nombre, descripción y porcentaje. El orden y el porcentaje determinan la probabilidad derivada.</span></div>}
-                <button style={S.cancB} onClick={()=>setShowOpoCatalogos(false)}>Cerrar</button>
-              </div>
+              })()}
             </div>
           );
         })()}
