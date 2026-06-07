@@ -164,6 +164,26 @@ function ChipMulti({opts,sel,setSel,color}){
   </div>;
 }
 
+function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel}){
+  const[abierto,setAbierto]=useState(false);const[q,setQ]=useState("");
+  const sel=opciones.find(o=>o.id===value);
+  const filt=opciones.filter(o=>!q||(o.label||"").toLowerCase().includes(q.toLowerCase()));
+  return <div style={{position:"relative"}}>
+    <div style={{...S.sel,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>{setAbierto(a=>!a);setQ("");}}>
+      <span style={{color:sel?"#e2e8f0":"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?sel.label:(placeholder||"— Selecciona —")}</span>
+      <span style={{color:"#64748b",fontSize:11,flexShrink:0,marginLeft:6}}>{abierto?"▲":"▼"}</span>
+    </div>
+    {abierto&&<div style={{marginTop:4,border:"1px solid #1e293b",borderRadius:8,background:"#0d0d16",overflow:"hidden"}}>
+      <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar…" style={{width:"100%",boxSizing:"border-box",background:"#10101e",border:"none",borderBottom:"1px solid #1e293b",color:"#e2e8f0",fontSize:12,padding:"9px 10px",outline:"none"}}/>
+      <div style={{maxHeight:210,overflowY:"auto"}}>
+        <div style={{padding:"8px 10px",fontSize:12,color:"#64748b",cursor:"pointer",borderBottom:"1px solid #14141f"}} onClick={()=>{onChange(null);setAbierto(false);}}>{vacioLabel||"— Ninguno —"}</div>
+        {filt.map(o=><div key={o.id} onClick={()=>{onChange(o.id);setAbierto(false);}} style={{padding:"8px 10px",fontSize:12,cursor:"pointer",borderBottom:"1px solid #14141f",color:o.id===value?"#2dd4bf":"#e2e8f0",fontWeight:o.id===value?700:400}}>{o.label}</div>)}
+        {filt.length===0&&<div style={{padding:"10px",fontSize:11,color:"#475569"}}>Sin coincidencias.</div>}
+      </div>
+    </div>}
+  </div>;
+}
+
 /* ════════ MODAL CONTACTO ════════ */
 function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose}){
   const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],tiposAliado:[],solucionesAliado:[],...init}));
@@ -201,10 +221,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <div style={S.g2}>
         <Field label="Empresa vinculada">
           <div style={{display:"flex",gap:6}}>
-            <select style={{...S.sel,flex:1}} value={f.empresaId||""} onChange={e=>set("empresaId",e.target.value||null)}>
-              <option value="">— Sin empresa —</option>
-              {empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
-            </select>
+            <div style={{flex:1}}><BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —"/></div>
             <button style={{...S.pill(true,"#3b82f6"),fontSize:14,padding:"0 12px"}} onClick={()=>setNuevaEmp({})} title="Nueva empresa">＋</button>
           </div>
         </Field>
@@ -795,6 +812,13 @@ function Productos({productos,setProductos,catalogos,onBack}){
   const[modal,setModal]=useState(null);
   const save=(d)=>{ setProductos(prev=>{ if(d.id)return prev.map(x=>x.id===d.id?d:x); const nid="prod"+Date.now(); return [...prev,{...d,id:nid}]; }); setModal(null); };
   const del=(id)=>setProductos(prev=>prev.filter(x=>x.id!==id));
+  const mover=(p,dir)=>setProductos(prev=>{
+    const arr=[...prev];
+    const sib=arr.map((x,i)=>x.solucionId===p.solucionId?i:-1).filter(i=>i>=0);
+    const pos=sib.findIndex(i=>arr[i].id===p.id);const np=pos+dir;
+    if(np<0||np>=sib.length)return prev;
+    const a=sib[pos],b=sib[np];const t=arr[a];arr[a]=arr[b];arr[b]=t;return arr;
+  });
   const sinSol=productos.filter(p=>!(catalogos.solucion||[]).some(s=>s.id===p.solucionId));
   return <div>
     <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -808,14 +832,20 @@ function Productos({productos,setProductos,catalogos,onBack}){
         if(ps.length===0)return null;
         return <div key={sol.id} style={{...S.card(),marginBottom:8}}>
           <div style={{fontSize:13,fontWeight:800,color:"#2dd4bf",marginBottom:6}}>{sol.nombre} <span style={{color:"#475569",fontWeight:600}}>· {ps.length}</span></div>
-          {ps.map(p=><div key={p.id} onClick={()=>setModal(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"7px 0",borderTop:"1px solid #1e293b",cursor:"pointer"}}>
-            <div style={{minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:600}}>{p.tipo}{p.categoria?" · "+p.categoria:""}</div>
-              <div style={{fontSize:10,color:"#64748b"}}>Negocio {money(p.montoNegocio)} · {Number(p.indiceComision)||0}%</div>
+          {ps.map((p,idx)=><div key={p.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderTop:"1px solid #1e293b"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}>
+              <button style={{...S.pill(false,"#64748b"),padding:"0 6px",fontSize:10,opacity:idx===0?0.3:1}} disabled={idx===0} onClick={(e)=>{e.stopPropagation();mover(p,-1);}}>↑</button>
+              <button style={{...S.pill(false,"#64748b"),padding:"0 6px",fontSize:10,opacity:idx===ps.length-1?0.3:1}} disabled={idx===ps.length-1} onClick={(e)=>{e.stopPropagation();mover(p,1);}}>↓</button>
             </div>
-            <div style={{textAlign:"right",flexShrink:0}}>
-              <div style={{fontSize:13,fontWeight:800,color:"#fbbf24"}}>{money(comResultProd(p))}</div>
-              <span style={S.tag(p.recurrente?"#2dd4bf":"#64748b")}>{p.recurrente?"Recurrente":"Único"}</span>
+            <div onClick={()=>setModal(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,flex:1,minWidth:0,cursor:"pointer"}}>
+              <div style={{minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:600}}>{p.tipo}{p.categoria?" · "+p.categoria:""}</div>
+                <div style={{fontSize:10,color:"#64748b"}}>Negocio {money(p.montoNegocio)} · {Number(p.indiceComision)||0}%</div>
+              </div>
+              <div style={{textAlign:"right",flexShrink:0}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#fbbf24"}}>{money(comResultProd(p))}</div>
+                <span style={S.tag(p.recurrente?"#2dd4bf":"#64748b")}>{p.recurrente?"Recurrente":"Único"}</span>
+              </div>
             </div>
           </div>)}
         </div>;
@@ -885,7 +915,7 @@ function Objetivos({productos,setProductos,catalogos,onProductos}){
                   <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{p.recurrente?" · recur.":" · único"}</div>
                 </div>
                 {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
-                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"right",padding:"5px 6px"}}/>
+                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"5px 6px"}}/>
                 </div>)}
               </div>)}
               <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14"}}>
@@ -976,7 +1006,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v15</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v16</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -1054,10 +1084,7 @@ function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,on
     {fixedContacto
       ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b>{cont&&cont.etapaPrincipal?` · ${cont.etapaPrincipal}`:""}</div>
       : <Field label="Contacto">
-          <select style={S.sel} value={f.contactoId||""} onChange={e=>set("contactoId",e.target.value||null)}>
-            <option value="">— Selecciona —</option>
-            {contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
-          </select>
+          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoId} onChange={v=>set("contactoId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —"/>
         </Field>}
     <div style={S.g2}>
       <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
