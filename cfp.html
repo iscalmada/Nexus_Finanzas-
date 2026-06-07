@@ -257,6 +257,8 @@ const crmOpos=()=>lsCRM('oportunidades',[]);
 const crmOpoById=(id)=>crmOpos().find(o=>o.id===id)||null;
 const crmOpoLabel=(o)=>{if(!o)return"desvinculada";const e=(lsCRM('empresas',[]).find(x=>x.id===o.empresaId)||{}).nombre;const c=(lsCRM('contactos',[]).find(x=>x.id===(o.contactoPrincipalId||o.contactoId))||{}).nombreCompleto;return o.concepto+(e?" · "+e:(c?" · "+c:""));};
 const crmOpoConcretada=(o)=>!!o&&o.etapa==="Oportunidad Concretada";
+const crmComProd=(p)=>(p.comisionDirecta!=null&&p.comisionDirecta!=="")?Number(p.comisionDirecta):((Number(p.montoNegocio)||0)*(Number(p.indiceComision)||0)/100);
+const crmIngresoProdMes=(p,mes)=>{const com=crmComProd(p),metas=p.metas||{};if(p.recurrente){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}return (Number(metas[mes])||0)*com;};
 const fmtShort = n=>{const v=Math.abs(n||0);if(v>=1000000)return`$${(v/1e6).toFixed(1)}M`;if(v>=1000)return`$${(v/1000).toFixed(1)}k`;return fmt(n);};
 const fmtDate  = d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
 const todayStr = ()=>{
@@ -1523,6 +1525,37 @@ function App(){
     return{totalIngresos:realPer.filter(r=>r.tipoOp==="Ingreso").reduce((s,r)=>s+r.monto,0),totalEgresos:realPer.filter(r=>r.tipoOp==="Egreso").reduce((s,r)=>s+r.monto,0),saldoReal,ingEspPer:ig(progPer),egEspPer:eg(progPer),saldoProy_per:saldoReal+ig(progPer)-eg(progPer),saldoProy_total:saldoReal+ig(progAll)-eg(progAll),ingEspTotal:ig(progAll),egEspTotal:eg(progAll)};
   },[withSaldos,cuentaSaldos,retrasados,period.inP]);
   useEffect(()=>{try{saveLS('resumen',{saldo:stats.saldoReal,ts:Date.now()});}catch(e){}},[stats.saldoReal]);
+  useEffect(()=>{
+    const prods=lsCRM('productos',[]);
+    const solIds=(lsCRM('catalogos',{}).solucion||[]).map(s=>s.id);
+    if(!solIds.length||!prods.length) return;
+    let metaMonths=[];
+    prods.forEach(p=>Object.keys(p.metas||{}).forEach(k=>metaMonths.push(k)));
+    if(!metaMonths.length) return;
+    metaMonths.sort();
+    const now=new Date();
+    const h=new Date(now.getFullYear(),now.getMonth()+12,1);
+    const horizonKey=h.getFullYear()+"-"+String(h.getMonth()+1).padStart(2,"0");
+    const maxKey=[metaMonths[metaMonths.length-1],horizonKey].sort().pop();
+    let yy=parseInt(metaMonths[0].slice(0,4)),mm=parseInt(metaMonths[0].slice(5,7));
+    const ey=parseInt(maxKey.slice(0,4)),em=parseInt(maxKey.slice(5,7));
+    const months=[];
+    while(yy<ey||(yy===ey&&mm<=em)){months.push(yy+"-"+String(mm).padStart(2,"0"));mm++;if(mm>12){mm=1;yy++;}}
+    setPresupuestos(prev=>{
+      const next={...prev};let changed=false;
+      solIds.forEach(solId=>{
+        const sp=prods.filter(p=>p.solucionId===solId);
+        months.forEach(mk=>{
+          const proj=sp.reduce((s,p)=>s+crmIngresoProdMes(p,mk),0);
+          const Y=parseInt(mk.slice(0,4)),M=parseInt(mk.slice(5,7));
+          const key=presKey(solId,M-1,Y);
+          if(proj>0){if(next[key]!==proj){next[key]=proj;changed=true;}}
+          else if(next[key]!=null){delete next[key];changed=true;}
+        });
+      });
+      return changed?next:prev;
+    });
+  },[crmTick]);
 
   // Estadísticas
   const statData=useMemo(()=>{
