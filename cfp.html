@@ -1126,6 +1126,8 @@ function ProySwipeCard({mes,total,idx,setIdx,semColor,fmt,fmtShort}){
 // ─── APP ─────────────────────────────────────────────────────
 function App(){
   const[view,setView]=useState("dashboard");
+  const[crmTick,setCrmTick]=useState(0); // refresco del reflejo CFC
+  const[verRef,setVerRef]=useState(null); // detalle de oportunidad reflejada
   // ── localStorage helpers ──
   function loadLS(key, fallback) {
     try {
@@ -1330,8 +1332,6 @@ function App(){
   const[editOpoId,setEditOpoId]=useState(null);
   const[formOpo,setFormOpo]=useState({});
   const[viewOpo,setViewOpo]=useState(null);
-  const[crmTick,setCrmTick]=useState(0); // refresco del reflejo CFC
-  const[verRef,setVerRef]=useState(null); // detalle de oportunidad reflejada
   const[showJsonModal,setShowJsonModal]=useState(false);
   const[pinInput,setPinInput]=useState('');
   const[pinError,setPinError]=useState(false);
