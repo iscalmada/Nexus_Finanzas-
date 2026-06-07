@@ -832,6 +832,80 @@ function Productos({productos,setProductos,catalogos,onBack}){
   </div>;
 }
 
+/* ════════ OBJETIVOS (metas mensuales y proyección) ════════ */
+const MESNOM=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+function mesesDesde(ini,n){const[y,m]=ini.split("-").map(Number);const a=[];let yy=y,mm=m;for(let i=0;i<n;i++){a.push(yy+"-"+String(mm).padStart(2,"0"));mm++;if(mm>12){mm=1;yy++;}}return a;}
+function etiquetaMes(k){const[y,m]=k.split("-").map(Number);return MESNOM[m-1]+" "+String(y).slice(2);}
+function Objetivos({productos,setProductos,catalogos,onProductos}){
+  const hoy=new Date();
+  const[ini,setIni]=useState(()=>hoy.getFullYear()+"-"+String(hoy.getMonth()+1).padStart(2,"0"));
+  const[nMeses,setNMeses]=useState(6);
+  const meses=mesesDesde(ini,nMeses);
+  const setMeta=(pid,mes,val)=>setProductos(prev=>prev.map(p=>{
+    if(p.id!==pid)return p;
+    const metas={...(p.metas||{})};
+    if(val===""||val===null)delete metas[mes];else metas[mes]=val;
+    return {...p,metas};
+  }));
+  const cierreProd=(p,mes)=>(Number((p.metas||{})[mes])||0)*comResultProd(p);
+  const ingresoProd=(p,mes)=>{const com=comResultProd(p),metas=p.metas||{};if(p.recurrente){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}return (Number(metas[mes])||0)*com;};
+  const sols=(catalogos.solucion||[]).map(s=>({s,prods:productos.filter(p=>p.solucionId===s.id)})).filter(g=>g.prods.length>0);
+  const sumProds=(prods,mes,fn)=>prods.reduce((a,p)=>a+fn(p,mes),0);
+  const WCOL=120,WMES=68;
+  const cellNum={width:WMES,flexShrink:0,fontSize:10,textAlign:"right",padding:"6px 6px 6px 0",color:"#94a3b8"};
+  const cellHd={width:WMES,flexShrink:0,fontSize:9,fontWeight:800,color:"#64748b",textAlign:"right",padding:"6px 6px 6px 0"};
+  return <div>
+    <div style={S.hdr}><div><div style={S.logo}>Objetivos</div><div style={S.sub}>Metas mensuales · proyección de ingreso Nexus</div></div></div>
+    <div style={S.line}/>
+    <div style={S.sec}>
+      <div style={S.g2}>
+        <div><div style={S.fl}>Mes inicial</div><input type="month" style={S.inp} value={ini} onChange={e=>setIni(e.target.value||ini)}/></div>
+        <div><div style={S.fl}>Meses a proyectar</div>
+          <div style={{display:"flex",gap:5}}>{[3,6,12].map(n=><button key={n} style={{...S.pill(nMeses===n,GOLD),flex:1}} onClick={()=>setNMeses(n)}>{n}</button>)}</div>
+        </div>
+      </div>
+      <div style={{fontSize:9,color:"#475569",marginTop:8,lineHeight:1.4}}>Captura la meta en <b>unidades</b> (admite decimales) por producto y mes. La comisión y el acumulado se calculan solos. Editar una celda guarda directo en el producto.</div>
+    </div>
+    {productos.length===0
+      ? <div style={S.sec}><div style={{...S.card(),textAlign:"center",color:"#475569",fontSize:12,padding:"24px 12px"}}>No hay productos todavía. Créalos en <span style={{color:"#2dd4bf",fontWeight:700,cursor:"pointer"}} onClick={onProductos}>Catálogos → Productos</span> y aquí defines sus metas.</div></div>
+      : <div style={S.sec}>
+        <div style={{...S.card(),padding:0,overflowX:"auto"}}>
+          <div style={{minWidth:WCOL+meses.length*WMES}}>
+            <div style={{display:"flex",borderBottom:"1px solid #1e293b",padding:"0 0 0 10px",position:"sticky",top:0}}>
+              <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:800,color:"#64748b",padding:"8px 0"}}>PRODUCTO</div>
+              {meses.map(m=><div key={m} style={{...cellHd,paddingTop:8,paddingBottom:8,color:"#cbd5e1"}}>{etiquetaMes(m)}</div>)}
+            </div>
+            {sols.map(g=><div key={g.s.id}>
+              <div style={{padding:"7px 10px",background:"#0d1420",borderBottom:"1px solid #1e293b",fontSize:11,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</div>
+              {g.prods.map(p=><div key={p.id} style={{display:"flex",alignItems:"center",padding:"0 0 0 10px",borderBottom:"1px solid #14141f"}}>
+                <div style={{width:WCOL,flexShrink:0,padding:"6px 6px 6px 0"}}>
+                  <div style={{fontSize:11,fontWeight:600,lineHeight:1.2}}>{p.tipo}</div>
+                  <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{p.recurrente?" · recur.":" · único"}</div>
+                </div>
+                {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
+                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"right",padding:"5px 6px"}}/>
+                </div>)}
+              </div>)}
+              <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14"}}>
+                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"5px 0"}}>Cierres $</div>
+                {meses.map(m=><div key={m} style={cellNum}>{money(sumProds(g.prods,m,cierreProd))}</div>)}
+              </div>
+              <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14",borderBottom:"1px solid #1e293b"}}>
+                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:800,color:"#2dd4bf",padding:"5px 0"}}>Ingreso proy.</div>
+                {meses.map(m=><div key={m} style={{...cellNum,color:"#2dd4bf",fontWeight:700}}>{money(sumProds(g.prods,m,ingresoProd))}</div>)}
+              </div>
+            </div>)}
+            <div style={{display:"flex",padding:"0 0 0 10px",background:"#1a1505",borderTop:"2px solid "+GOLD}}>
+              <div style={{width:WCOL,flexShrink:0,fontSize:10,fontWeight:800,color:GOLD,padding:"8px 0"}}>TOTAL ingreso</div>
+              {meses.map(m=><div key={m} style={{...cellNum,color:GOLD,fontWeight:800,fontSize:11,paddingTop:8,paddingBottom:8}}>{money(sumProds(productos,m,ingresoProd))}</div>)}
+            </div>
+          </div>
+        </div>
+        <div style={{fontSize:9,color:"#475569",marginTop:10,lineHeight:1.5,padding:"0 2px"}}>El <b style={{color:"#2dd4bf"}}>Ingreso proy.</b> de cada solución es el acumulado vivo: los productos recurrentes se apilan mes a mes; los únicos solo en su mes. Ese total por solución alimentará el presupuesto de ingresos Nexus del CFP cuando hagamos la integración.</div>
+      </div>}
+  </div>;
+}
+
 /* ════════ INICIO (shell) ════════ */
 function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView,catalogos,productos}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
@@ -844,7 +918,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v13</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v14</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -1279,7 +1353,7 @@ function App(){
   const delOpo=(id)=>{setOportunidades(prev=>prev.filter(o=>o.id!==id));setActividades(prev=>prev.map(a=>a.oportunidadId===id?{...a,oportunidadId:null}:a));};
 
   const go=(k)=>{setOpenContacto(null);setView(k);};
-  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["aliados","Aliados","🤝"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["catalogos","Catál.","☰"]];
+  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["aliados","Aliados","🤝"],["oportunidades","Oport.","🎯"],["objetivos","Metas","📊"],["agenda","Agenda","🗓"],["catalogos","Catál.","☰"]];
   return <div style={S.app}>
     {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} actividades={actividades} oportunidades={oportunidades} openAct={openAct} openOpo={openOpo} setView={go} catalogos={catalogos} productos={productos}/>}
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
@@ -1289,6 +1363,7 @@ function App(){
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} openAct={openAct}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} onProductos={()=>go("productos")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("catalogos")}/>}
+    {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} onProductos={()=>go("productos")}/>}
     <div style={S.nav}>
       {NAV.map(([k,lab,ico])=><button key={k} style={S.navB(view===k)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>)}
