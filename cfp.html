@@ -253,6 +253,10 @@ const INIT_PRESUPUESTOS = {};
 // ─── HELPERS ─────────────────────────────────────────────────
 const fmt      = n=>new Intl.NumberFormat("es-MX",{style:"currency",currency:"MXN",minimumFractionDigits:2}).format(n||0);
 const lsCRM=(k,d)=>{try{const v=localStorage.getItem('nexus_crm_'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
+const crmOpos=()=>lsCRM('oportunidades',[]);
+const crmOpoById=(id)=>crmOpos().find(o=>o.id===id)||null;
+const crmOpoLabel=(o)=>{if(!o)return"desvinculada";const e=(lsCRM('empresas',[]).find(x=>x.id===o.empresaId)||{}).nombre;const c=(lsCRM('contactos',[]).find(x=>x.id===(o.contactoPrincipalId||o.contactoId))||{}).nombreCompleto;return o.concepto+(e?" · "+e:(c?" · "+c:""));};
+const crmOpoConcretada=(o)=>!!o&&o.etapa==="Oportunidad Concretada";
 const fmtShort = n=>{const v=Math.abs(n||0);if(v>=1000000)return`$${(v/1e6).toFixed(1)}M`;if(v>=1000)return`$${(v/1000).toFixed(1)}k`;return fmt(n);};
 const fmtDate  = d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
 const todayStr = ()=>{
@@ -771,12 +775,11 @@ const ModalMov=memo(function ModalMov({
                   </select>
                 )}
                 {formMov.vinculoTipo==="oportunidades"&&(
-                  <select style={S.sel} value={formMov.vinculoId||""} onChange={e=>set("vinculoId",parseInt(e.target.value)||null)}>
+                  <select style={S.sel} value={formMov.vinculoId||""} onChange={e=>set("vinculoId",e.target.value||null)}>
                     <option value="">— Seleccionar Oportunidad —</option>
-                    {oportunidades.filter(o=>getEtapa(o.etapaId,etapasAvance).pctAvance>0).map(x=>{
-                      const et=getEtapa(x.etapaId,etapasAvance);
-                      return(<option key={x.id} value={x.id}>{x.concepto+(x.empresa?" | "+x.empresa:"")+(x.contacto?" | "+x.contacto:"")+" ["+et.nombre+"]"}</option>);
-                    })}
+                    {crmOpos().filter(o=>o.etapa!=="Oportunidad Rechazada").map(x=>(
+                      <option key={x.id} value={x.id}>{crmOpoLabel(x)+" ["+(x.etapa||"").replace("Oportunidad ","")+"]"}</option>
+                    ))}
                   </select>
                 )}
               </>)}
@@ -1210,6 +1213,7 @@ function App(){
       return [...prev,nx];
     });
   },[crmTick]);
+  useEffect(()=>{ if(localStorage.getItem('nexus_migVinc3'))return; const ids=new Set(crmOpos().map(o=>o.id)); setMovs(p=>{let ch=false;const n=p.map(m=>{if(m.vinculoTipo==="oportunidades"&&m.vinculoId&&!ids.has(m.vinculoId)){ch=true;return{...m,vinculoTipo:null,vinculoId:null};}return m;});return ch?n:p;}); try{localStorage.setItem('nexus_migVinc3','1');}catch(e){} },[]);
   useEffect(()=>{ saveLS('aliadosEst', aliadosEst); }, [aliadosEst]);
   useEffect(()=>{ saveLS('aliadosCom', aliadosCom); }, [aliadosCom]);
   useEffect(()=>{ saveLS('deudores', deudores); }, [deudores]);
@@ -1728,6 +1732,12 @@ function App(){
     }
     setFieldErrors(null);setSaveError("");
 
+    // Candado Capa 3: no se puede INGRESAR un movimiento ligado a una oportunidad no Concretada en el CFC
+    if(data.vinculoTipo==="oportunidades"&&data.vinculoId&&data.estatus==="INGRESADO"&&!crmOpoConcretada(crmOpoById(data.vinculoId))){
+      setSaveError("La oportunidad vinculada no está Concretada en el CFC. Conviértela en el CFC, o deja el movimiento en PROGRAMADO hasta que se concrete.");
+      return;
+    }
+
     // Calcular ID antes de guardar para usarlo en vinculación
     const newId = editMovId!==null ? editMovId : nextId(movs);
     const newOrd = editMovId!==null ? (movs.find(r=>r.id===editMovId)?.orden||nextOrd()) : nextOrd();
@@ -1743,23 +1753,6 @@ function App(){
       setMovs(p=>[...p,{...data,id:newId,orden:newOrd}]);
     }
 
-    // Validación especial: ingreso INGRESADO vinculado a oportunidad no concretada
-    if(data.vinculoTipo==="oportunidades"&&data.vinculoId&&data.estatus==="INGRESADO"){
-      const opoVinc=oportunidades.find(x=>x.id===data.vinculoId);
-      if(opoVinc&&opoVinc.etapaId!=="ea5"){
-        const concretar=window.confirm(
-          "Este movimiento esta vinculado a una Oportunidad que aun no esta Concretada."+
-          " Para registrarlo como INGRESADO, la Oportunidad debe estar Concretada."+
-          " Presiona Aceptar para concretarla automaticamente, o Cancelar para no guardar el movimiento."
-        );
-        if(concretar){
-          setOportunidades(p=>p.map(x=>x.id===data.vinculoId?{...x,etapaId:"ea5",fechaConcretada:todayStr()}:x));
-        } else {
-          setSaveError("Movimiento no guardado. Concreta la Oportunidad primero o cambia el estatus a PROGRAMADO.");
-          return;
-        }
-      }
-    }
     // Vincular a cartera/oportunidades — incluir TODOS los IDs generados (series incluidas)
     if(data.vinculoTipo&&data.vinculoId){
       // Calcular todos los IDs que se acaban de crear
@@ -1775,7 +1768,6 @@ function App(){
       if(data.vinculoTipo==="acreedores")   vinculaEn(setAcreedores);
       else if(data.vinculoTipo==="deudores") vinculaEn(setDeudores);
       else if(data.vinculoTipo==="ingresosExt") vinculaEn(setIngresosExt);
-      else if(data.vinculoTipo==="oportunidades") vinculaEn(setOportunidades);
     }
     setShowMov(false);setEditMovId(null);
   },[formMov,editMovId,isEditReal,movs,recForm,cuentas,acreedores,deudores,ingresosExt]);
@@ -2220,7 +2212,7 @@ function App(){
               </div>
             )}
             {(()=>{
-              const concretadasSinMov=oportunidades.filter(o=>o.etapaId==="ea5"&&(o.movIdsVinculados||[]).length===0);
+              const concretadasSinMov=crmOpos().filter(o=>o.etapa==="Oportunidad Concretada"&&!movs.some(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id&&m.estatus==="INGRESADO"));
               if(concretadasSinMov.length===0) return null;
               return(
                 <div style={{...S.alertCard,background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.3)"}}
@@ -2687,7 +2679,7 @@ function App(){
                       if(row.vinculoTipo==="acreedores"){const r2=acreedores.find(x=>x.id===row.vinculoId);label="🔴 Acreedor: "+(r2?r2.nombre||r2.concepto:"desvinculado");color="#f87171";}
                       else if(row.vinculoTipo==="deudores"){const r2=deudores.find(x=>x.id===row.vinculoId);label="🟢 Deudor: "+(r2?r2.nombre||r2.concepto:"desvinculado");color="#22c55e";}
                       else if(row.vinculoTipo==="ingresosExt"){const r2=ingresosExt.find(x=>x.id===row.vinculoId);label="⭐ Ing. Ext.: "+(r2?r2.concepto:"desvinculado");color="#fbbf24";}
-                      else if(row.vinculoTipo==="oportunidades"){const r2=oportunidades.find(x=>x.id===row.vinculoId);const opoDisp=r2?(r2.empresa||r2.contacto||r2.concepto)+(r2.empresa&&r2.contacto?" · "+r2.contacto:""):"desvinculada";label="🚀 "+opoDisp;color="#38bdf8";}
+                      else if(row.vinculoTipo==="oportunidades"){const r2=crmOpoById(row.vinculoId);const opoDisp=r2?crmOpoLabel(r2):"desvinculada";label="🚀 "+opoDisp;color="#38bdf8";}
                       if(!label) return null;
                       return <div style={{fontSize:8,color,background:color+"11",padding:"2px 7px",borderRadius:5,marginBottom:2,fontWeight:600}}>{label}</div>;
                     })()}
