@@ -1006,7 +1006,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v16</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v16.1</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -1226,22 +1226,13 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
     <div style={S.mTit}>{init&&init.id?"Editar oportunidad":"Nueva oportunidad"}</div>
     <Field label="Concepto"><input style={S.inp} value={f.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Ej. Fianza de cumplimiento…"/></Field>
     <Field label="Contacto principal">
-      <select style={S.sel} value={f.contactoPrincipalId||""} onChange={e=>set("contactoPrincipalId",e.target.value||null)}>
-        <option value="">— Selecciona —</option>
-        {csort.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
-      </select>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —"/>
     </Field>
     <Field label="Contacto operativo (opcional)">
-      <select style={S.sel} value={f.contactoOperativoId||""} onChange={e=>set("contactoOperativoId",e.target.value||null)}>
-        <option value="">— Ninguno —</option>
-        {csort.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
-      </select>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoOperativoId} onChange={v=>set("contactoOperativoId",v)} placeholder="— Ninguno —" vacioLabel="— Ninguno —"/>
     </Field>
     <Field label="Empresa (opcional)">
-      <select style={S.sel} value={f.empresaId||""} onChange={e=>set("empresaId",e.target.value||null)}>
-        <option value="">— Sin empresa —</option>
-        {empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
-      </select>
+      <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —"/>
     </Field>
     <Field label="Solución Nexus"><CatSelect cat={catalogos.solucion} value={f.solucionNexus} onChange={v=>pickSolucion(v)}/></Field>
     {f.solucionNexus&&(()=>{
