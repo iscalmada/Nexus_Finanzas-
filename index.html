@@ -58,24 +58,36 @@ const ingresoProdMes=(p,mes)=>{const com=comResultProd(p),metas=p.metas||{};if(p
 function Tablero(){
   const mes=mesActual();
   const productos=lsCFC('productos',[]);
-  const comisionMes=productos.reduce((a,p)=>a+ingresoProdMes(p,mes),0);
+  const ingresoNexus=productos.reduce((a,p)=>a+ingresoProdMes(p,mes),0);
   const opos=lsCFC('oportunidades',[]);
   const opAb=opos.filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada").length;
-  const contactos=lsCFC('contactos',[]).length;
-  const cuentas=lsCFP('cuentas',[]).length;
-  const movsMes=lsCFP('movs',[]).filter(m=>(m.fecha||"").slice(0,7)===mes).length;
-  const card={background:"#10101e",border:"1px solid #1e293b",borderRadius:14,padding:"14px 16px"};
-  const lbl={fontSize:10,color:"#64748b",letterSpacing:1,textTransform:"uppercase",marginBottom:4};
-  return <div style={{display:"flex",flexDirection:"column",gap:10}}>
-    <div style={{...card,borderColor:GOLD+"44"}}>
-      <div style={lbl}>Comisión proyectada · este mes (CFC)</div>
-      <div style={{fontSize:30,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD}}>{money(comisionMes)}</div>
-      <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{opAb} oportunidad{opAb===1?"":"es"} abierta{opAb===1?"":"s"} · {contactos} contactos</div>
+  const r=lsCFP('resumen',{});
+  const sec={fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700,margin:"0 2px 7px"};
+  const card={background:"#10101e",border:"1px solid #1e293b",borderRadius:12,padding:"11px 13px",flex:1,minWidth:0};
+  const lbl={fontSize:9,color:"#64748b",letterSpacing:1,textTransform:"uppercase",marginBottom:5,lineHeight:1.25};
+  const val=(c)=>({fontSize:21,fontWeight:800,fontFamily:"'Cinzel',serif",color:c,lineHeight:1.05,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"});
+  const M=(n)=>n!=null?money(n):"—";
+  return <div style={{display:"flex",flexDirection:"column",gap:13}}>
+    <div>
+      <div style={sec}>Comercial · CFC</div>
+      <div style={{display:"flex",gap:10}}>
+        <div style={{...card,borderColor:GOLD+"44"}}><div style={lbl}>Ingreso Nexus Proyectado</div><div style={val(GOLD)}>{money(ingresoNexus)}</div></div>
+        <div style={card}><div style={lbl}>Oportunidades Abiertas</div><div style={val("#2dd4bf")}>{opAb}</div></div>
+      </div>
     </div>
-    <div style={{...card,borderColor:GOLD+"22"}}>
-      <div style={lbl}>Saldo en cuentas (CFP)</div>
-      {(()=>{const r=lsCFP('resumen',{});return <div style={{fontSize:25,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#e2e8f0"}}>{r.saldo!=null?money(r.saldo):"—"}</div>;})()}
-      <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{cuentas} cuenta{cuentas===1?"":"s"} · {movsMes} movimiento{movsMes===1?"":"s"} este mes</div>
+    <div>
+      <div style={sec}>Personal · CFP</div>
+      <div style={{display:"flex",gap:10}}>
+        <div style={card}><div style={lbl}>Saldo en Cuentas</div><div style={val("#e2e8f0")}>{M(r.saldo)}</div></div>
+        <div style={card}><div style={lbl}>Ingreso Extra Proyectado</div><div style={val("#22c55e")}>{M(r.ingresoExtra)}</div></div>
+      </div>
+    </div>
+    <div>
+      <div style={sec}>Totales</div>
+      <div style={{display:"flex",gap:10}}>
+        <div style={{...card,borderColor:GOLD+"33"}}><div style={lbl}>Saldo Consolidado Proyectado</div><div style={val(GOLD)}>{M(r.saldoConsolProy)}</div></div>
+        <div style={card}><div style={lbl}>Egresos Proyectado</div><div style={val("#f87171")}>{M(r.egresosProy)}</div></div>
+      </div>
     </div>
   </div>;
 }
@@ -148,33 +160,31 @@ function Lock({onOk}){
 
 function Home({ir}){
   const[nombre,setNombre]=useState(()=>String(lsCFP('nombreUsuario','')));
-  const[editName,setEditName]=useState(false);
-  const[tmpName,setTmpName]=useState("");
   const[pinOn,setPinOn]=useState(()=>!!lsCFP('pinActivo',false)&&!!String(lsCFP('pinApp','')));
   const[setter,setSetter]=useState(false);
-  const guardarNombre=()=>{ const n=tmpName.trim(); setNombre(n); setLS('nombreUsuario',n); setEditName(false); };
-  const abrirEdit=()=>{ setTmpName(nombre); setEditName(true); };
-  const activarPin=(pin)=>{ setLS('pinApp',hashPin(pin)); setLS('pinActivo',true); setPinOn(true); setSetter(false); };
-  const desactivarPin=()=>{ if(window.confirm("¿Desactivar el PIN de acceso? Podrás volver a activarlo cuando quieras, sin perder ningún dato.")){ setLS('pinActivo',false); setLS('pinApp',''); setPinOn(false); } };
+  const[cfg,setCfg]=useState(false);
+  const[editName,setEditName]=useState(false);
+  const[tmpName,setTmpName]=useState("");
+  const[pto,setPto]=useState(()=>{const v=lsCFP('pinTimeout',5);return v==null?5:Number(v);});
+  const guardarNombre=()=>{const n=tmpName.trim();setNombre(n);setLS('nombreUsuario',n);setEditName(false);};
+  const activarPin=(pin)=>{setLS('pinApp',hashPin(pin));setLS('pinActivo',true);setPinOn(true);setSetter(false);};
+  const desactivarPin=()=>{if(window.confirm("¿Desactivar el PIN de acceso? Podrás volver a activarlo cuando quieras, sin perder ningún dato.")){setLS('pinActivo',false);setLS('pinApp','');setPinOn(false);}};
+  const setTO=(v)=>{setPto(v);setLS('pinTimeout',v);};
   const card={background:"#10101e",border:"1px solid #1e293b",borderRadius:14,padding:"14px 16px"};
   const lbl={fontSize:10,color:"#64748b",letterSpacing:1,textTransform:"uppercase"};
-  return <div>
-    {/* Encabezado con isotipo */}
-    <div style={{textAlign:"center",paddingTop:6,marginBottom:14}}>
-      <img src={ISOTIPO} width="84" height="84" alt="Nexus Partners" style={{display:"block",margin:"0 auto 8px"}}/>
-      <div style={{fontFamily:"'Cinzel',serif",fontSize:26,fontWeight:700,letterSpacing:5,color:GOLD}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>by Nexus Partners</div>
+
+  if(cfg) return <div>
+    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,paddingTop:4}}>
+      <button onClick={()=>{setCfg(false);setEditName(false);}} style={{background:"transparent",border:"1px solid #1e293b",borderRadius:9,color:"#94a3b8",fontSize:13,padding:"7px 12px",cursor:"pointer"}}>← Inicio</button>
+      <div style={{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:GOLD,letterSpacing:1}}>Configuración</div>
     </div>
 
-    {/* Bienvenida + nombre configurable */}
     <div style={{...card,marginBottom:10}}>
-      <div style={lbl}>Bienvenida</div>
+      <div style={lbl}>Nombre de bienvenida</div>
       {!editName?(
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-          <div style={{fontSize:16,color:"#cbd5e1"}}>
-            Bienvenido{nombre?<span>, <span style={{color:"#e2e8f0",fontWeight:700}}>{nombre}</span></span>:null}
-          </div>
-          <button onClick={abrirEdit} style={{background:"transparent",border:"1px solid #1e293b",borderRadius:9,color:GOLD,fontSize:12,padding:"5px 10px",cursor:"pointer"}}>{nombre?"Editar":"Poner nombre"}</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6}}>
+          <div style={{fontSize:16,color:"#e2e8f0",fontWeight:700}}>{nombre||"Sin nombre"}</div>
+          <button onClick={()=>{setTmpName(nombre);setEditName(true);}} style={{background:"transparent",border:"1px solid #1e293b",borderRadius:9,color:GOLD,fontSize:12,padding:"5px 10px",cursor:"pointer"}}>{nombre?"Editar":"Poner nombre"}</button>
         </div>
       ):(
         <div style={{marginTop:8}}>
@@ -188,16 +198,7 @@ function Home({ir}){
       )}
     </div>
 
-    <Tablero/>
-
-    {/* Accesos */}
-    <div style={{display:"flex",gap:10,marginTop:14}}>
-      <button onClick={()=>ir("cfp")} style={{flex:1,padding:"14px 0",background:"#10101e",border:"1px solid "+GOLD+"55",borderRadius:14,color:GOLD,fontWeight:700,fontSize:14,cursor:"pointer"}}>Entrar a CFP</button>
-      <button onClick={()=>ir("cfc")} style={{flex:1,padding:"14px 0",background:"#10101e",border:"1px solid #2dd4bf55",borderRadius:14,color:"#2dd4bf",fontWeight:700,fontSize:14,cursor:"pointer"}}>Entrar a CFC</button>
-    </div>
-
-    {/* Control de PIN */}
-    <div style={{...card,marginTop:10}}>
+    <div style={{...card,marginBottom:10}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
           <div style={lbl}>PIN de acceso</div>
@@ -212,9 +213,43 @@ function Home({ir}){
       <div style={{fontSize:10,color:"#475569",marginTop:8}}>El PIN protege la entrada a Nexus Flow. Es el mismo del CFP.</div>
     </div>
 
-    <div style={{fontSize:10,color:"#334155",textAlign:"center",marginTop:18,marginBottom:4}}>Control Financiero Personal · Control de Flujo Comercial</div>
+    <div style={{...card,marginBottom:10,opacity:pinOn?1:0.5}}>
+      <div style={lbl}>Volver a pedir PIN tras regresar</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:9}}>
+        {[[0,"Inmediato"],[1,"1 min"],[5,"5 min"],[15,"15 min"],[-1,"Nunca"]].map(([v,l])=>(
+          <button key={v} disabled={!pinOn} onClick={()=>setTO(v)}
+            style={{flex:"1 0 28%",padding:"8px 0",fontSize:11,fontWeight:pto===v?800:500,borderRadius:9,cursor:pinOn?"pointer":"default",
+              background:pto===v?GOLD:"transparent",color:pto===v?"#08080f":"#94a3b8",border:"1px solid "+(pto===v?GOLD:"#1e293b")}}>{l}</button>
+        ))}
+      </div>
+      <div style={{fontSize:10,color:"#475569",marginTop:8}}>Si dejas Nexus Flow en segundo plano y regresas pasado este tiempo, se pedirá el PIN de nuevo.</div>
+    </div>
 
     {setter&&<PinSetter onDone={activarPin} onCancel={()=>setSetter(false)}/>}
+  </div>;
+
+  return <div>
+    <div style={{textAlign:"center",paddingTop:10,marginBottom:18}}>
+      <img src={ISOTIPO} width="84" height="84" alt="Nexus Partners" style={{display:"block",margin:"0 auto 8px"}}/>
+      <div style={{fontFamily:"'Cinzel',serif",fontSize:26,fontWeight:700,letterSpacing:5,color:GOLD}}>NEXUS FLOW</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>by Nexus Partners</div>
+    </div>
+
+    <div style={{textAlign:"center",fontSize:15,color:"#cbd5e1",marginBottom:16}}>
+      Bienvenido{nombre?<span>, <span style={{color:"#e2e8f0",fontWeight:700}}>{nombre}</span></span>:null}
+    </div>
+
+    <Tablero/>
+
+    <div style={{display:"flex",gap:10,marginTop:16}}>
+      <button onClick={()=>ir("cfp")} style={{flex:1,padding:"14px 0",background:"#10101e",border:"1px solid "+GOLD+"55",borderRadius:14,color:GOLD,fontWeight:700,fontSize:14,cursor:"pointer"}}>Entrar a CFP</button>
+      <button onClick={()=>ir("cfc")} style={{flex:1,padding:"14px 0",background:"#10101e",border:"1px solid #2dd4bf55",borderRadius:14,color:"#2dd4bf",fontWeight:700,fontSize:14,cursor:"pointer"}}>Entrar a CFC</button>
+    </div>
+
+    <div style={{textAlign:"center",marginTop:20,marginBottom:6}}>
+      <button onClick={()=>setCfg(true)} style={{background:"transparent",border:"none",color:"#475569",fontSize:12,letterSpacing:1,cursor:"pointer",padding:"6px 12px"}}>⚙ Configuración</button>
+    </div>
+    <div style={{fontSize:10,color:"#334155",textAlign:"center",marginBottom:4}}>Control Financiero Personal · Control de Flujo Comercial</div>
   </div>;
 }
 
@@ -225,16 +260,19 @@ function App(){
   const[vista,setVista]=useState("home");
   const[cargado,setCargado]=useState({cfp:false,cfc:false});
   useEffect(()=>{const el=document.getElementById('loading');if(el){el.classList.add('fade-out');setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},380);}},[]);
+  useEffect(()=>{let hid=null;const onHide=()=>{hid=Date.now();};const onShow=()=>{if(hid==null)return;const mins=Number(lsCFP('pinTimeout',5));const pa=lsCFP('pinActivo',false),pk=String(lsCFP('pinApp',''));if(pa&&pk&&mins>=0&&(Date.now()-hid)/60000>=mins)setAbierto(false);hid=null;};const vis=()=>{document.hidden?onHide():onShow();};document.addEventListener('visibilitychange',vis);window.addEventListener('focus',onShow);window.addEventListener('blur',onHide);return()=>{document.removeEventListener('visibilitychange',vis);window.removeEventListener('focus',onShow);window.removeEventListener('blur',onHide);};},[]);
   const ir=(v)=>{ setVista(v); if(v==="cfp"||v==="cfc"){ setCargado(c=>({...c,[v]:true})); try{localStorage.setItem('nexus_flow_ultima',v);}catch(e){} } };
   if(!abierto) return <Lock onOk={()=>setAbierto(true)}/>;
   const barBtn=(v,lab)=>{const on=vista===v;return <button onClick={()=>ir(v)} style={{flex:1,padding:"9px 0",fontSize:12,fontWeight:on?800:500,background:on?GOLD:"transparent",color:on?"#08080f":"#94a3b8",border:"none",borderRadius:9,cursor:"pointer"}}>{lab}</button>;};
   return <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
+    {vista!=="home"&&(
     <div style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#0b0b16",borderBottom:"1px solid #1e293b"}}>
       <div style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:GOLD,letterSpacing:2,paddingLeft:4,paddingRight:4}}>FLOW</div>
       <div style={{flex:1,display:"flex",gap:4,background:"#10101e",borderRadius:11,padding:4}}>
         {barBtn("home","Inicio")}{barBtn("cfp","CFP")}{barBtn("cfc","CFC")}
       </div>
     </div>
+    )}
     <div style={{flex:1,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,overflowY:"auto",padding:"18px 16px",display:vista==="home"?"block":"none"}}>
         <Home ir={ir}/>
