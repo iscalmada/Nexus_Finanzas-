@@ -431,7 +431,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
 }
 
 /* ════════ LISTA CONTACTOS ════════ */
-function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct,oportunidades,openOpo,aliadosOnly}){
+function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct,oportunidades,openOpo,aliadosOnly,onBack}){
   const[q,setQ]=useState("");
   const[fEtapa,setFEtapa]=useState([]);
   const[fEsp,setFEsp]=useState([]);
@@ -506,6 +506,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   }
 
   return <div>
+    {aliadosOnly&&onBack&&<div style={S.sec}><button style={S.back} onClick={onBack}>‹ Configuración</button></div>}
     <div style={S.hdr}><div><div style={S.logo}>{aliadosOnly?"Aliados":"Contactos"}</div><div style={S.sub}>{aliadosOnly?`${list.length} aliado${list.length===1?"":"s"} registrado${list.length===1?"":"s"}`:`${list.length} de ${contactos.length}`}</div></div></div>
     {aliadosOnly&&<div style={{display:"flex",gap:6,padding:"10px 16px 0"}}>
       <button style={{...S.pill(vistaAliados==="aliado","#2dd4bf"),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setVistaAliados("aliado")}>Por aliado</button>
@@ -705,7 +706,7 @@ const CAT_LABEL={circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cerc
   etapaEspecifica:"Etapa específica de contacto",areaEstrategica:"Área estratégica",solucion:"Solución de intervención",
   tipoAccion:"Tipo de acción",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
   pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal",tipoContacto:"Tipo de contacto",tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado"};
-function Catalogos({catalogos,setCatalogos,onProductos}){
+function Catalogos({catalogos,setCatalogos,onProductos,onBack}){
   const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");
   if(open){
     const items=catalogos[open]||[];
@@ -738,6 +739,7 @@ function Catalogos({catalogos,setCatalogos,onProductos}){
     </div>;
   }
   return <div>
+    {onBack&&<div style={S.sec}><button style={S.back} onClick={onBack}>‹ Configuración</button></div>}
     <div style={S.hdr}><div><div style={S.logo}>Catálogos</div><div style={S.sub}>Editables</div></div></div>
     <div style={S.line}/>
     <div style={{...S.sec,paddingTop:10}}>
@@ -796,7 +798,7 @@ function Productos({productos,setProductos,catalogos,onBack}){
   const sinSol=productos.filter(p=>!(catalogos.solucion||[]).some(s=>s.id===p.solucionId));
   return <div>
     <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-      <button style={S.back} onClick={onBack}>‹ Catálogos</button>
+      <button style={S.back} onClick={onBack}>‹ Configuración</button>
     </div>
     <div style={S.hdr}><div><div style={S.logo}>Productos</div><div style={S.sub}>{productos.length} producto{productos.length===1?"":"s"} · base de Oportunidades y Objetivos</div></div></div>
     <div style={S.line}/>
@@ -906,6 +908,62 @@ function Objetivos({productos,setProductos,catalogos,onProductos}){
   </div>;
 }
 
+/* ════════ CONFIGURACIÓN ════════ */
+function Configuracion({data,onRestore,onExcel,go}){
+  const fileRef=useRef(null);
+  const exportTotal=()=>{
+    const payload={app:"Nexus CFC",tipo:"respaldo-total",version:1,fecha:new Date().toISOString(),data};
+    const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="Nexus_CFC_respaldo_"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  };
+  const onFile=(e)=>{
+    const file=e.target.files&&e.target.files[0];if(!file){return;}
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const p=JSON.parse(r.result);
+        const d=p&&p.data?p.data:p;
+        if(!d||typeof d!=="object"||!Array.isArray(d.contactos)){alert("El archivo no parece un respaldo válido de Nexus CFC.");e.target.value="";return;}
+        const resumen="Esto REEMPLAZARÁ todo el contenido actual por el del respaldo:\n\n"
+          +"• "+(d.contactos||[]).length+" contactos\n"
+          +"• "+(d.empresas||[]).length+" empresas\n"
+          +"• "+(d.actividades||[]).length+" actividades\n"
+          +"• "+(d.oportunidades||[]).length+" oportunidades\n"
+          +"• "+(d.productos||[]).length+" productos\n"
+          +"• "+(d.catalogos?Object.keys(d.catalogos).length:0)+" catálogos\n\n¿Continuar?";
+        if(window.confirm(resumen)){onRestore(d);alert("Respaldo recuperado. El contenido quedó idéntico al del archivo.");}
+      }catch(err){alert("No se pudo leer el archivo: "+err.message);}
+      e.target.value="";
+    };
+    r.readAsText(file);
+  };
+  return <div>
+    <div style={S.hdr}><div><div style={S.logo}>Configuración</div><div style={S.sub}>Catálogos, productos, aliados y respaldos</div></div></div>
+    <div style={S.line}/>
+    <div style={{...S.sec,paddingTop:10}}>
+      {[["catalogos","☰","Catálogos","Listas y valores del sistema"],
+        ["productos","📦","Productos por solución","Base de Oportunidades y Metas"],
+        ["aliados","🤝","Aliados","Estratégicos y comerciales"]].map(a=>
+        <div key={a[0]} style={{...S.cCard(GOLD),display:"flex",alignItems:"center",gap:12,marginBottom:9}} onClick={()=>go(a[0])}>
+          <span style={{fontSize:20}}>{a[1]}</span>
+          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{a[2]}</div><div style={{fontSize:10,color:"#64748b"}}>{a[3]}</div></div>
+          <span style={{color:"#64748b"}}>›</span>
+        </div>)}
+      <div style={{...S.sTit,marginTop:14}}>Respaldo total</div>
+      <div style={{fontSize:9,color:"#475569",marginBottom:8,lineHeight:1.5}}>Guarda o recupera TODO (contactos, empresas, actividades, oportunidades, catálogos, productos y metas) en un archivo restaurable. Ideal para respaldar antes de meter datos de prueba y volver al estado previo. Recuperar reemplaza todo lo actual.</div>
+      <button style={{...S.cancB,borderColor:"#2dd4bf55",color:"#2dd4bf",marginTop:0}} onClick={exportTotal}>⬇ Generar respaldo total (JSON)</button>
+      <button style={{...S.cancB,borderColor:"#fbbf2455",color:"#fbbf24"}} onClick={()=>fileRef.current&&fileRef.current.click()}>⬆ Recuperar respaldo (JSON)</button>
+      <input ref={fileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={onFile}/>
+      <div style={{...S.sTit,marginTop:14}}>Exportar a Excel</div>
+      <div style={{fontSize:9,color:"#475569",marginBottom:8,lineHeight:1.5}}>Archivo de lectura (no restaurable) con Contactos, Empresas y Oportunidades.</div>
+      <button style={{...S.cancB,borderColor:GOLD+"55",color:GOLD,marginTop:0}} onClick={onExcel}>⬇ Exportar a Excel</button>
+    </div>
+  </div>;
+}
+
 /* ════════ INICIO (shell) ════════ */
 function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView,catalogos,productos}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
@@ -918,7 +976,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v14</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v15</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -965,9 +1023,6 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
         <input type="date" style={{width:"auto",background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"5px 8px",color:"#e2e8f0",fontSize:11,outline:"none"}} value={limite} onChange={e=>setLimite(e.target.value)} title="Hasta fecha"/>
       </div>
       <ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} onTap={(a)=>openAct(a,a.contactoId)}/>
-    </div>
-    <div style={S.sec}>
-      <button style={{...S.cancB,borderColor:GOLD+"55",color:GOLD,marginTop:0}} onClick={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)}>⬇ Exportar respaldo (Excel)</button>
     </div>
   </div>;
 }
@@ -1353,20 +1408,30 @@ function App(){
   const delOpo=(id)=>{setOportunidades(prev=>prev.filter(o=>o.id!==id));setActividades(prev=>prev.map(a=>a.oportunidadId===id?{...a,oportunidadId:null}:a));};
 
   const go=(k)=>{setOpenContacto(null);setView(k);};
-  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["aliados","Aliados","🤝"],["oportunidades","Oport.","🎯"],["objetivos","Metas","📊"],["agenda","Agenda","🗓"],["catalogos","Catál.","☰"]];
+  const restoreTotal=(d)=>{
+    if(Array.isArray(d.contactos))setContactos(d.contactos);
+    if(Array.isArray(d.empresas))setEmpresas(d.empresas);
+    if(Array.isArray(d.actividades))setActividades(d.actividades);
+    if(Array.isArray(d.oportunidades))setOportunidades(d.oportunidades);
+    if(d.catalogos&&typeof d.catalogos==="object")setCatalogos(d.catalogos);
+    if(Array.isArray(d.productos))setProductos(d.productos);
+    setView("configuracion");
+  };
+  const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["objetivos","Metas","📊"],["configuracion","Config.","⚙"]];
   return <div style={S.app}>
     {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} actividades={actividades} oportunidades={oportunidades} openAct={openAct} openOpo={openOpo} setView={go} catalogos={catalogos} productos={productos}/>}
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
-    {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
+    {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} openAct={openAct}/>}
-    {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} onProductos={()=>go("productos")}/>}
-    {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("catalogos")}/>}
+    {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
+    {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} onProductos={()=>go("productos")}/>}
+    {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
     <div style={S.nav}>
-      {NAV.map(([k,lab,ico])=><button key={k} style={S.navB(view===k)} onClick={()=>go(k)}>
-        <span style={S.navIco}>{ico}</span><span>{lab}</span></button>)}
+      {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
+        <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
     {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onClose={()=>setActModal(null)}/>}
     {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onClose={()=>setOpoModal(null)}/>}
