@@ -72,10 +72,10 @@ function Tablero(){
       <div style={{fontSize:30,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD}}>{money(comisionMes)}</div>
       <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{opAb} oportunidad{opAb===1?"":"es"} abierta{opAb===1?"":"s"} · {contactos} contactos</div>
     </div>
-    <div style={card}>
-      <div style={lbl}>Control financiero (CFP)</div>
-      <div style={{fontSize:13,color:"#cbd5e1"}}>{cuentas} cuenta{cuentas===1?"":"s"} · {movsMes} movimiento{movsMes===1?"":"s"} este mes</div>
-      <div style={{fontSize:10,color:"#475569",marginTop:4}}>El saldo consolidado y el cruce con el presupuesto se integran en la siguiente capa.</div>
+    <div style={{...card,borderColor:GOLD+"22"}}>
+      <div style={lbl}>Saldo en cuentas (CFP)</div>
+      {(()=>{const r=lsCFP('resumen',{});return <div style={{fontSize:25,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#e2e8f0"}}>{r.saldo!=null?money(r.saldo):"—"}</div>;})()}
+      <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>{cuentas} cuenta{cuentas===1?"":"s"} · {movsMes} movimiento{movsMes===1?"":"s"} este mes</div>
     </div>
   </div>;
 }
