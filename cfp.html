@@ -997,6 +997,21 @@ function ModalPresupuesto({data,presupuestos,setPresupuestos,sm,sy,onClose}){
     return c;
   })();
 
+  if(catId==="nexus") return (
+    <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div style={S.mBox}>
+        <div style={S.mTit}>🎯 PRESUPUESTO</div>
+        <div style={{fontSize:11,color:"#94a3b8",marginBottom:13}}>{nombre} — {MESES_FULL[sm]} {sy}</div>
+        <div style={{background:"rgba(201,168,76,0.08)",border:"1px solid #C9A84C33",borderRadius:11,padding:"12px 14px",marginBottom:13}}>
+          <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,letterSpacing:1}}>INGRESO PROYECTADO · CFC</div>
+          <div style={{fontSize:22,fontWeight:800,color:"#C9A84C",fontFamily:"'Cinzel',serif",marginTop:4}}>{fmt(currentVal)}</div>
+          <div style={{fontSize:10,color:"#475569",marginTop:8}}>Se calcula automáticamente desde los Objetivos del CFC (metas × comisión de la solución). No es editable aquí.</div>
+        </div>
+        <button style={S.cancB} onClick={onClose}>Cerrar</button>
+      </div>
+    </div>
+  );
+
   return(
     <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
       <div style={S.mBox}>
@@ -3273,6 +3288,7 @@ function App(){
           const abiertas=opos.filter(ABIERTA);
           const concret=opos.filter(o=>o.etapa==="Oportunidad Concretada");
           const comAb=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
+          const prodAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
           const comCon=concret.reduce((s,o)=>s+(Number(o.comisionEstimada)||Number(o.montoEstimado)||0),0);
           const lista=opos.filter(o=>!opoFiltroEtapa||o.etapa===opoFiltroEtapa).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
           const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
@@ -3284,8 +3300,8 @@ function App(){
                 <div style={{fontSize:10,color:"#64748b",marginTop:2}}>{opos.length} en total · {abiertas.length} abiertas · reflejo del CFC</div>
               </div>
               <div style={{display:"flex",gap:8,marginBottom:10}}>
-                <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Comisión abierta</div><div style={{fontSize:17,fontWeight:800,color:"#22c55e"}}>{fmt(comAb)}</div></div>
-                <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Comisión concretada</div><div style={{fontSize:17,fontWeight:800,color:"#C9A84C"}}>{fmt(comCon)}</div></div>
+                <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Producción Proyectada</div><div style={{fontSize:17,fontWeight:800,color:"#22c55e"}}>{fmt(prodAb)}</div></div>
+                <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Participación Proyectada</div><div style={{fontSize:17,fontWeight:800,color:"#C9A84C"}}>{fmt(comAb)}</div></div>
               </div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
                 <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
@@ -3375,8 +3391,6 @@ function App(){
                 {ico:"📊",label:"Estadísticas",sub:"Gastos, ingresos y evolución",target:"estadisticas",color:"#a78bfa"},
                 {ico:"🎯",label:"Presupuestos",sub:"Control de gasto por categoría",target:"presupuestos",color:"#22c55e"},
                 {ico:"📈",label:"Proyección Presupuestal",sub:"Panorama financiero mes a mes",target:"proyeccion",color:"#60a5fa"},
-                {ico:"🤝",label:"Cartera",sub:`Acreedores · Deudores · Ing. Extraordinarios`,target:"cartera",color:"#f472b6"},
-                {ico:"🚀",label:"Oportunidades Nexus",sub:"Pipeline comercial · Proyección de ingresos",target:"oportunidades",color:"#C9A84C"},
               ].map(it=>(
                 <div key={it.target} style={S.menuRow} onClick={()=>setView(it.target)}>
                   <div style={{...S.menuIco,background:`${it.color}18`}}><span>{it.ico}</span></div>
