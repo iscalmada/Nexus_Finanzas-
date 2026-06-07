@@ -3287,6 +3287,35 @@ function App(){
                         {row("Cierre estimado",o.fechaEstimadaCierre?fmtDate(o.fechaEstimadaCierre):null)}
                         {row("Concretada",o.fechaConcretada?fmtDate(o.fechaConcretada):null)}
                       </div>
+                      {(()=>{
+                        const vinc=movs.filter(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id);
+                        const ingresado=vinc.filter(m=>m.estatus==="INGRESADO").reduce((s,m)=>s+(Number(m.monto)||0),0);
+                        const programado=vinc.filter(m=>["PROGRAMADO","PROYECTADO"].includes(m.estatus)).reduce((s,m)=>s+(Number(m.monto)||0),0);
+                        const estim=Number(o.comisionEstimada)||Number(o.montoEstimado)||0;
+                        const pend=Math.max(0,estim-ingresado);
+                        return (
+                          <div style={{marginTop:16}}>
+                            <div style={{fontSize:10,color:"#64748b",letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Movimientos vinculados</div>
+                            <div style={{display:"flex",gap:6,marginBottom:10}}>
+                              <div style={{flex:1,background:"rgba(34,197,94,0.08)",border:"1px solid #22c55e33",borderRadius:8,padding:"6px 4px",textAlign:"center"}}><div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>INGRESADO</div><div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(ingresado)}</div></div>
+                              <div style={{flex:1,background:"rgba(96,165,250,0.08)",border:"1px solid #60a5fa33",borderRadius:8,padding:"6px 4px",textAlign:"center"}}><div style={{fontSize:7,color:"#60a5fa",fontWeight:700}}>PROGRAMADO</div><div style={{fontSize:12,fontWeight:800,color:"#60a5fa"}}>{fmt(programado)}</div></div>
+                              <div style={{flex:1,background:"rgba(201,168,76,0.08)",border:"1px solid #C9A84C33",borderRadius:8,padding:"6px 4px",textAlign:"center"}}><div style={{fontSize:7,color:"#C9A84C",fontWeight:700}}>PENDIENTE</div><div style={{fontSize:12,fontWeight:800,color:"#C9A84C"}}>{fmt(pend)}</div></div>
+                            </div>
+                            {vinc.length===0
+                              ? <div style={{fontSize:10,color:"#475569",padding:"4px 0"}}>Sin movimientos vinculados. Para vincular un ingreso, créalo o edítalo y selecciona esta oportunidad en "Vínculo".</div>
+                              : vinc.map(m=>(
+                                  <div key={m.id} onClick={()=>{setVerRef(null);setViewMov(m);}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,marginBottom:6,cursor:"pointer"}}>
+                                    <div style={{minWidth:0,flex:1}}>
+                                      <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.concepto||"(sin concepto)"}</div>
+                                      <div style={{fontSize:9,color:"#64748b"}}>{m.fecha?fmtDate(m.fecha):"sin fecha"} · {m.estatus}</div>
+                                    </div>
+                                    <div style={{fontSize:13,fontWeight:800,color:"#C9A84C",whiteSpace:"nowrap"}}>{fmt(m.monto)}</div>
+                                  </div>
+                                ))}
+                            {vinc.length>0&&<div style={{fontSize:9,color:"#475569",marginTop:2}}>Toca un movimiento para ver o editarlo.</div>}
+                          </div>
+                        );
+                      })()}
                       <div style={{fontSize:10,color:"#475569",textAlign:"center",marginTop:16}}>Reflejo del CFC · solo lectura</div>
                     </div>
                   </div>
