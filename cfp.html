@@ -2121,18 +2121,16 @@ function App(){
   // ── PANTALLA DE DESBLOQUEO PIN ──
   if(pinActivo&&!pinDesbloqueado){
     const handlePinBtn=(d)=>{
-      if(pinInput.length>=(pinApp.length||4)) return;
+      if(pinInput.length>=8) return;
       const nuevo=pinInput+d;
       setPinInput(nuevo);
       setPinError(false);
-      if(nuevo.length===(pinApp.length||4)){
-        if(hashPin(nuevo)===pinApp){
-          setPinDesbloqueado(true);
-          setPinInput('');
-        } else {
-          setPinError(true);
-          setTimeout(()=>{setPinInput('');setPinError(false);},600);
-        }
+      if(hashPin(nuevo)===pinApp){
+        setPinDesbloqueado(true);
+        setPinInput('');
+      } else if(nuevo.length>=8){
+        setPinError(true);
+        setTimeout(()=>{setPinInput('');setPinError(false);},600);
       }
     };
     return(
@@ -2151,7 +2149,7 @@ function App(){
           </div>
         )}
         <div style={{display:"flex",gap:12,marginBottom:24}}>
-          {Array.from({length:pinApp.length||4}).map((_,i)=>(
+          {Array.from({length:Math.max(4,pinInput.length)}).map((_,i)=>(
             <div key={i} style={{width:16,height:16,borderRadius:"50%",
               background:i<pinInput.length?(pinError?"#f87171":"#C9A84C"):"transparent",
               border:"2px solid "+(pinError?"#f87171":i<pinInput.length?"#C9A84C":"#334155"),
