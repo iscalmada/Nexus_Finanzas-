@@ -87,7 +87,7 @@ function exportBackup(contactos,empresas,oportunidades,catalogos,productos){
       UltimoContacto:c.fechaUltimoContacto||"",ResumenAvance:c.resumenAvance||"",Observaciones:c.obs||""}));
     const es=empresas.map(e=>({Nombre:e.nombre,Giro:e.giro||"",Tamano:e.tamano||"",Telefono:e.telefono||"",Correo:e.correo||"",Domicilio:e.domicilio||"",Observaciones:e.obs||""}));
     const os=(oportunidades||[]).map(o=>({Concepto:o.concepto,Contacto:((contactos.find(c=>c.id===(o.contactoPrincipalId||o.contactoId))||{}).nombreCompleto)||"",
-      Empresa:((empresas.find(e=>e.id===o.empresaId)||{}).nombre)||"",Solucion:o.solucionNexus||"",
+      Empresa:((empresas.find(e=>e.id===o.empresaId)||{}).nombre)||"",Solucion:(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===o.solucionId)||{}).nombre||"",
       Producto:((productos||[]).find(p=>p.id===o.productoId)||{}).tipo||"",
       AliadoEstrategico:((contactos.find(c=>c.id===o.aliadoEstrategicoId)||{}).nombreCompleto)||"",
       AliadoComercial:((contactos.find(c=>c.id===o.aliadoComercialId)||{}).nombreCompleto)||"",
@@ -430,7 +430,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
           <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Oportunidades</div>
           <button style={S.pill(true,"#fbbf24")} onClick={()=>onAddOpo(c.id)}>+ Detonar</button>
         </div>
-        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} onTap={(x)=>onEditOpo(x)}/>)}
+        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>onEditOpo(x)}/>)}
         {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
       </div>
 
@@ -1006,7 +1006,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   return <div>
     <div style={{textAlign:"center",padding:"32px 20px 8px"}}>
       <div style={{fontSize:26,fontWeight:700,letterSpacing:6,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS FLOW</div>
-      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v16.1</div>
+      <div style={{fontSize:9,color:"#475569",letterSpacing:2,marginTop:2}}>Sistema Integral de Gestión Financiera y Comercial · v17</div>
     </div>
     <div style={S.sec}>
       <div onClick={()=>alert("El Control Financiero Personal vive en tu app Nexus CFP actual. En el siguiente bloque unificamos ambos bajo este mismo sistema.")}
@@ -1197,12 +1197,11 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   const eo=catalogos.etapaOportunidad||[];
   const[f,setF]=useState(()=>{const b={recurrencia:"Única",etapa:(eo[0]?eo[0].nombre:""),...init};if(b.contactoId&&!b.contactoPrincipalId)b.contactoPrincipalId=b.contactoId;return b;});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const solIdOf=(nombre)=>((catalogos.solucion||[]).find(s=>s.nombre===nombre)||{}).id;
   const aliadosDe=(sid,tipo)=>contactos.filter(c=>(c.tiposAliado||[]).includes(tipo)&&(c.solucionesAliado||[]).includes(sid));
-  const pickSolucion=(v)=>setF(p=>{
-    const sid=solIdOf(v);
+  const pickSolucion=(sid)=>setF(p=>{
+    sid=sid||null;
     const est=aliadosDe(sid,"Estratégico"), com=aliadosDe(sid,"Comercial");
-    const n={...p,solucionNexus:v||null};
+    const n={...p,solucionId:sid};
     if(p.productoId&&!(productos||[]).some(x=>x.id===p.productoId&&x.solucionId===sid))n.productoId=null;
     if(n.aliadoEstrategicoId&&!est.some(c=>c.id===n.aliadoEstrategicoId))n.aliadoEstrategicoId=null;
     if(!n.aliadoEstrategicoId&&est.length===1)n.aliadoEstrategicoId=est[0].id;
@@ -1234,9 +1233,9 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
     <Field label="Empresa (opcional)">
       <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —"/>
     </Field>
-    <Field label="Solución Nexus"><CatSelect cat={catalogos.solucion} value={f.solucionNexus} onChange={v=>pickSolucion(v)}/></Field>
-    {f.solucionNexus&&(()=>{
-      const sid=solIdOf(f.solucionNexus);
+    <Field label="Solución Nexus"><BuscaSelect opciones={(catalogos.solucion||[]).map(s=>({id:s.id,label:s.nombre}))} value={f.solucionId} onChange={v=>pickSolucion(v)} placeholder="— Selecciona solución —" vacioLabel="— Sin solución —"/></Field>
+    {f.solucionId&&(()=>{
+      const sid=f.solucionId;
       const prods=(productos||[]).filter(p=>p.solucionId===sid);
       const est=aliadosDe(sid,"Estratégico"), com=aliadosDe(sid,"Comercial");
       return <>
@@ -1289,7 +1288,7 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,onTap}){
+function OpoCard({o,contactos,empresas,catalogos,onTap}){
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
   const op=contactos.find(x=>x.id===o.contactoOperativoId);
   const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
@@ -1305,7 +1304,7 @@ function OpoCard({o,contactos,empresas,onTap}){
       {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
       {op&&<span style={S.tag("#64748b")}>op: {op.nombreCompleto}</span>}
       {e&&<span style={S.tag("#3b82f6")}>{e.nombre}</span>}
-      {o.solucionNexus&&<span style={S.tag(GOLD)}>{o.solucionNexus.length>22?o.solucionNexus.slice(0,22)+"…":o.solucionNexus}</span>}
+      {(()=>{const sol=(catalogos&&catalogos.solucion||[]).find(s=>s.id===o.solucionId);return sol?<span style={S.tag(GOLD)}>{sol.nombre.length>22?sol.nombre.slice(0,22)+"…":sol.nombre}</span>:null;})()}
       {o.aliadoEstrategicoId&&(()=>{const ae=contactos.find(x=>x.id===o.aliadoEstrategicoId);return ae?<span style={S.tag("#2dd4bf")}>🤝 {ae.nombreCompleto}</span>:null;})()}
     </div>
   </div>;
@@ -1331,7 +1330,7 @@ function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
       </div>
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
@@ -1390,7 +1389,15 @@ function App(){
     }
     return base;
   });
-  const[oportunidades,setOportunidades]=useState(()=>loadLS("oportunidades",null)||[]);
+  const[oportunidades,setOportunidades]=useState(()=>{
+    let os=loadLS("oportunidades",null)||[];
+    if(!localStorage.getItem(PFX+"migSolId")){
+      const cat=loadLS("catalogos",null)||SEED.catalogos;const sols=(cat&&cat.solucion)||[];
+      os=os.map(o=>{if(o.solucionId!==undefined)return o;const s=sols.find(x=>x.nombre===o.solucionNexus);const{solucionNexus,...rest}=o;return {...rest,solucionId:s?s.id:null};});
+      try{localStorage.setItem(PFX+"migSolId","1");}catch(e){}
+    }
+    return os;
+  });
   const[productos,setProductos]=useState(()=>loadLS("productos",null)||[]);
   const[openContacto,setOpenContacto]=useState(null);
   const[actModal,setActModal]=useState(null);
