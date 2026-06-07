@@ -1193,7 +1193,20 @@ function App(){
   useEffect(()=>{ saveLS('etapasAvance', etapasAvance); }, [etapasAvance]);
   useEffect(()=>{ saveLS('solucionesNexus', solucionesNexus); }, [solucionesNexus]);
   useEffect(()=>{const h=(e)=>{if(!e.key||e.key.indexOf('nexus_crm_')===0)setCrmTick(t=>t+1);};window.addEventListener('storage',h);return ()=>window.removeEventListener('storage',h);},[]);
-  useEffect(()=>{ if(view==="oportunidades") setCrmTick(t=>t+1); },[view]);
+  useEffect(()=>{ setCrmTick(t=>t+1); },[view]);
+  useEffect(()=>{
+    const sols=(lsCRM('catalogos',{}).solucion)||[];
+    const desired=sols.map(s=>({id:s.id,nombre:s.nombre}));
+    setCatIng(prev=>{
+      const idx=prev.findIndex(c=>c.nexus||c.id==="nexus");
+      const cur=idx>=0?(prev[idx].subs||[]):null;
+      const same=idx>=0&&cur.length===desired.length&&cur.every((s,i)=>s.id===desired[i].id&&s.nombre===desired[i].nombre);
+      if(idx>=0&&same) return prev;
+      const nx={id:"nexus",nombre:"Ingreso por Nexus",nexus:true,subs:desired};
+      if(idx>=0){const cp=prev.slice();cp[idx]=nx;return cp;}
+      return [...prev,nx];
+    });
+  },[crmTick]);
   useEffect(()=>{ saveLS('aliadosEst', aliadosEst); }, [aliadosEst]);
   useEffect(()=>{ saveLS('aliadosCom', aliadosCom); }, [aliadosCom]);
   useEffect(()=>{ saveLS('deudores', deudores); }, [deudores]);
@@ -4009,7 +4022,7 @@ function App(){
               <button style={{...S.prioB2(catMode==="ing","#22c55e"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("ing")}>↑ Ingresos</button>
             </div>
             <div style={{fontSize:9,color:"#475569",marginBottom:9}}>☰ arrastra para reordenar · toca el nombre para editar</div>
-            {cats_.map(cat=>(
+            {cats_.filter(c=>!c.nexus).map(cat=>(
               <div key={cat.id} draggable onDragStart={()=>catDrag.start(cat.id)} onDragOver={e=>{e.preventDefault();catDrag.enter(cat.id);}} onDrop={catDrag.commit}
                 style={{background:catDrag.aId===cat.id?"#1e2a1e":catDrag.oViz===cat.id?"#1a2030":"#13131f",border:"1px solid #1e293b",borderRadius:11,padding:"11px 13px",marginBottom:7,cursor:"grab",transition:"background 0.15s"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
@@ -4063,6 +4076,23 @@ function App(){
                 {addingSubTo===cat.id&&<div style={{display:"flex",gap:5,marginTop:7}}><input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:11}} value={newSubName} onChange={e=>setNewSubName(e.target.value)} placeholder="Nombre subcategoría" onKeyDown={e=>{if(e.key==="Enter")addSub(cat.id);}}/><button style={S.smBtn("#22c55e")} onClick={()=>addSub(cat.id)}>✓</button></div>}
               </div>
             ))}
+            {catMode==="ing"&&(()=>{
+              const nx=catIng.find(c=>c.nexus);
+              if(!nx) return null;
+              return (
+                <div style={{background:"#13131f",border:"1px solid #C9A84C44",borderRadius:11,padding:"11px 13px",marginBottom:7}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <span style={{fontSize:12,fontWeight:700,color:"#C9A84C"}}>◈ {nx.nombre}</span>
+                    <span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:"#C9A84C22",color:"#C9A84C"}}>SOLUCIONES · CFC</span>
+                  </div>
+                  {(nx.subs||[]).map(s=>(
+                    <div key={s.id} style={{padding:"4px 0 4px 11px",borderLeft:"2px solid #C9A84C33",marginBottom:2,fontSize:11,color:"#94a3b8"}}>{s.nombre}</div>
+                  ))}
+                  {(!nx.subs||nx.subs.length===0)&&<div style={{fontSize:10,color:"#475569",paddingLeft:11}}>Sin soluciones en el CFC todavía.</div>}
+                  <div style={{fontSize:9,color:"#475569",marginTop:6}}>Las subcategorías se administran como soluciones desde el CFC.</div>
+                </div>
+              );
+            })()}
             <div style={{display:"flex",gap:7,marginTop:7}}>
               <input style={{...S.inp,flex:1,padding:"8px 11px",fontSize:11}} value={newCatName} onChange={e=>setNewCatName(e.target.value)} placeholder="Nueva categoría…" onKeyDown={e=>{if(e.key==="Enter")addCat();}}/>
               <button style={{...S.saveB,width:"auto",padding:"8px 14px",marginTop:0,fontSize:11}} onClick={addCat}>+ Agregar</button>
