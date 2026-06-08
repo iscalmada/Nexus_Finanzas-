@@ -165,7 +165,7 @@ function ChipMulti({opts,sel,setSel,color}){
   </div>;
 }
 
-function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd}){
+function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd,addLabel="contacto"}){
   const[abierto,setAbierto]=useState(false);const[q,setQ]=useState("");
   const sel=opciones.find(o=>o.id===value);
   const filt=opciones.filter(o=>!q||(o.label||"").toLowerCase().includes(q.toLowerCase()));
@@ -180,7 +180,7 @@ function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd}){
         <div style={{padding:"8px 10px",fontSize:12,color:"#64748b",cursor:"pointer",borderBottom:"1px solid #14141f"}} onClick={()=>{onChange(null);setAbierto(false);}}>{vacioLabel||"— Ninguno —"}</div>
         {filt.map(o=><div key={o.id} onClick={()=>{onChange(o.id);setAbierto(false);}} style={{padding:"8px 10px",fontSize:12,cursor:"pointer",borderBottom:"1px solid #14141f",color:o.id===value?"#2dd4bf":"#e2e8f0",fontWeight:o.id===value?700:400}}>{o.label}</div>)}
         {filt.length===0&&<div style={{padding:"10px",fontSize:11,color:"#475569"}}>Sin coincidencias.</div>}
-        {onAdd&&<div onClick={()=>{let nombre=q.trim();if(!nombre){nombre=(window.prompt("Nombre del nuevo contacto")||"").trim();}if(nombre){const id=onAdd(nombre);if(id){onChange(id);setAbierto(false);}}}} style={{padding:"10px",fontSize:12,color:"#C9A84C",cursor:"pointer",borderTop:"1px solid #1e293b",fontWeight:700,textAlign:"center"}}>{q.trim()?`+ Crear contacto «${q.trim()}»`:"+ Nuevo contacto"}</div>}
+        {onAdd&&<div onClick={()=>{const nombre=q.trim();const r=onAdd(nombre);setAbierto(false);if(r){onChange(r);}}} style={{padding:"10px",fontSize:12,color:"#C9A84C",cursor:"pointer",borderTop:"1px solid #1e293b",fontWeight:700,textAlign:"center"}}>{q.trim()?`+ Crear ${addLabel} «${q.trim()}»`:`+ Nuevo ${addLabel}`}</div>}
       </div>
     </div>}
   </div>;
@@ -222,10 +222,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <Field label="Domicilio"><input style={S.inp} value={f.domicilio||""} onChange={e=>set("domicilio",e.target.value||null)}/></Field>
       <div style={S.g2}>
         <Field label="Empresa vinculada">
-          <div style={{display:"flex",gap:6}}>
-            <div style={{flex:1}}><BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —"/></div>
-            <button style={{...S.pill(true,"#3b82f6"),fontSize:14,padding:"0 12px"}} onClick={()=>setNuevaEmp({})} title="Nueva empresa">＋</button>
-          </div>
+          <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —" onAdd={(nombre)=>{setNuevaEmp({nombre:nombre||null});return null;}} addLabel="empresa"/>
         </Field>
         <Field label="Rol en la empresa"><CatSelect cat={catalogos.rolEmpresa} value={f.rolEmpresa} onChange={v=>set("rolEmpresa",v)}/></Field>
       </div>
@@ -893,9 +890,10 @@ function Objetivos({productos,setProductos,catalogos,onProductos}){
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Objetivos</div><div style={S.sub}>Metas mensuales · proyección de ingreso Nexus</div></div></div>
     <div style={S.line}/>
-    <div style={S.sec}><div style={{display:"flex",gap:6}}>
-      <button style={{...S.pill(modo==="matriz",GOLD),flex:1}} onClick={()=>setModo("matriz")}>Matriz</button>
-      <button style={{...S.pill(modo==="reporte","#2dd4bf"),flex:1}} onClick={()=>setModo("reporte")}>Reporte mensual</button>
+    <div style={S.sec}><div style={{display:"flex",gap:5}}>
+      <button style={{...S.pill(modo==="matriz",GOLD),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("matriz")}>Matriz</button>
+      <button style={{...S.pill(modo==="reporte","#2dd4bf"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("reporte")}>Reporte mensual</button>
+      <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos por mes</button>
     </div></div>
     {modo==="matriz"&&<div style={S.sec}>
       <div style={S.g2}>
@@ -973,6 +971,30 @@ function Objetivos({productos,setProductos,catalogos,onProductos}){
               </div>)}
             </div>)}
         <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Incluye productos con meta del mes y recurrentes con acumulado vivo. El total coincide con el Ingreso Nexus Proyectado que alimenta el presupuesto del CFP.</div>
+      </div>;
+    })()}
+    {modo==="productos"&&(()=>{
+      const shiftMes=(mk,d)=>{let a=mk.split("-").map(Number),y=a[0],m=a[1];m+=d;while(m<1){m+=12;y--;}while(m>12){m-=12;y++;}return y+"-"+String(m).padStart(2,"0");};
+      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
+      return <div style={S.sec}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"8px 10px",marginBottom:12}}>
+          <button onClick={()=>setMesRep(shiftMes(mesRep,-1))} style={{background:"transparent",border:"none",color:GOLD,fontSize:20,cursor:"pointer",padding:"0 12px"}}>‹</button>
+          <div style={{textAlign:"center"}}><div style={{fontSize:9,color:"#64748b",letterSpacing:1}}>QUÉ VENDER ESTE MES</div><div style={{fontSize:15,fontWeight:800,color:"#e2e8f0",textTransform:"capitalize"}}>{etiquetaMes(mesRep)}</div></div>
+          <button onClick={()=>setMesRep(shiftMes(mesRep,1))} style={{background:"transparent",border:"none",color:GOLD,fontSize:20,cursor:"pointer",padding:"0 12px"}}>›</button>
+        </div>
+        {grupos.length===0
+          ? <div style={{...S.card(),textAlign:"center",color:"#475569",fontSize:12,padding:"24px 12px"}}>Sin productos con meta este mes.</div>
+          : grupos.map(g=><div key={g.s.id} style={{...S.card(),marginBottom:10,padding:0}}>
+              <div style={{padding:"9px 12px",borderBottom:"1px solid #1e293b",fontSize:12,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</div>
+              {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
+                <div style={{minWidth:0,flex:1}}>
+                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"pre-wrap"}}>{it.p.tipo}</div>
+                  <div style={{fontSize:10,color:"#94a3b8"}}>{[it.p.categoria,(it.p.montoNegocio?money(it.p.montoNegocio):null)].filter(Boolean).join(" · ")||"—"}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:800,color:"#a78bfa"}}>{it.meta}</div><div style={{fontSize:8,color:"#64748b"}}>cantidad</div></div>
+              </div>)}
+            </div>)}
+        <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Síntesis de venta del mes: producto, categoría, monto de producción y unidades meta. Sin comisiones ni proyección de ingreso.</div>
       </div>;
     })()}
   </div>;
@@ -1495,8 +1517,8 @@ function App(){
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
-    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onQuickContacto={(nombre)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:nombre}]);return id;}} onClose={()=>setActModal(null)}/>}
-    {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onQuickContacto={(nombre)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:nombre}]);return id;}} onClose={()=>setOpoModal(null)}/>}
+    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onQuickContacto={(nombre)=>{let n=(nombre||"").trim();if(!n){n=(window.prompt("Nombre del nuevo contacto")||"").trim();}if(!n)return null;const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:n}]);return id;}} onClose={()=>setActModal(null)}/>}
+    {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onQuickContacto={(nombre)=>{let n=(nombre||"").trim();if(!n){n=(window.prompt("Nombre del nuevo contacto")||"").trim();}if(!n)return null;const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:n}]);return id;}} onClose={()=>setOpoModal(null)}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
