@@ -87,7 +87,7 @@ function exportBackup(contactos,empresas,oportunidades,catalogos,productos){
       UltimoContacto:c.fechaUltimoContacto||"",ResumenAvance:c.resumenAvance||"",Observaciones:c.obs||""}));
     const es=empresas.map(e=>({Nombre:e.nombre,Giro:e.giro||"",Tamano:e.tamano||"",Telefono:e.telefono||"",Correo:e.correo||"",Domicilio:e.domicilio||"",Observaciones:e.obs||""}));
     const os=(oportunidades||[]).map(o=>({Concepto:o.concepto,Contacto:((contactos.find(c=>c.id===(o.contactoPrincipalId||o.contactoId))||{}).nombreCompleto)||"",
-      Empresa:((empresas.find(e=>e.id===o.empresaId)||{}).nombre)||"",Solucion:o.solucionNexus||"",
+      Empresa:((empresas.find(e=>e.id===o.empresaId)||{}).nombre)||"",Solucion:(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===o.solucionId)||{}).nombre||o.solucionNexus||"",
       Producto:((productos||[]).find(p=>p.id===o.productoId)||{}).tipo||"",
       AliadoEstrategico:((contactos.find(c=>c.id===o.aliadoEstrategicoId)||{}).nombreCompleto)||"",
       AliadoComercial:((contactos.find(c=>c.id===o.aliadoComercialId)||{}).nombreCompleto)||"",
@@ -165,7 +165,7 @@ function ChipMulti({opts,sel,setSel,color}){
   </div>;
 }
 
-function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel}){
+function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd}){
   const[abierto,setAbierto]=useState(false);const[q,setQ]=useState("");
   const sel=opciones.find(o=>o.id===value);
   const filt=opciones.filter(o=>!q||(o.label||"").toLowerCase().includes(q.toLowerCase()));
@@ -180,6 +180,7 @@ function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel}){
         <div style={{padding:"8px 10px",fontSize:12,color:"#64748b",cursor:"pointer",borderBottom:"1px solid #14141f"}} onClick={()=>{onChange(null);setAbierto(false);}}>{vacioLabel||"— Ninguno —"}</div>
         {filt.map(o=><div key={o.id} onClick={()=>{onChange(o.id);setAbierto(false);}} style={{padding:"8px 10px",fontSize:12,cursor:"pointer",borderBottom:"1px solid #14141f",color:o.id===value?"#2dd4bf":"#e2e8f0",fontWeight:o.id===value?700:400}}>{o.label}</div>)}
         {filt.length===0&&<div style={{padding:"10px",fontSize:11,color:"#475569"}}>Sin coincidencias.</div>}
+        {onAdd&&q.trim()&&<div onClick={()=>{const id=onAdd(q.trim());if(id){onChange(id);setAbierto(false);}}} style={{padding:"9px 10px",fontSize:12,color:"#C9A84C",cursor:"pointer",borderTop:"1px solid #1e293b",fontWeight:700}}>+ Crear contacto «{q.trim()}»</div>}
       </div>
     </div>}
   </div>;
@@ -431,7 +432,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
           <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Oportunidades</div>
           <button style={S.pill(true,"#fbbf24")} onClick={()=>onAddOpo(c.id)}>+ Detonar</button>
         </div>
-        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} onTap={(x)=>onEditOpo(x)}/>)}
+        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>onEditOpo(x)}/>)}
         {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
       </div>
 
@@ -1009,7 +1010,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
       <img src={ISOTIPO} width="78" height="78" alt="Nexus Partners" style={{display:"block",margin:"0 auto 8px"}}/>
       <div style={{fontSize:25,fontWeight:700,letterSpacing:5,color:GOLD,fontFamily:"'Cinzel',serif"}}>NEXUS CFC</div>
       <div style={{fontSize:8,color:GOLD+"88",letterSpacing:3,marginTop:2}}>by Nexus Partners</div>
-      <div style={{fontSize:9,color:"#334155",letterSpacing:1.5,marginTop:4}}>Control de Flujo Comercial · v17</div>
+      <div style={{fontSize:9,color:"#334155",letterSpacing:1.5,marginTop:4}}>Control de Flujo Comercial</div>
     </div>
     <div style={S.sec}>
       <div style={S.sTit}>Resumen comercial</div>
@@ -1050,7 +1051,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
 const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
 const hoyISO=()=>new Date().toISOString().slice(0,10);
 
-function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,onSave,onDelete,onClose}){
+function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,onSave,onDelete,onClose,onQuickContacto}){
   const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const cid=f.contactoId||fixedContacto;
@@ -1073,7 +1074,7 @@ function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,on
     {fixedContacto
       ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b>{cont&&cont.etapaPrincipal?` · ${cont.etapaPrincipal}`:""}</div>
       : <Field label="Contacto">
-          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoId} onChange={v=>set("contactoId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —"/>
+          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoId} onChange={v=>set("contactoId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={onQuickContacto}/>
         </Field>}
     <div style={S.g2}>
       <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
@@ -1182,16 +1183,15 @@ const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
 const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
 
-function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose}){
+function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose,onQuickContacto}){
   const eo=catalogos.etapaOportunidad||[];
   const[f,setF]=useState(()=>{const b={recurrencia:"Única",etapa:(eo[0]?eo[0].nombre:""),...init};if(b.contactoId&&!b.contactoPrincipalId)b.contactoPrincipalId=b.contactoId;return b;});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const solIdOf=(nombre)=>((catalogos.solucion||[]).find(s=>s.nombre===nombre)||{}).id;
+  const solName=(id)=>((catalogos.solucion||[]).find(s=>s.id===id)||{}).nombre||"";
   const aliadosDe=(sid,tipo)=>contactos.filter(c=>(c.tiposAliado||[]).includes(tipo)&&(c.solucionesAliado||[]).includes(sid));
-  const pickSolucion=(v)=>setF(p=>{
-    const sid=solIdOf(v);
+  const pickSolucion=(sid)=>setF(p=>{
     const est=aliadosDe(sid,"Estratégico"), com=aliadosDe(sid,"Comercial");
-    const n={...p,solucionNexus:v||null};
+    const n={...p,solucionId:sid||null,solucionNexus:sid?solName(sid):null};
     if(p.productoId&&!(productos||[]).some(x=>x.id===p.productoId&&x.solucionId===sid))n.productoId=null;
     if(n.aliadoEstrategicoId&&!est.some(c=>c.id===n.aliadoEstrategicoId))n.aliadoEstrategicoId=null;
     if(!n.aliadoEstrategicoId&&est.length===1)n.aliadoEstrategicoId=est[0].id;
@@ -1215,17 +1215,22 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
     <div style={S.mTit}>{init&&init.id?"Editar oportunidad":"Nueva oportunidad"}</div>
     <Field label="Concepto"><input style={S.inp} value={f.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Ej. Fianza de cumplimiento…"/></Field>
     <Field label="Contacto principal">
-      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —"/>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={onQuickContacto}/>
     </Field>
     <Field label="Contacto operativo (opcional)">
-      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoOperativoId} onChange={v=>set("contactoOperativoId",v)} placeholder="— Ninguno —" vacioLabel="— Ninguno —"/>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoOperativoId} onChange={v=>set("contactoOperativoId",v)} placeholder="— Ninguno —" vacioLabel="— Ninguno —" onAdd={onQuickContacto}/>
     </Field>
     <Field label="Empresa (opcional)">
       <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —"/>
     </Field>
-    <Field label="Solución Nexus"><CatSelect cat={catalogos.solucion} value={f.solucionNexus} onChange={v=>pickSolucion(v)}/></Field>
-    {f.solucionNexus&&(()=>{
-      const sid=solIdOf(f.solucionNexus);
+    <Field label="Solución Nexus">
+      <select style={S.sel} value={f.solucionId||""} onChange={e=>pickSolucion(e.target.value||null)}>
+        <option value="">— Selecciona —</option>
+        {(catalogos.solucion||[]).map(o=><option key={o.id} value={o.id}>{o.nombre}</option>)}
+      </select>
+    </Field>
+    {f.solucionId&&(()=>{
+      const sid=f.solucionId;
       const prods=(productos||[]).filter(p=>p.solucionId===sid);
       const est=aliadosDe(sid,"Estratégico"), com=aliadosDe(sid,"Comercial");
       return <>
@@ -1278,7 +1283,7 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,onTap}){
+function OpoCard({o,contactos,empresas,catalogos,onTap}){
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
   const op=contactos.find(x=>x.id===o.contactoOperativoId);
   const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
@@ -1294,7 +1299,7 @@ function OpoCard({o,contactos,empresas,onTap}){
       {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
       {op&&<span style={S.tag("#64748b")}>op: {op.nombreCompleto}</span>}
       {e&&<span style={S.tag("#3b82f6")}>{e.nombre}</span>}
-      {o.solucionNexus&&<span style={S.tag(GOLD)}>{o.solucionNexus.length>22?o.solucionNexus.slice(0,22)+"…":o.solucionNexus}</span>}
+      {(()=>{const nm=(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===o.solucionId)||{}).nombre||o.solucionNexus;return nm?<span style={S.tag(GOLD)}>{nm.length>22?nm.slice(0,22)+"…":nm}</span>:null;})()}
       {o.aliadoEstrategicoId&&(()=>{const ae=contactos.find(x=>x.id===o.aliadoEstrategicoId);return ae?<span style={S.tag("#2dd4bf")}>🤝 {ae.nombreCompleto}</span>:null;})()}
     </div>
   </div>;
@@ -1320,7 +1325,7 @@ function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
       </div>
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
@@ -1379,7 +1384,19 @@ function App(){
     }
     return base;
   });
-  const[oportunidades,setOportunidades]=useState(()=>loadLS("oportunidades",null)||[]);
+  const[oportunidades,setOportunidades]=useState(()=>{
+    let ops=loadLS("oportunidades",null)||[];
+    if(!localStorage.getItem(PFX+"migSolId")){
+      const sols=(catalogos.solucion||[]);
+      ops=ops.map(o=>{
+        if(o.solucionId) return o;
+        if(o.solucionNexus){const s=sols.find(x=>x.nombre===o.solucionNexus);if(s)return{...o,solucionId:s.id};}
+        return o;
+      });
+      try{localStorage.setItem(PFX+"migSolId","1");}catch(e){}
+    }
+    return ops;
+  });
   const[productos,setProductos]=useState(()=>loadLS("productos",null)||[]);
   const[openContacto,setOpenContacto]=useState(null);
   const[actModal,setActModal]=useState(null);
@@ -1440,8 +1457,8 @@ function App(){
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
-    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onClose={()=>setActModal(null)}/>}
-    {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onClose={()=>setOpoModal(null)}/>}
+    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onQuickContacto={(nombre)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:nombre}]);return id;}} onClose={()=>setActModal(null)}/>}
+    {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onQuickContacto={(nombre)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:nombre}]);return id;}} onClose={()=>setOpoModal(null)}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
