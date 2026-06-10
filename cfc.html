@@ -935,11 +935,13 @@ function Productos({productos,setProductos,catalogos,onBack}){
 const MESNOM=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 function mesesDesde(ini,n){const[y,m]=ini.split("-").map(Number);const a=[];let yy=y,mm=m;for(let i=0;i<n;i++){a.push(yy+"-"+String(mm).padStart(2,"0"));mm++;if(mm>12){mm=1;yy++;}}return a;}
 function etiquetaMes(k){const[y,m]=k.split("-").map(Number);return MESNOM[m-1]+" "+String(y).slice(2);}
-function Objetivos({productos,setProductos,catalogos,onProductos}){
+function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,oportunidades,onProductos}){
   const hoy=new Date();
   const[ini,setIni]=useState(()=>hoy.getFullYear()+"-"+String(hoy.getMonth()+1).padStart(2,"0"));
   const[nMeses,setNMeses]=useState(6);
   const[modo,setModo]=useState("matriz");
+  const[ver,setVer]=useState(null);
+  const[metaContactos,setMetaContactos]=useState(()=>loadLS("metaProspContactos",0));
   const[mesRep,setMesRep]=useState(()=>hoy.getFullYear()+"-"+String(hoy.getMonth()+1).padStart(2,"0"));
   const meses=mesesDesde(ini,nMeses);
   const setMeta=(pid,mes,val)=>setProductos(prev=>prev.map(p=>{
@@ -962,7 +964,60 @@ function Objetivos({productos,setProductos,catalogos,onProductos}){
       <button style={{...S.pill(modo==="matriz",GOLD),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("matriz")}>Matriz</button>
       <button style={{...S.pill(modo==="reporte","#2dd4bf"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("reporte")}>Reporte</button>
       <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos</button>
+      <button style={{...S.pill(modo==="prospeccion","#2dd4bf"),flex:1,fontSize:10,padding:"8px 4px"}} onClick={()=>setModo("prospeccion")}>Prospección</button>
     </div></div>
+    {modo==="prospeccion"&&(()=>{
+      const NOPROS=["Oportunidad Concretada","Oportunidad Rechazada"];
+      const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso");
+      const enContacto=contactos.filter(c=>c.etapaPrincipal==="Contacto");
+      const prospBySol={};
+      (oportunidades||[]).forEach(o=>{if(NOPROS.indexOf(o.etapa)>-1)return;const sid=o.solucionId;const cid=o.contactoPrincipalId||o.contactoId;if(!sid||!cid)return;(prospBySol[sid]=prospBySol[sid]||{})[cid]=1;});
+      const solList=(catalogos.solucion||[]);
+      const cById=(id)=>contactos.find(c=>c.id===id);
+      const prospContactosSol=(sid)=>Object.keys(prospBySol[sid]||{}).map(cById).filter(Boolean);
+      const totalProsp=solList.reduce((a,s)=>a+Object.keys(prospBySol[s.id]||{}).length,0);
+      const totalMeta=solList.reduce((a,s)=>a+(Number(s.metaProspeccion)||0),0);
+      const setMetaProsp=(sid,val)=>setCatalogos(p=>({...p,solucion:p.solucion.map(s=>s.id===sid?{...s,metaProspeccion:val===""?null:(Number(val)||0)}:s)}));
+      const barra=(val,meta,color)=>{const pct=meta>0?Math.min(100,Math.round(val/meta*100)):0;return <div style={{height:6,background:"#1e293b",borderRadius:4,overflow:"hidden",marginTop:6}}><div style={{height:"100%",width:pct+"%",background:color}}/></div>;};
+      const Lista=({titulo,items})=><div style={{...S.card(),marginTop:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><div style={{fontSize:13,fontWeight:800,color:GOLD}}>{titulo} ({items.length})</div><button style={S.pill(false,"#64748b")} onClick={()=>setVer(null)}>Cerrar</button></div>
+          {items.length===0?<div style={{fontSize:11,color:"#475569"}}>Sin contactos.</div>:items.map(c=><div key={c.id} style={{padding:"7px 0",borderTop:"1px solid #14141f"}}><div style={{fontSize:12,fontWeight:700}}>{c.nombreCompleto}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>{c.etapaEspecifica||c.etapaPrincipal||"—"}{c.fechaUltimoContacto?" · últ. "+c.fechaUltimoContacto:""}</div></div>)}
+        </div>;
+      return <div style={S.sec}>
+        <div style={{...S.card(),cursor:"pointer",borderColor:"#a78bfa44"}} onClick={()=>setVer({t:"cand"})}>
+          <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Candidatos en Proceso</div>
+          <div style={{fontSize:26,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#a78bfa",lineHeight:1.1}}>{candProceso.length}</div>
+          <div style={{fontSize:10,color:"#475569"}}>En la mira para lograr contacto · toca para ver</div>
+        </div>
+        <div style={{...S.card(),marginTop:10,borderColor:GOLD+"33"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:10}}>
+            <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Contactos (trabajando)</div>
+              <div onClick={()=>setVer({t:"cont"})} style={{fontSize:26,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD,cursor:"pointer",lineHeight:1.1}}>{enContacto.length}<span style={{fontSize:13,color:"#64748b"}}> / {Number(metaContactos)||0}</span></div></div>
+            <div style={{width:96}}><div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Meta global</div><input type="number" style={{...S.inp,fontSize:13,padding:"6px 8px"}} value={metaContactos||""} onChange={e=>{const v=e.target.value===""?0:(Number(e.target.value)||0);setMetaContactos(v);saveLS("metaProspContactos",v);}}/></div>
+          </div>
+          {barra(enContacto.length,Number(metaContactos)||0,GOLD)}
+        </div>
+        <div style={{...S.sTit,marginTop:16}}>Prospectos por solución</div>
+        <div style={{fontSize:10,color:"#64748b",marginBottom:8}}>Contactos con oportunidad activa (excluye Concretada/Rechazada). Toca el número para ver quiénes.</div>
+        {solList.length===0&&<div style={{fontSize:11,color:"#475569"}}>No hay soluciones en el catálogo.</div>}
+        {solList.map(s=>{const val=Object.keys(prospBySol[s.id]||{}).length;const meta=Number(s.metaProspeccion)||0;return (
+          <div key={s.id} style={{...S.card(),marginBottom:8,padding:"10px 12px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+              <div style={{fontSize:12,fontWeight:700,flex:1,minWidth:0}}>{s.nombre}</div>
+              <div onClick={()=>setVer({t:"sol",sid:s.id,nom:s.nombre})} style={{fontSize:19,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#2dd4bf",cursor:"pointer",minWidth:24,textAlign:"right"}}>{val}</div>
+              <div style={{width:66}}><input type="number" placeholder="meta" style={{...S.inp,fontSize:12,padding:"5px 7px"}} value={s.metaProspeccion!=null?s.metaProspeccion:""} onChange={e=>setMetaProsp(s.id,e.target.value)}/></div>
+            </div>
+            {meta>0&&barra(val,meta,"#2dd4bf")}
+          </div>);})}
+        {solList.length>0&&<div style={{...S.card(),marginTop:2,borderColor:GOLD+"44",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{fontSize:13,fontWeight:800}}>Total prospectos</div>
+          <div style={{fontSize:19,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD}}>{totalProsp}<span style={{fontSize:12,color:"#64748b"}}> / {totalMeta}</span></div>
+        </div>}
+        {ver&&ver.t==="cand"&&<Lista titulo="Candidatos en Proceso" items={candProceso}/>}
+        {ver&&ver.t==="cont"&&<Lista titulo="Contactos (trabajando)" items={enContacto}/>}
+        {ver&&ver.t==="sol"&&<Lista titulo={"Prospectos · "+ver.nom} items={prospContactosSol(ver.sid)}/>}
+      </div>;
+    })()}
     {modo==="matriz"&&<div style={S.sec}>
       <div style={S.g2}>
         <div><div style={S.fl}>Mes inicial</div><input type="month" style={S.inp} value={ini} onChange={e=>setIni(e.target.value||ini)}/></div>
@@ -1690,7 +1745,7 @@ function App(){
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
-    {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} onProductos={()=>go("productos")}/>}
+    {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} oportunidades={oportunidades} onProductos={()=>go("productos")}/>}
     {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
     <div style={S.nav}>
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
