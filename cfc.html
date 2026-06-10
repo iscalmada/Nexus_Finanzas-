@@ -191,17 +191,25 @@ function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd,addLa
 }
 
 /* ════════ MODAL CONTACTO ════════ */
+function cEmpresas(c){return (c&&c.empresas&&c.empresas.length)?c.empresas:((c&&c.empresaId)?[{empresaId:c.empresaId,rol:c.rolEmpresa||""}]:[]);}
 function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose}){
   const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],tiposAliado:[],solucionesAliado:[],...init}));
   const[nuevaEmp,setNuevaEmp]=useState(null);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const empList=f.empresas||(f.empresaId?[{empresaId:f.empresaId,rol:f.rolEmpresa||""}]:[]);
+  const setEmps=(arr)=>setF(p=>({...p,empresas:arr}));
+  const addEmpRow=()=>setEmps([...empList,{empresaId:"",rol:""}]);
+  const setEmpRow=(i,k,v)=>setEmps(empList.map((x,j)=>j===i?{...x,[k]:v}:x));
+  const delEmpRow=(i)=>setEmps(empList.filter((x,j)=>j!==i));
   const espDisp=(catalogos.etapaEspecifica||[]).filter(e=>!f.etapaPrincipal||e.principal===f.etapaPrincipal);
   const toggleGiro=(g)=>setF(p=>{const has=p.giros.includes(g);const giros=has?p.giros.filter(x=>x!==g):[...p.giros,g];
     let gp=p.giroPrincipal; if(has&&gp===g)gp=giros[0]||null; if(!has&&!gp)gp=g; return {...p,giros,giroPrincipal:gp};});
   const toggleSol=(v)=>setF(p=>({...p,solucionesAncla:p.solucionesAncla.includes(v)?p.solucionesAncla.filter(x=>x!==v):[...p.solucionesAncla,v]}));
   const save=()=>{ if(!f.nombre&&!f.nombreCompleto){alert("El nombre es obligatorio");return;}
     const completo=f.nombreCompleto||[f.nombre,f.apellido].filter(Boolean).join(" ");
-    onSave({...f,nombreCompleto:completo}); };
+    const empsRaw=f.empresas||(f.empresaId?[{empresaId:f.empresaId,rol:f.rolEmpresa||""}]:[]);
+    const emps=empsRaw.filter(x=>x&&x.empresaId);const prim=emps[0]||{};
+    onSave({...f,nombreCompleto:completo,empresas:emps,empresaId:prim.empresaId||null,rolEmpresa:prim.rol||null}); };
   return <div style={S.modal} onClick={onClose}>
     <div style={S.mBox} onClick={e=>e.stopPropagation()}>
       <div style={S.mTit}>{init.id?"Editar contacto":"Nuevo contacto"}</div>
@@ -224,12 +232,18 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
         <Field label="Correo"><input style={S.inp} value={f.correo||""} onChange={e=>set("correo",e.target.value||null)}/></Field>
       </div>
       <Field label="Domicilio"><input style={S.inp} value={f.domicilio||""} onChange={e=>set("domicilio",e.target.value||null)}/></Field>
-      <div style={S.g2}>
-        <Field label="Empresa vinculada">
-          <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —" onAdd={(nombre)=>{setNuevaEmp({nombre:nombre||null});return null;}} addLabel="empresa"/>
-        </Field>
-        <Field label="Rol en la empresa"><CatSelect cat={catalogos.rolEmpresa} value={f.rolEmpresa} onChange={v=>set("rolEmpresa",v)}/></Field>
-      </div>
+      <div style={S.sTit}>Empresas vinculadas</div>
+      {empList.length===0&&<div style={{fontSize:11,color:"#475569",marginBottom:8}}>Sin empresas. Agrega una si el contacto pertenece o es dueño de alguna.</div>}
+      {empList.map((row,i)=><div key={i} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",marginBottom:8}}>
+        <div style={S.g2}>
+          <Field label="Empresa">
+            <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={row.empresaId} onChange={v=>setEmpRow(i,"empresaId",v)} placeholder="— Selecciona —" vacioLabel="— Sin empresa —" onAdd={(nombre)=>{setNuevaEmp({nombre:nombre||null,_row:i});return null;}} addLabel="empresa"/>
+          </Field>
+          <Field label="Rol"><CatSelect cat={catalogos.rolEmpresa} value={row.rol} onChange={v=>setEmpRow(i,"rol",v)}/></Field>
+        </div>
+        <button style={{...S.pill(false,"#f87171"),marginTop:6,padding:"4px 10px",fontSize:11}} onClick={()=>delEmpRow(i)}>Quitar empresa</button>
+      </div>)}
+      <button style={{...S.pill(true,GOLD),marginBottom:4,padding:"7px 12px",fontWeight:700}} onClick={addEmpRow}>+ Agregar empresa</button>
 
       <div style={S.sTit}>Información relacional</div>
       <div style={S.g2}>
@@ -332,8 +346,8 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <button style={S.cancB} onClick={onClose}>Cancelar</button>
     </div>
     {nuevaEmp&&<div onClick={e=>e.stopPropagation()}>
-      <EmpresaModal init={nuevaEmp} catalogos={catalogos}
-        onSave={(d)=>{const nid=onCreateEmpresa(d);set("empresaId",nid);setNuevaEmp(null);}}
+      <EmpresaModal init={{nombre:nuevaEmp.nombre}} catalogos={catalogos}
+        onSave={(d)=>{const nid=onCreateEmpresa(d);if(nuevaEmp&&nuevaEmp._row!=null)setEmpRow(nuevaEmp._row,"empresaId",nid);else setEmps([...empList,{empresaId:nid,rol:""}]);setNuevaEmp(null);}}
         onClose={()=>setNuevaEmp(null)}/>
     </div>}
   </div>;
@@ -363,8 +377,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
       <div style={S.card()}>
         <div style={S.sTit}>Generales</div>
         <Row k="Actividad" v={c.actividad}/>
-        <Row k="Empresa" v={emp?emp.nombre:null}/>
-        <Row k="Rol" v={c.rolEmpresa}/>
+        {cEmpresas(c).map((x,i)=>{const e=empresas.find(em=>em.id===x.empresaId);return e?<Row key={i} k={i===0?"Empresa":"Empresa "+(i+1)} v={e.nombre+(x.rol?" · "+x.rol:"")}/>:null;})}
         <Row k="Teléfono" v={c.telefono}/>
         <Row k="Correo" v={c.correo}/>
         <Row k="Domicilio" v={c.domicilio}/>
@@ -667,14 +680,14 @@ function EmpresaModal({init,catalogos,onSave,onClose}){
 function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
   const[sel,setSel]=useState(null);const[modal,setModal]=useState(null);const[q,setQ]=useState("");
   const save=(d)=>{setEmpresas(prev=>{if(d.id)return prev.map(e=>e.id===d.id?d:e);const nid="e"+(Math.max(0,...prev.map(e=>parseInt((e.id||"e0").slice(1))||0))+1);return[...prev,{...d,id:nid}];});setModal(null);};
-  const del=(e)=>{const n=contactos.filter(c=>c.empresaId===e.id).length;
+  const del=(e)=>{const n=contactos.filter(c=>cEmpresas(c).some(x=>x.empresaId===e.id)).length;
     if(n>0){alert(`Esta empresa tiene ${n} contacto(s) vinculado(s). Desvincúlalos o reasígnalos primero (desde cada contacto, en "Empresa vinculada").`);return;}
     if(window.confirm("¿Eliminar esta empresa? Esta acción no se puede deshacer."))
       {setEmpresas(prev=>prev.filter(x=>x.id!==e.id));setSel(null);}};
   const list=empresas.filter(e=>!q||(e.nombre||"").toLowerCase().includes(q.toLowerCase())).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
   if(sel){
     const e=empresas.find(x=>x.id===sel);if(!e){setSel(null);return null;}
-    const vinc=contactos.filter(c=>c.empresaId===e.id);
+    const vinc=contactos.filter(c=>cEmpresas(c).some(x=>x.empresaId===e.id));
     const Row=({k,v})=>v?<div style={S.detRow}><span style={S.detK}>{k}</span><span style={S.detV}>{v}</span></div>:null;
     return <div>
       <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -691,7 +704,7 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
         <div style={S.card()}>
           <div style={S.sTit}>Contactos vinculados ({vinc.length})</div>
           {vinc.map(c=><div key={c.id} onClick={()=>goContacto(c.id)} style={{...S.detRow,cursor:"pointer"}}>
-            <span style={{fontWeight:600}}>{c.nombreCompleto}</span><span style={{...S.detK}}>{c.rolEmpresa||""}</span></div>)}
+            <span style={{fontWeight:600}}>{c.nombreCompleto}</span><span style={{...S.detK}}>{(cEmpresas(c).find(x=>x.empresaId===e.id)||{}).rol||""}</span></div>)}
           {vinc.length===0&&<div style={{fontSize:11,color:"#475569"}}>Aún sin contactos vinculados.</div>}
         </div>
         <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>del(e)}>Eliminar empresa</button>
@@ -704,7 +717,7 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
     <div style={S.line}/>
     <div style={S.sec}><input style={S.srch} placeholder="Buscar empresa…" value={q} onChange={e=>setQ(e.target.value)}/></div>
     <div style={{...S.sec,paddingTop:8}}>
-      {list.map(e=>{const n=contactos.filter(c=>c.empresaId===e.id).length;return(
+      {list.map(e=>{const n=contactos.filter(c=>cEmpresas(c).some(x=>x.empresaId===e.id)).length;return(
         <div key={e.id} style={S.cCard("#3b82f6")} onClick={()=>setSel(e.id)}>
           <div style={{fontSize:14,fontWeight:700}}>{e.nombre}</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
