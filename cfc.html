@@ -726,9 +726,64 @@ const CAT_LABEL={circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cerc
   etapaEspecifica:"Etapa específica de contacto",areaEstrategica:"Área estratégica",solucion:"Solución de intervención",
   tipoAccion:"Tipo de acción",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
   pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal",tipoContacto:"Tipo de contacto",tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado"};
-function Catalogos({catalogos,setCatalogos,onProductos,onBack}){
-  const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");
+function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,onBack}){
+  const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");const[editEsp,setEditEsp]=useState(null);
   if(open){
+    if(open==="etapaEspecifica"){
+      const esps=catalogos.etapaEspecifica||[];const prins=catalogos.etapaPrincipal||[];
+      const moveE=(idx,dir)=>{const j=idx+dir;if(j<0||j>=esps.length)return;setCatalogos(p=>{const arr=[...p.etapaEspecifica];const t=arr[idx];arr[idx]=arr[j];arr[j]=t;return{...p,etapaEspecifica:arr};});};
+      const delE=(id)=>{if(window.confirm("¿Eliminar esta etapa específica?"))setCatalogos(p=>({...p,etapaEspecifica:p.etapaEspecifica.filter(o=>o.id!==id)}));};
+      const saveE=()=>{const nombre=(editEsp.nombre||"").trim();if(!nombre){alert("Indica el nombre");return;}
+        if(editEsp.id){const old=esps.find(o=>o.id===editEsp.id);const oldName=old?old.nombre:null;
+          setCatalogos(p=>({...p,etapaEspecifica:p.etapaEspecifica.map(o=>o.id===editEsp.id?{...o,nombre,principal:editEsp.principal||null,descripcion:editEsp.descripcion||""}:o)}));
+          if(setContactos)setContactos(prev=>prev.map(c=>c.etapaEspecifica===oldName?{...c,etapaEspecifica:nombre,etapaPrincipal:editEsp.principal||c.etapaPrincipal}:c));
+        }else{const nid="eta"+Date.now();setCatalogos(p=>({...p,etapaEspecifica:[...p.etapaEspecifica,{id:nid,nombre,principal:editEsp.principal||null,descripcion:editEsp.descripcion||""}]}));}
+        setEditEsp(null);};
+      if(editEsp){return <div>
+        <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}><button style={S.back} onClick={()=>setEditEsp(null)}>‹ Etapas específicas</button></div>
+        <div style={S.sec}>
+        {!editEsp.editing
+          ? <div style={S.card()}>
+              <div style={{fontSize:10,color:"#64748b"}}>Etapa específica</div>
+              <div style={{fontSize:18,fontWeight:800,color:GOLD,marginBottom:10}}>{editEsp.nombre}</div>
+              <div style={{fontSize:10,color:"#64748b"}}>Etapa principal</div>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>{editEsp.principal||"— sin asignar —"}</div>
+              <div style={{fontSize:10,color:"#64748b"}}>Descripción</div>
+              <div style={{fontSize:13,color:"#cbd5e1",lineHeight:1.5,marginBottom:14}}>{editEsp.descripcion||"— sin descripción —"}</div>
+              <button style={S.saveB} onClick={()=>setEditEsp({...editEsp,editing:true})}>Editar</button>
+              <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{delE(editEsp.id);setEditEsp(null);}}>Eliminar</button>
+            </div>
+          : <div style={S.card()}>
+              <Field label="Nombre de la etapa específica"><input style={S.inp} value={editEsp.nombre||""} onChange={e=>setEditEsp({...editEsp,nombre:e.target.value})}/></Field>
+              <Field label="Etapa principal a la que pertenece"><select style={S.sel} value={editEsp.principal||""} onChange={e=>setEditEsp({...editEsp,principal:e.target.value})}><option value="">— Selecciona —</option>{prins.map(pp=><option key={pp.id} value={pp.nombre}>{pp.nombre}</option>)}</select></Field>
+              <Field label="Descripción / explicación"><textarea style={S.ta} value={editEsp.descripcion||""} onChange={e=>setEditEsp({...editEsp,descripcion:e.target.value})} placeholder="Explica qué significa esta etapa…"/></Field>
+              <button style={S.saveB} onClick={saveE}>Guardar</button>
+              <button style={S.cancB} onClick={()=>editEsp.id?setEditEsp({...esps.find(o=>o.id===editEsp.id),editing:false}):setEditEsp(null)}>Cancelar</button>
+            </div>}
+        </div>
+      </div>;}
+      return <div>
+        <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}><button style={S.back} onClick={()=>setOpen(null)}>‹ Catálogos</button></div>
+        <div style={S.sec}>
+          <div style={{fontSize:17,fontWeight:800,marginBottom:4}}>{CAT_LABEL.etapaEspecifica}</div>
+          <div style={{fontSize:10,color:"#64748b",marginBottom:12}}>Toca una etapa para ver su detalle, principal y descripción.</div>
+          {esps.map((o,idx)=><div key={o.id} style={{display:"flex",gap:6,marginBottom:7,alignItems:"center"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:2}}>
+              <button style={{...S.pill(false,"#64748b"),padding:"0 7px",fontSize:11,opacity:idx===0?0.3:1}} disabled={idx===0} onClick={()=>moveE(idx,-1)}>↑</button>
+              <button style={{...S.pill(false,"#64748b"),padding:"0 7px",fontSize:11,opacity:idx===esps.length-1?0.3:1}} disabled={idx===esps.length-1} onClick={()=>moveE(idx,1)}>↓</button>
+            </div>
+            <div style={{flex:1,minWidth:0,background:"#10101e",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",cursor:"pointer"}} onClick={()=>setEditEsp({...o,editing:false})}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"center"}}>
+                <span style={{fontSize:13,fontWeight:700}}>{o.nombre}</span>
+                <span style={S.tag(o.principal?"#a78bfa":"#64748b")}>{o.principal||"sin principal"}</span>
+              </div>
+              {o.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{o.descripcion}</div>}
+            </div>
+          </div>)}
+          <button style={{...S.pill(true,GOLD),marginTop:12,padding:"9px 14px",fontWeight:700}} onClick={()=>setEditEsp({nombre:"",principal:"",descripcion:"",editing:true})}>+ Nueva etapa específica</button>
+        </div>
+      </div>;
+    }
     const items=catalogos[open]||[];
     const add=()=>{if(!nuevo.trim())return;const nid=open.slice(0,3)+Date.now();
       setCatalogos(p=>({...p,[open]:[...p[open],{id:nid,nombre:nuevo.trim()}]}));setNuevo("");};
@@ -1113,6 +1168,7 @@ const hoyISO=()=>new Date().toISOString().slice(0,10);
 
 function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
   const[nuevoCto,setNuevoCto]=useState(null);
+  const[esCopia,setEsCopia]=useState(false);
   const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const cid=f.contactoId||fixedContacto;
@@ -1131,7 +1187,8 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
     onClose();
   };
   return <div style={S.modal} onClick={onClose}><div style={S.mBox} onClick={e=>e.stopPropagation()}>
-    <div style={S.mTit}>{init&&init.id?"Editar actividad":"Nueva actividad"}</div>
+    <div style={S.mTit}>{esCopia?"Copia de actividad":(init&&init.id?"Editar actividad":"Nueva actividad")}</div>
+    {esCopia&&<div style={{fontSize:10,color:GOLD,marginBottom:10,marginTop:-6}}>Se guardará como una actividad nueva.</div>}
     {fixedContacto
       ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b>{cont&&cont.etapaPrincipal?` · ${cont.etapaPrincipal}`:""}</div>
       : <Field label="Contacto">
@@ -1158,7 +1215,8 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
     {(f.estatus==="Cerrada"||f.resultado)&&<Field label="Resultado (al concluir)"><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
     {/* Oportunidad: campo preparado, se activará con el módulo de Oportunidades */}
     <button style={S.saveB} onClick={save}>Guardar</button>
-    {init&&init.id&&<button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{if(window.confirm("¿Eliminar esta actividad?")){onDelete(init.id);onClose();}}}>Eliminar actividad</button>}
+    {init&&init.id&&!esCopia&&<button style={S.cancB} onClick={()=>{setF(p=>{const{id,...r}=p;return r;});setEsCopia(true);}}>Copiar como nueva</button>}
+    {init&&init.id&&!esCopia&&<button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{if(window.confirm("¿Eliminar esta actividad?")){onDelete(init.id);onClose();}}}>Eliminar actividad</button>}
     <button style={S.cancB} onClick={onClose}>Cancelar</button>
   </div></div>;
 }
@@ -1256,7 +1314,6 @@ function Agenda({actividades,contactos,catalogos,oportunidades,openAct,onEditAct
                   <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>setSel([])}>Ninguna</button>
                   <div style={{flex:1}}/>
                   <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:""});}}>Editar</button>
-                  <button style={{...S.pill(false,"#2dd4bf"),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length){onCopyActs(sel);setSelMode(false);setSel([]);}}}>Copiar</button>
                   <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button></>}
           </div>
           <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} showContacto={true} asc={asc} selectable={selMode} selected={sel} onToggleSel={toggleSel} onTap={(a)=>openAct(a,a.contactoId)}/></>
@@ -1614,7 +1671,7 @@ function App(){
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs}/>}
-    {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
+    {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} onProductos={()=>go("productos")}/>}
     {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
