@@ -1159,37 +1159,54 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
   </div></div>;
 }
 
-function ActividadesList({acts,contactos,showContacto,onTap,asc}){
+function ActividadesList({acts,contactos,oportunidades,showContacto,onTap,asc}){
   const sorted=acts.slice().sort((a,b)=>asc?(a.fecha||"").localeCompare(b.fecha||""):(b.fecha||"").localeCompare(a.fecha||""));
   if(sorted.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades registradas.</div>;
-  return <div>{sorted.map(a=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";
+  return <div>{sorted.map(a=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);
     return <div key={a.id} onClick={()=>onTap&&onTap(a)} style={{background:"#10101e",border:`1px solid ${col}33`,borderLeft:`3px solid ${col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"pointer"}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
         <div style={{fontSize:12,fontWeight:700}}>{a.tipoAccion||"Actividad"}</div>
         <span style={S.tag(col)}>{a.estatus}</span>
       </div>
       <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?<span> · <span style={{color:GOLD,fontWeight:700}}>{c.nombreCompleto}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
+      {showContacto&&((c&&c.etapaEspecifica)||(op&&op.etapa))&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>{c&&c.etapaEspecifica&&<span style={{fontSize:8,fontWeight:700,color:"#a78bfa",background:"#a78bfa1a",border:"1px solid #a78bfa44",borderRadius:5,padding:"1px 6px"}}>{c.etapaEspecifica}</span>}{op&&op.etapa&&<span style={{fontSize:8,fontWeight:700,color:oc(op.etapa),background:oc(op.etapa)+"1a",border:`1px solid ${oc(op.etapa)}44`,borderRadius:5,padding:"1px 6px"}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}</div>}
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
       {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
     </div>;})}</div>;
 }
 
-function Agenda({actividades,contactos,catalogos,openAct}){
+function Agenda({actividades,contactos,catalogos,oportunidades,openAct}){
   const[filtro,setFiltro]=useState("Todas");
   const[modo,setModo]=useState("lista");
   const[desde,setDesde]=useState("");
   const[hasta,setHasta]=useState("");
+  const[showFil,setShowFil]=useState(false);
+  const[fContacto,setFContacto]=useState("");
+  const[fTipos,setFTipos]=useState([]);
+  const[fEtC,setFEtC]=useState("");
+  const[fEtO,setFEtO]=useState("");
+  const[q,setQ]=useState("");
   const fmtF=(f)=>f?f.split("-").reverse().join("/"):"—";
   const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"—";
+  const ctById=(id)=>contactos.find(c=>c.id===id);
+  const opById=(id)=>(oportunidades||[]).find(o=>o.id===id);
+  const toggleTipo=(t)=>setFTipos(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
+  const ql=q.trim().toLowerCase();
   const base=actividades.filter(a=>{
     if(filtro!=="Todas"&&a.estatus!==filtro)return false;
     if(desde&&(a.fecha||"")<desde)return false;
     if(hasta&&(a.fecha||"")>hasta)return false;
+    if(fContacto&&a.contactoId!==fContacto)return false;
+    if(fTipos.length&&!fTipos.includes(a.tipoAccion))return false;
+    if(fEtC){const c=ctById(a.contactoId);if(!c||c.etapaEspecifica!==fEtC)return false;}
+    if(fEtO){const o=opById(a.oportunidadId);if(!o||o.etapa!==fEtO)return false;}
+    if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.resultado,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
   });
-  const ordenadas=filtro==="Programada"
-    ? base.slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""))
-    : base.slice().sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  const asc=filtro==="Programada";
+  const ordenadas=base.slice().sort((a,b)=>asc?(a.fecha||"").localeCompare(b.fecha||""):(b.fecha||"").localeCompare(a.fecha||""));
+  const nFil=(fContacto?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
+  const limpiar=()=>{setFContacto("");setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");};
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
@@ -1201,15 +1218,29 @@ function Agenda({actividades,contactos,catalogos,openAct}){
       <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
         {["Programada","En Proceso","Cerrada","Todas"].map(t=><span key={t} style={S.chip(filtro===t,EST_COLOR[t]||GOLD)} onClick={()=>setFiltro(t)}>{t}</span>)}
       </div>
-      {modo==="reporte"&&<div style={{...S.g2,marginTop:10}}>
-        <div><div style={S.fl}>Desde</div><input type="date" style={S.inp} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
-        <div><div style={S.fl}>Hasta</div><input type="date" style={S.inp} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+      <div style={{display:"flex",gap:6,marginTop:10}}>
+        <input style={{...S.inp,flex:1}} placeholder="Buscar acción, contacto, nota…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>Filtros{nFil>0?` (${nFil})`:""}</button>
+      </div>
+      {showFil&&<div style={{...S.card(),marginTop:10}}>
+        <div style={S.fl}>Contacto</div>
+        <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        <div style={{...S.fl,marginTop:10}}>Tipo de acción</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={S.chip(fTipos.includes(t.nombre),GOLD)} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
+        <div style={S.g2}>
+          <div><div style={{...S.fl,marginTop:10}}>Etapa contacto</div><select style={S.sel} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+          <div><div style={{...S.fl,marginTop:10}}>Etapa oportunidad</div><select style={S.sel} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+        </div>
+        <div style={S.g2}>
+          <div><div style={{...S.fl,marginTop:10}}>Desde</div><input type="date" style={S.inp} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
+          <div><div style={{...S.fl,marginTop:10}}>Hasta</div><input type="date" style={S.inp} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+        </div>
+        {nFil>0&&<div style={{textAlign:"right",marginTop:10}}><button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar filtros</button></div>}
       </div>}
-      {modo==="reporte"&&(desde||hasta)&&<div style={{textAlign:"right",marginTop:6}}><button style={S.pill(false,"#f87171")} onClick={()=>{setDesde("");setHasta("");}}>Limpiar fechas</button></div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
       {modo==="lista"
-        ? <ActividadesList acts={ordenadas} contactos={contactos} showContacto={true} asc={filtro==="Programada"} onTap={(a)=>openAct(a,a.contactoId)}/>
+        ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} showContacto={true} asc={asc} onTap={(a)=>openAct(a,a.contactoId)}/>
         : (ordenadas.length===0
             ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
             : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
@@ -1370,7 +1401,28 @@ function OpoCard({o,contactos,empresas,catalogos,onTap}){
 
 function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
   const[fEt,setFEt]=useState("");
-  const list=oportunidades.filter(o=>!fEt||o.etapa===fEt).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  const[showFil,setShowFil]=useState(false);
+  const[fSol,setFSol]=useState([]);
+  const[fContacto,setFContacto]=useState("");
+  const[cDesde,setCDesde]=useState("");
+  const[cHasta,setCHasta]=useState("");
+  const[q,setQ]=useState("");
+  const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
+  const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"";
+  const en=(id)=>(empresas.find(e=>e.id===id)||{}).nombre||"";
+  const toggleSol=(id)=>setFSol(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  const ql=q.trim().toLowerCase();
+  const list=oportunidades.filter(o=>{
+    if(fEt&&o.etapa!==fEt)return false;
+    if(fSol.length&&!fSol.includes(o.solucionId))return false;
+    if(fContacto&&(o.contactoPrincipalId||o.contactoId)!==fContacto&&o.contactoOperativoId!==fContacto)return false;
+    if(cDesde&&(o.fechaEstimadaCierre||"")<cDesde)return false;
+    if(cHasta&&(o.fechaEstimadaCierre||"")>cHasta)return false;
+    if(ql){const hay=[o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
+    return true;
+  }).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+((cDesde||cHasta)?1:0);
+  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setCDesde("");setCHasta("");setQ("");};
   const abiertas=oportunidades.filter(ABIERTA);
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
   const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
@@ -1382,10 +1434,26 @@ function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
         <div style={S.card()}><div style={S.lbl}>Monto abierto</div><div style={S.big()}>{money(totalAb)}</div></div>
         <div style={S.card()}><div style={S.lbl}>Comisión abierta</div><div style={S.big("#22c55e")}>{money(totalCom)}</div></div>
       </div>
-      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
-        <span style={S.chip(!fEt)} onClick={()=>setFEt("")}>Todas</span>
-        {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEt===o.nombre,oc(o.nombre))} onClick={()=>setFEt(fEt===o.nombre?"":o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
+      <div style={{display:"flex",gap:6,marginTop:4}}>
+        <input style={{...S.inp,flex:1}} placeholder="Buscar concepto, contacto, empresa…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>Filtros{nFil>0?` (${nFil})`:""}</button>
       </div>
+      {showFil&&<div style={{...S.card(),marginTop:10}}>
+        <div style={S.fl}>Etapa</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          <span style={S.chip(!fEt)} onClick={()=>setFEt("")}>Todas</span>
+          {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEt===o.nombre,oc(o.nombre))} onClick={()=>setFEt(fEt===o.nombre?"":o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
+        </div>
+        <div style={{...S.fl,marginTop:10}}>Solución</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.solucion||[]).map(s=><span key={s.id} style={S.chip(fSol.includes(s.id),GOLD)} onClick={()=>toggleSol(s.id)}>{s.nombre.length>22?s.nombre.slice(0,22)+"…":s.nombre}</span>)}</div>
+        <div style={{...S.fl,marginTop:10}}>Contacto</div>
+        <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        <div style={S.g2}>
+          <div><div style={{...S.fl,marginTop:10}}>Cierre desde</div><input type="date" style={S.inp} value={cDesde} onChange={e=>{setCDesde(e.target.value);if(e.target.value&&!cHasta)setCHasta(e.target.value);}}/></div>
+          <div><div style={{...S.fl,marginTop:10}}>Cierre hasta</div><input type="date" style={S.inp} value={cHasta} onChange={e=>setCHasta(e.target.value)}/></div>
+        </div>
+        {nFil>0&&<div style={{textAlign:"right",marginTop:10}}><button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar filtros</button></div>}
+      </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
       {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
@@ -1511,7 +1579,7 @@ function App(){
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
-    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} openAct={openAct}/>}
+    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} openAct={openAct}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} onProductos={()=>go("productos")}/>}
