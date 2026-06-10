@@ -176,11 +176,11 @@ function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd,addLa
     </div>
     {abierto&&<div style={{marginTop:4,border:"1px solid #1e293b",borderRadius:8,background:"#0d0d16",overflow:"hidden"}}>
       <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar…" style={{width:"100%",boxSizing:"border-box",background:"#10101e",border:"none",borderBottom:"1px solid #1e293b",color:"#e2e8f0",fontSize:12,padding:"9px 10px",outline:"none"}}/>
+      {onAdd&&<div onClick={()=>{const nombre=q.trim();const r=onAdd(nombre);setAbierto(false);if(r){onChange(r);}}} style={{padding:"10px",fontSize:12,color:"#C9A84C",cursor:"pointer",borderBottom:"1px solid #1e293b",fontWeight:700,textAlign:"center",background:"#15151f"}}>{q.trim()?`+ Crear ${addLabel} «${q.trim()}»`:`+ Nuevo ${addLabel}`}</div>}
       <div style={{maxHeight:210,overflowY:"auto"}}>
         <div style={{padding:"8px 10px",fontSize:12,color:"#64748b",cursor:"pointer",borderBottom:"1px solid #14141f"}} onClick={()=>{onChange(null);setAbierto(false);}}>{vacioLabel||"— Ninguno —"}</div>
         {filt.map(o=><div key={o.id} onClick={()=>{onChange(o.id);setAbierto(false);}} style={{padding:"8px 10px",fontSize:12,cursor:"pointer",borderBottom:"1px solid #14141f",color:o.id===value?"#2dd4bf":"#e2e8f0",fontWeight:o.id===value?700:400}}>{o.label}</div>)}
         {filt.length===0&&<div style={{padding:"10px",fontSize:11,color:"#475569"}}>Sin coincidencias.</div>}
-        {onAdd&&<div onClick={()=>{const nombre=q.trim();const r=onAdd(nombre);setAbierto(false);if(r){onChange(r);}}} style={{padding:"10px",fontSize:12,color:"#C9A84C",cursor:"pointer",borderTop:"1px solid #1e293b",fontWeight:700,textAlign:"center"}}>{q.trim()?`+ Crear ${addLabel} «${q.trim()}»`:`+ Nuevo ${addLabel}`}</div>}
       </div>
     </div>}
   </div>;
@@ -759,10 +759,6 @@ function Catalogos({catalogos,setCatalogos,onProductos,onBack}){
     <div style={S.hdr}><div><div style={S.logo}>Catálogos</div><div style={S.sub}>Editables</div></div></div>
     <div style={S.line}/>
     <div style={{...S.sec,paddingTop:10}}>
-      <div style={{...S.cCard("#2dd4bf"),display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}} onClick={onProductos}>
-        <span style={{fontSize:13,fontWeight:800,color:"#2dd4bf"}}>📦 Productos por solución</span>
-        <span style={S.tag("#2dd4bf")}>Abrir ›</span>
-      </div>
       {Object.keys(catalogos).map(k=><div key={k} style={{...S.cCard(GOLD),display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setOpen(k)}>
         <span style={{fontSize:13,fontWeight:700}}>{CAT_LABEL[k]||k}</span>
         <span style={S.tag("#64748b")}>{(catalogos[k]||[]).length}</span>
@@ -892,8 +888,8 @@ function Objetivos({productos,setProductos,catalogos,onProductos}){
     <div style={S.line}/>
     <div style={S.sec}><div style={{display:"flex",gap:5}}>
       <button style={{...S.pill(modo==="matriz",GOLD),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("matriz")}>Matriz</button>
-      <button style={{...S.pill(modo==="reporte","#2dd4bf"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("reporte")}>Reporte mensual</button>
-      <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos por mes</button>
+      <button style={{...S.pill(modo==="reporte","#2dd4bf"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("reporte")}>Reporte</button>
+      <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos</button>
     </div></div>
     {modo==="matriz"&&<div style={S.sec}>
       <div style={S.g2}>
@@ -1111,7 +1107,8 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
 const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
 const hoyISO=()=>new Date().toISOString().slice(0,10);
 
-function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,onSave,onDelete,onClose,onQuickContacto}){
+function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
+  const[nuevoCto,setNuevoCto]=useState(null);
   const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const cid=f.contactoId||fixedContacto;
@@ -1134,7 +1131,8 @@ function ActividadModal({init,contactos,catalogos,oportunidades,fixedContacto,on
     {fixedContacto
       ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b>{cont&&cont.etapaPrincipal?` · ${cont.etapaPrincipal}`:""}</div>
       : <Field label="Contacto">
-          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoId} onChange={v=>set("contactoId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={onQuickContacto}/>
+          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoId} onChange={v=>set("contactoId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={(nombre)=>{setNuevoCto({nombre:nombre||null});}}/>
+          {nuevoCto&&<div onClick={e=>e.stopPropagation()}><ContactoModal init={nuevoCto} catalogos={catalogos} empresas={empresas} onCreateEmpresa={onCreateEmpresa} onSave={(d)=>{const id=onCreateContacto(d);set("contactoId",id);setNuevoCto(null);}} onClose={()=>setNuevoCto(null)}/></div>}
         </Field>}
     <div style={S.g2}>
       <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
@@ -1170,14 +1168,14 @@ function ActividadesList({acts,contactos,showContacto,onTap,asc}){
         <div style={{fontSize:12,fontWeight:700}}>{a.tipoAccion||"Actividad"}</div>
         <span style={S.tag(col)}>{a.estatus}</span>
       </div>
-      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?` · ${c.nombreCompleto}`:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
+      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?<span> · <span style={{color:GOLD,fontWeight:700}}>{c.nombreCompleto}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
       {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
     </div>;})}</div>;
 }
 
 function Agenda({actividades,contactos,catalogos,openAct}){
-  const[filtro,setFiltro]=useState("Programada");
+  const[filtro,setFiltro]=useState("Todas");
   const[modo,setModo]=useState("lista");
   const[desde,setDesde]=useState("");
   const[hasta,setHasta]=useState("");
@@ -1243,7 +1241,9 @@ const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
 const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
 
-function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose,onQuickContacto}){
+function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
+  const[nuevoCto,setNuevoCto]=useState(null);
+  const[nuevaEmp,setNuevaEmp]=useState(null);
   const eo=catalogos.etapaOportunidad||[];
   const[f,setF]=useState(()=>{const b={recurrencia:"Única",etapa:(eo[0]?eo[0].nombre:""),...init};if(b.contactoId&&!b.contactoPrincipalId)b.contactoPrincipalId=b.contactoId;return b;});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -1275,13 +1275,15 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
     <div style={S.mTit}>{init&&init.id?"Editar oportunidad":"Nueva oportunidad"}</div>
     <Field label="Concepto"><input style={S.inp} value={f.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Ej. Fianza de cumplimiento…"/></Field>
     <Field label="Contacto principal">
-      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={onQuickContacto}/>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={(nombre)=>{setNuevoCto({field:"contactoPrincipalId",nombre:nombre||null});}}/>
     </Field>
     <Field label="Contacto operativo (opcional)">
-      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoOperativoId} onChange={v=>set("contactoOperativoId",v)} placeholder="— Ninguno —" vacioLabel="— Ninguno —" onAdd={onQuickContacto}/>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoOperativoId} onChange={v=>set("contactoOperativoId",v)} placeholder="— Ninguno —" vacioLabel="— Ninguno —" onAdd={(nombre)=>{setNuevoCto({field:"contactoOperativoId",nombre:nombre||null});}}/>
     </Field>
     <Field label="Empresa (opcional)">
-      <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —"/>
+      <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —" onAdd={(nombre)=>{setNuevaEmp({nombre:nombre||null});}} addLabel="empresa"/>
+      {nuevoCto&&<div onClick={e=>e.stopPropagation()}><ContactoModal init={nuevoCto} catalogos={catalogos} empresas={empresas} onCreateEmpresa={onCreateEmpresa} onSave={(d)=>{const id=onCreateContacto(d);set(nuevoCto.field,id);setNuevoCto(null);}} onClose={()=>setNuevoCto(null)}/></div>}
+      {nuevaEmp&&<div onClick={e=>e.stopPropagation()}><EmpresaModal init={nuevaEmp} catalogos={catalogos} onSave={(d)=>{const nid=onCreateEmpresa(d);set("empresaId",nid);setNuevaEmp(null);}} onClose={()=>setNuevaEmp(null)}/></div>}
     </Field>
     <Field label="Solución Nexus">
       <select style={S.sel} value={f.solucionId||""} onChange={e=>pickSolucion(e.target.value||null)}>
@@ -1355,6 +1357,7 @@ function OpoCard({o,contactos,empresas,catalogos,onTap}){
     </div>
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
       <span style={S.tag(col)}>{(o.etapa||"").replace("Oportunidad ","")}</span>
+      {o.recurrencia&&<span style={S.tag("#a78bfa")}>{o.recurrencia}</span>}
       {o.probabilidad&&<span style={S.tag(PROB_COLOR[o.probabilidad])}>{o.probabilidad}</span>}
       {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
       {op&&<span style={S.tag("#64748b")}>op: {op.nombreCompleto}</span>}
@@ -1517,8 +1520,8 @@ function App(){
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
-    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onQuickContacto={(nombre)=>{let n=(nombre||"").trim();if(!n){n=(window.prompt("Nombre del nuevo contacto")||"").trim();}if(!n)return null;const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:n}]);return id;}} onClose={()=>setActModal(null)}/>}
-    {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onQuickContacto={(nombre)=>{let n=(nombre||"").trim();if(!n){n=(window.prompt("Nombre del nuevo contacto")||"").trim();}if(!n)return null;const id="c"+Date.now();setContactos(prev=>[...prev,{id,nombreCompleto:n}]);return id;}} onClose={()=>setOpoModal(null)}/>}
+    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setActModal(null)}/>}
+    {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setOpoModal(null)}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
