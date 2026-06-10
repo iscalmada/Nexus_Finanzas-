@@ -58,7 +58,23 @@ const ingresoProdMes=(p,mes)=>{const com=comResultProd(p),metas=p.metas||{};if(p
 function Tablero(){
   const mes=mesActual();
   const productos=lsCFC('productos',[]);
-  const ingresoNexus=productos.reduce((a,p)=>a+ingresoProdMes(p,mes),0);
+  const metaBySol={};
+  productos.forEach(p=>{const sid=p.solucionId||"_";metaBySol[sid]=(metaBySol[sid]||0)+ingresoProdMes(p,mes);});
+  const oposLink=lsCFC('oportunidades',[]).concat(lsCFP('oportunidades',[]));
+  const opById={}; oposLink.forEach(o=>{if(o&&o.id!=null&&opById[o.id]==null)opById[o.id]=o;});
+  const ETAPAS_NEXUS=["Propuesta Presentada","Oportunidad Aceptada","Oportunidad Concretada"];
+  const movs=lsCFP('movs',[]);
+  const vincBySol={};
+  movs.forEach(m=>{
+    if(!m||m.tipoOp!=="Ingreso"||m.vinculoTipo!=="oportunidades"||!m.vinculoId)return;
+    if(m.estatus!=="PROGRAMADO"&&m.estatus!=="PROYECTADO")return;
+    if((m.fecha||"").slice(0,7)!==mes)return;
+    const o=opById[m.vinculoId]; if(!o||ETAPAS_NEXUS.indexOf(o.etapa)<0)return;
+    const sid=o.solucionId||"_"; vincBySol[sid]=(vincBySol[sid]||0)+(Number(m.monto)||0);
+  });
+  const solSet={}; Object.keys(metaBySol).forEach(s=>solSet[s]=1); Object.keys(vincBySol).forEach(s=>solSet[s]=1);
+  let ingresoNexus=0, vincTotal=0;
+  Object.keys(solSet).forEach(s=>{ingresoNexus+=Math.max(metaBySol[s]||0,vincBySol[s]||0); vincTotal+=vincBySol[s]||0;});
   const opos=lsCFC('oportunidades',[]);
   const opAb=opos.filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada").length;
   const r=lsCFP('resumen',{});
@@ -72,7 +88,7 @@ function Tablero(){
     <div>
       <div style={sec}>Comercial · CFC</div>
       <div style={{display:"flex",gap:10}}>
-        <div style={{...card,borderColor:GOLD+"44"}}><div style={lbl}>Ingreso Nexus Proyectado</div><div style={val(GOLD)}>{money(ingresoNexus)}</div></div>
+        <div style={{...card,borderColor:GOLD+"44"}}><div style={lbl}>Ingreso Nexus Proyectado</div><div style={val(GOLD)}>{money(ingresoNexus)}</div>{vincTotal>0&&<div style={{fontSize:8,color:"#64748b",marginTop:3,lineHeight:1.2}}>incl. {money(vincTotal)} vinculados a oportunidades</div>}</div>
         <div style={card}><div style={lbl}>Oportunidades Abiertas</div><div style={val("#2dd4bf")}>{opAb}</div></div>
       </div>
     </div>

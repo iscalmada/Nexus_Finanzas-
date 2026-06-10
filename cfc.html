@@ -1234,23 +1234,23 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
   </div></div>;
 }
 
-function ActividadesList({acts,contactos,oportunidades,showContacto,onTap,asc,selectable,selected,onToggleSel}){
+function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel}){
   const sorted=acts.slice().sort((a,b)=>asc?(a.fecha||"").localeCompare(b.fecha||""):(b.fecha||"").localeCompare(a.fecha||""));
   if(sorted.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades registradas.</div>;
-  return <div>{sorted.map(a=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;
+  return <div>{sorted.map(a=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";
     return <div key={a.id} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:`1px solid ${col}33`,borderLeft:`3px solid ${col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"pointer"}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
         <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>{selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}<div style={{fontSize:12,fontWeight:700}}>{a.tipoAccion||"Actividad"}</div></div>
         <span style={S.tag(col)}>{a.estatus}</span>
       </div>
-      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?<span> · <span style={{color:GOLD,fontWeight:700}}>{c.nombreCompleto}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
+      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?<span> · <span style={{color:GOLD,fontWeight:700}}>{c.nombreCompleto}</span></span>:""}{showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
       {showContacto&&((c&&c.etapaEspecifica)||(op&&op.etapa))&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>{c&&c.etapaEspecifica&&<span style={{fontSize:8,fontWeight:700,color:"#a78bfa",background:"#a78bfa1a",border:"1px solid #a78bfa44",borderRadius:5,padding:"1px 6px"}}>{c.etapaEspecifica}</span>}{op&&op.etapa&&<span style={{fontSize:8,fontWeight:700,color:oc(op.etapa),background:oc(op.etapa)+"1a",border:`1px solid ${oc(op.etapa)}44`,borderRadius:5,padding:"1px 6px"}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}</div>}
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
       {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
     </div>;})}</div>;
 }
 
-function Agenda({actividades,contactos,catalogos,oportunidades,openAct,onEditActs,onCopyActs}){
+function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs}){
   const[filtro,setFiltro]=useState("Todas");
   const[modo,setModo]=useState("lista");
   const[desde,setDesde]=useState("");
@@ -1261,6 +1261,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,openAct,onEditAct
   const[fEtC,setFEtC]=useState("");
   const[fEtO,setFEtO]=useState("");
   const[q,setQ]=useState("");
+  const[fEmpresa,setFEmpresa]=useState("");
   const[selMode,setSelMode]=useState(false);
   const[sel,setSel]=useState([]);
   const[batch,setBatch]=useState(null);
@@ -1276,6 +1277,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,openAct,onEditAct
     if(desde&&(a.fecha||"")<desde)return false;
     if(hasta&&(a.fecha||"")>hasta)return false;
     if(fContacto&&a.contactoId!==fContacto)return false;
+    if(fEmpresa){const c=ctById(a.contactoId);if(!c||!cEmpresas(c).some(x=>x.empresaId===fEmpresa))return false;}
     if(fTipos.length&&!fTipos.includes(a.tipoAccion))return false;
     if(fEtC){const c=ctById(a.contactoId);if(!c||c.etapaEspecifica!==fEtC)return false;}
     if(fEtO){const o=opById(a.oportunidadId);if(!o||o.etapa!==fEtO)return false;}
@@ -1284,8 +1286,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,openAct,onEditAct
   });
   const asc=filtro==="Programada";
   const ordenadas=base.slice().sort((a,b)=>asc?(a.fecha||"").localeCompare(b.fecha||""):(b.fecha||"").localeCompare(a.fecha||""));
-  const nFil=(fContacto?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
-  const limpiar=()=>{setFContacto("");setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");};
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");};
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
@@ -1304,6 +1306,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,openAct,onEditAct
       {showFil&&<div style={{...S.card(),marginTop:10}}>
         <div style={S.fl}>Contacto</div>
         <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        <div style={{...S.fl,marginTop:10}}>Empresa</div>
+        <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={{...S.fl,marginTop:10}}>Tipo de acción</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={S.chip(fTipos.includes(t.nombre),GOLD)} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
         <div style={S.g2}>
@@ -1329,7 +1333,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,openAct,onEditAct
                   <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:""});}}>Editar</button>
                   <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button></>}
           </div>
-          <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} showContacto={true} asc={asc} selectable={selMode} selected={sel} onToggleSel={toggleSel} onTap={(a)=>openAct(a,a.contactoId)}/></>
+          <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={asc} selectable={selMode} selected={sel} onToggleSel={toggleSel} onTap={(a)=>openAct(a,a.contactoId)}/></>
         : (ordenadas.length===0
             ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
             : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
@@ -1683,7 +1687,7 @@ function App(){
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
-    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs}/>}
+    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} onProductos={()=>go("productos")}/>}
