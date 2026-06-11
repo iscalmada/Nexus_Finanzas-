@@ -170,6 +170,10 @@ const ResponsiveContainer = _RC.ResponsiveContainer || (({children,height})=>Rea
 // ─── CONSTANTES ───────────────────────────────────────────────
 const CUENTA_COLORS = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8"];
 const ESTATUS_LIST  = ["PENDIENTE","PROYECTADO","PROGRAMADO","INGRESADO","PAGADO"];
+const _b64u={e:function(b){return btoa(String.fromCharCode.apply(null,new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');},d:function(s){s=s.replace(/-/g,'+').replace(/_/g,'/');s+='='.repeat((4-s.length%4)%4);var x=atob(s),a=new Uint8Array(x.length);for(var i=0;i<x.length;i++)a[i]=x.charCodeAt(i);return a.buffer;}};
+const huellaSoporta=function(){return !!(window.PublicKeyCredential&&navigator.credentials&&navigator.credentials.create&&window.isSecureContext);};
+function huellaRegistrar(){var uid=new Uint8Array(16);crypto.getRandomValues(uid);return navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:"Nexus Partners",id:location.hostname},user:{id:uid,name:"nexus",displayName:"Nexus"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000,attestation:"none"}}).then(function(cred){return _b64u.e(cred.rawId);});}
+function huellaVerificar(id){if(!id)return Promise.resolve(false);return navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:"public-key",id:_b64u.d(id),transports:["internal"]}],userVerification:"required",timeout:60000}}).then(function(){return true;}).catch(function(){return false;});}
 const TIPO_OP       = ["Ingreso","Egreso","Traspaso","Pago Tarjeta"];
 const REC_OPTS      = ["Diaria","Semanal","Quincenal","Mensual","Bimestral","Anual"];
 const DIAS_SEM      = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
@@ -2187,6 +2191,7 @@ function App(){
 
   // ── PANTALLA DE DESBLOQUEO PIN ──
   if(pinActivo&&!pinDesbloqueado){
+    const huellaCred=String(loadLS('huellaCred',''));
     const handlePinBtn=(d)=>{
       if(pinInput.length>=8) return;
       const nuevo=pinInput+d;
@@ -2238,6 +2243,7 @@ function App(){
             </button>
           ))}
         </div>
+        {huellaSoporta()&&huellaCred&&<button onClick={()=>huellaVerificar(huellaCred).then(ok=>{if(ok){setPinDesbloqueado(true);setPinInput('');}else setPinError(true);})} style={{marginTop:22,background:"transparent",border:"1px solid #C9A84C55",borderRadius:14,color:"#C9A84C",fontSize:14,fontWeight:600,padding:"12px 24px",cursor:"pointer"}}>🔑 Entrar con huella</button>}
       </div>
     );
   }

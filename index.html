@@ -50,6 +50,10 @@ const lsCFP=(k,d)=>{try{const v=localStorage.getItem('nexus_'+k);return v==null?
 const lsCFC=(k,d)=>{try{const v=localStorage.getItem('nexus_crm_'+k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
 const setLS=(k,v)=>{try{localStorage.setItem('nexus_'+k,JSON.stringify(v));}catch(e){}};
 const hashPin=p=>p.split('').reduce((a,c)=>((a<<5)-a)+c.charCodeAt(0)|0,0).toString(36);
+const _b64u={e:function(b){return btoa(String.fromCharCode.apply(null,new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');},d:function(s){s=s.replace(/-/g,'+').replace(/_/g,'/');s+='='.repeat((4-s.length%4)%4);var x=atob(s),a=new Uint8Array(x.length);for(var i=0;i<x.length;i++)a[i]=x.charCodeAt(i);return a.buffer;}};
+const huellaSoporta=function(){return !!(window.PublicKeyCredential&&navigator.credentials&&navigator.credentials.create&&window.isSecureContext);};
+function huellaRegistrar(){var uid=new Uint8Array(16);crypto.getRandomValues(uid);return navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:"Nexus Partners",id:location.hostname},user:{id:uid,name:"nexus",displayName:"Nexus"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000,attestation:"none"}}).then(function(cred){return _b64u.e(cred.rawId);});}
+function huellaVerificar(id){if(!id)return Promise.resolve(false);return navigator.credentials.get({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),allowCredentials:[{type:"public-key",id:_b64u.d(id),transports:["internal"]}],userVerification:"required",timeout:60000}}).then(function(){return true;}).catch(function(){return false;});}
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX",{minimumFractionDigits:0,maximumFractionDigits:0});
 const comResultProd=(p)=>(p.comisionDirecta!=null&&p.comisionDirecta!=="")?Number(p.comisionDirecta):((Number(p.montoNegocio)||0)*(Number(p.indiceComision)||0)/100);
 const mesActual=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
@@ -149,6 +153,8 @@ function PinSetter({onDone,onCancel}){
 function Lock({onOk}){
   const pinApp=String(lsCFP('pinApp',''));
   const[v,setV]=useState("");const[err,setErr]=useState(false);
+  const huellaId=String(lsCFP('huellaCred',''));
+  useEffect(()=>{if(huellaSoporta()&&huellaId){huellaVerificar(huellaId).then(ok=>{if(ok)onOk();});}},[]);
   const press=(d)=>{
     if(v.length>=8)return;
     const n=v+d; setV(n); setErr(false);
@@ -172,6 +178,7 @@ function Lock({onOk}){
       <button style={key} onClick={()=>press("0")}>0</button>
       <button style={{...key,fontSize:16,color:"#64748b"}} onClick={del}>borrar</button>
     </div>
+    {huellaSoporta()&&huellaId&&<button onClick={()=>huellaVerificar(huellaId).then(ok=>ok?onOk():setErr(true))} style={{marginTop:18,background:"transparent",border:"1px solid "+GOLD+"55",borderRadius:12,color:GOLD,fontSize:13,fontWeight:600,padding:"11px 22px",cursor:"pointer"}}>🔑 Entrar con huella</button>}
     <div style={{fontSize:11,color:"#f87171",height:16,marginTop:14}}>{err?"PIN incorrecto":""}</div>
   </div>;
 }
@@ -179,6 +186,8 @@ function Lock({onOk}){
 function Home({ir}){
   const[nombre,setNombre]=useState(()=>String(lsCFP('nombreUsuario','')));
   const[pinOn,setPinOn]=useState(()=>!!lsCFP('pinActivo',false)&&!!String(lsCFP('pinApp','')));
+  const[huellaOn,setHuellaOn]=useState(()=>!!String(lsCFP('huellaCred','')));
+  const[huellaMsg,setHuellaMsg]=useState('');
   const[setter,setSetter]=useState(false);
   const[cfg,setCfg]=useState(false);
   const[editName,setEditName]=useState(false);
@@ -188,6 +197,8 @@ function Home({ir}){
   const activarPin=(pin)=>{setLS('pinApp',hashPin(pin));setLS('pinActivo',true);setPinOn(true);setSetter(false);};
   const desactivarPin=()=>{if(window.confirm("¿Desactivar el PIN de acceso? Podrás volver a activarlo cuando quieras, sin perder ningún dato.")){setLS('pinActivo',false);setLS('pinApp','');setPinOn(false);}};
   const setTO=(v)=>{setPto(v);setLS('pinTimeout',v);};
+  const activarHuella=()=>{setHuellaMsg('');huellaRegistrar().then(id=>{setLS('huellaCred',id);setHuellaOn(true);setHuellaMsg('Huella activada.');}).catch(()=>{setHuellaMsg('No se pudo activar la huella. Verifica que tu dispositivo tenga biometría registrada.');});};
+  const quitarHuella=()=>{setLS('huellaCred','');setHuellaOn(false);setHuellaMsg('');};
   const card={background:"#10101e",border:"1px solid #1e293b",borderRadius:14,padding:"14px 16px"};
   const lbl={fontSize:10,color:"#64748b",letterSpacing:1,textTransform:"uppercase"};
 
@@ -229,6 +240,20 @@ function Home({ir}){
       </div>
       {pinOn&&<button onClick={()=>setSetter(true)} style={{marginTop:10,background:"transparent",border:"1px solid #1e293b",borderRadius:9,color:GOLD,fontSize:12,padding:"7px 0",width:"100%",cursor:"pointer"}}>Cambiar PIN</button>}
       <div style={{fontSize:10,color:"#475569",marginTop:8}}>El PIN protege la entrada a Nexus Flow. Es el mismo del CFP.</div>
+    </div>
+
+    <div style={{...card,marginBottom:10}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div><div style={lbl}>Acceso por huella</div>
+          <div style={{fontSize:13,color:huellaOn?"#22c55e":"#94a3b8",marginTop:3,fontWeight:600}}>{huellaOn?"Activado":"Desactivado"}</div></div>
+        {huellaSoporta()
+          ? (huellaOn
+              ? <button onClick={quitarHuella} style={{background:"transparent",border:"1px solid #1e293b",borderRadius:9,color:"#f87171",fontSize:12,padding:"7px 12px",cursor:"pointer"}}>Quitar</button>
+              : <button onClick={activarHuella} disabled={!pinOn} style={{background:pinOn?GOLD:"#1e293b",border:"none",borderRadius:9,color:pinOn?"#08080f":"#475569",fontWeight:800,fontSize:12,padding:"7px 14px",cursor:pinOn?"pointer":"default"}}>Activar</button>)
+          : <span style={{fontSize:10,color:"#475569"}}>No disponible</span>}
+      </div>
+      <div style={{fontSize:10,color:"#475569",marginTop:8}}>{(!pinOn&&!huellaOn)?"Activa primero el PIN; la huella es un acceso rápido y el PIN queda como respaldo.":"Usa la biometría del dispositivo para entrar a Nexus Flow y al CFP. El PIN sigue disponible como respaldo."}</div>
+      {huellaMsg&&<div style={{fontSize:10,color:GOLD,marginTop:6}}>{huellaMsg}</div>}
     </div>
 
     <div style={{...card,marginBottom:10,opacity:pinOn?1:0.5}}>
