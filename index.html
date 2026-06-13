@@ -77,8 +77,8 @@ function Tablero(){
     const sid=o.solucionId||"_"; vincBySol[sid]=(vincBySol[sid]||0)+(Number(m.monto)||0);
   });
   const solSet={}; Object.keys(metaBySol).forEach(s=>solSet[s]=1); Object.keys(vincBySol).forEach(s=>solSet[s]=1);
-  let ingresoNexus=0, vincTotal=0;
-  Object.keys(solSet).forEach(s=>{ingresoNexus+=Math.max(metaBySol[s]||0,vincBySol[s]||0); vincTotal+=vincBySol[s]||0;});
+  let ingresoNexus=0, porMov=0, porMeta=0;
+  Object.keys(solSet).forEach(s=>{const m=metaBySol[s]||0,v=vincBySol[s]||0;const mx=Math.max(m,v);ingresoNexus+=mx;if(v>=m)porMov+=mx;else porMeta+=mx;});
   const opos=lsCFC('oportunidades',[]);
   const opAb=opos.filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada").length;
   const r=lsCFP('resumen',{});
@@ -92,7 +92,7 @@ function Tablero(){
     <div>
       <div style={sec}>Comercial · CFC</div>
       <div style={{display:"flex",gap:10}}>
-        <div style={{...card,borderColor:GOLD+"44"}}><div style={lbl}>Ingreso Nexus Proyectado</div><div style={val(GOLD)}>{money(ingresoNexus)}</div>{vincTotal>0&&<div style={{fontSize:8,color:"#64748b",marginTop:3,lineHeight:1.2}}>incl. {money(vincTotal)} vinculados a oportunidades</div>}</div>
+        <div style={{...card,borderColor:GOLD+"44"}}><div style={lbl}>Ingreso Nexus Proyectado</div><div style={val(GOLD)}>{money(ingresoNexus)}</div>{porMov>0&&<div style={{fontSize:8,color:"#64748b",marginTop:3,lineHeight:1.3}}>{money(porMov)} respaldados por movimientos · {money(porMeta)} por metas</div>}</div>
         <div style={card}><div style={lbl}>Oportunidades Abiertas</div><div style={val("#2dd4bf")}>{opAb}</div></div>
       </div>
     </div>
