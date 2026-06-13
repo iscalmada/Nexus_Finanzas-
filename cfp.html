@@ -170,6 +170,7 @@ const ResponsiveContainer = _RC.ResponsiveContainer || (({children,height})=>Rea
 // ─── CONSTANTES ───────────────────────────────────────────────
 const CUENTA_COLORS = ["#C9A84C","#60a5fa","#f472b6","#22c55e","#fb923c","#a78bfa","#38bdf8"];
 const ESTATUS_LIST  = ["PENDIENTE","PROYECTADO","PROGRAMADO","INGRESADO","PAGADO"];
+const NIV_COL={Alta:"#22c55e",Media:"#fbbf24",Baja:"#94a3b8"};
 const _b64u={e:function(b){return btoa(String.fromCharCode.apply(null,new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');},d:function(s){s=s.replace(/-/g,'+').replace(/_/g,'/');s+='='.repeat((4-s.length%4)%4);var x=atob(s),a=new Uint8Array(x.length);for(var i=0;i<x.length;i++)a[i]=x.charCodeAt(i);return a.buffer;}};
 const huellaSoporta=function(){return !!(window.PublicKeyCredential&&navigator.credentials&&navigator.credentials.create&&window.isSecureContext);};
 function huellaRegistrar(){var uid=new Uint8Array(16);crypto.getRandomValues(uid);return navigator.credentials.create({publicKey:{challenge:crypto.getRandomValues(new Uint8Array(32)),rp:{name:"Nexus Partners",id:location.hostname},user:{id:uid,name:"nexus",displayName:"Nexus"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000,attestation:"none"}}).then(function(cred){return _b64u.e(cred.rawId);});}
@@ -1282,7 +1283,7 @@ function App(){
 
   const[showPeriod,setShowPeriod]=useState(false);
   const[showPrioPanel,setShowPrioPanel]=useState(false); // false | 'ing' | 'eg'
-  const[prioI,setPrioI]=useState(3);
+  const[prioI,setPrioI]=useState(2); // default Alta+Media (Baja no impacta salvo activarlo)
   const[prioE,setPrioE]=useState(5); // 5=Todos para egresos (Esencial=1..Extraordinario=4)
   const[incluirProy,setIncluirProy]=useState(true); // toggle PROYECTADO en consolidado — ON por defecto
   const[multiMode,setMultiMode]=useState(false);
@@ -1332,6 +1333,7 @@ function App(){
   const[showExportModal,setShowExportModal]=useState(false);
   const[carteraTab,setCarteraTab]=useState("acreedores"); // acreedores|deudores|ingresosExt
   const[carteraOrigen,setCarteraOrigen]=useState("Todos");
+  const[carteraNivel,setCarteraNivel]=useState("Todos");
   const[showCarteraForm,setShowCarteraForm]=useState(false);
   const[editCarteraId,setEditCarteraId]=useState(null);
   const[formCartera,setFormCartera]=useState({});
@@ -2048,8 +2050,8 @@ function App(){
       setEditCarteraId(item.id);
     } else {
       const blanks={
-        acreedores:{origen:"",nombre:"",concepto:"",montoCapital:"",montoInteres:"",montoActual:"",condicionPago:"",condiciones:"",abonos:[],movIdsVinculados:[]},
-        deudores:  {origen:"",nombre:"",concepto:"",montoActual:"",condiciones:"",abonos:[],movIdsVinculados:[]},
+        acreedores:{origen:"",nombre:"",concepto:"",montoCapital:"",montoInteres:"",montoActual:"",condicionPago:"",condiciones:"",nivel:"Media",abonos:[],movIdsVinculados:[]},
+        deudores:  {origen:"",nombre:"",concepto:"",montoActual:"",condiciones:"",nivel:"Media",abonos:[],movIdsVinculados:[]},
         ingresosExt:{origen:"",concepto:"",monto:"",montoObjetivo:"",condiciones:"",estado:"Pendiente",movIdsVinculados:[]},
       };
       setFormCartera(blanks[tipo]);
@@ -3449,7 +3451,7 @@ function App(){
             {/* ── ACREEDORES ── */}
             {carteraTab==="acreedores"&&(()=>{
               const origenes=["Todos",...ORIG_ACREEDOR];
-              const acrFiltrados=carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen);
+              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
               const total=acrFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector de origen */}
@@ -3459,6 +3461,10 @@ function App(){
                     return(<button key={o} style={{...S.prioB2(carteraOrigen===o,"#f87171"),flex:"none",padding:"5px 10px",fontSize:9}}
                       onClick={()=>setCarteraOrigen(o)}>{o} {cnt>0&&<span style={{opacity:0.7}}>({cnt})</span>}</button>);
                   })}
+                </div>
+                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Prioridad de pago</span>
+                  {["Todos","Alta","Media","Baja"].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]),flex:"none",padding:"5px 10px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
                 </div>
                 {(()=>{
                   const totalInicial=acrFiltrados.reduce((s,x)=>s+(x.montoActual||0),0);
@@ -3498,7 +3504,7 @@ function App(){
                       onClick={()=>{setViewCartera({...x,tipo:"acreedores"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
-                          <div style={{fontSize:8,color:"#f87171",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
+                          <div style={{fontSize:8,color:"#f87171",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}{x.nivel&&<span style={{marginLeft:6,padding:"1px 6px",borderRadius:6,background:NIV_COL[x.nivel]+"22",color:NIV_COL[x.nivel]}}>{x.nivel}</span>}</div>
                           <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{x.nombre||x.concepto}</div>
                           {x.nombre&&<div style={{fontSize:10,color:"#64748b"}}>{x.concepto}</div>}
                         </div>
@@ -3525,7 +3531,7 @@ function App(){
             {/* ── DEUDORES ── */}
             {carteraTab==="deudores"&&(()=>{
               const origenes=["Todos",...ORIG_DEUDOR];
-              const deuFiltrados=carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen);
+              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
               const total=deuFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector de origen */}
@@ -3535,6 +3541,10 @@ function App(){
                     return(<button key={o} style={{...S.prioB2(carteraOrigen===o,"#22c55e"),flex:"none",padding:"5px 10px",fontSize:9}}
                       onClick={()=>setCarteraOrigen(o)}>{o} {cnt>0&&<span style={{opacity:0.7}}>({cnt})</span>}</button>);
                   })}
+                </div>
+                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Probabilidad de recuperación</span>
+                  {["Todos","Alta","Media","Baja"].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]),flex:"none",padding:"5px 10px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
                 </div>
                 {(()=>{
                   const totalInicial=deuFiltrados.reduce((s,x)=>s+(x.montoActual||0),0);
@@ -3575,7 +3585,7 @@ function App(){
                       onClick={()=>{setViewCartera({...x,tipo:"deudores"});setCarteraDetalleModo("ejecutados");}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:5}}>
                         <div style={{flex:1}}>
-                          <div style={{fontSize:8,color:"#22c55e",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}</div>
+                          <div style={{fontSize:8,color:"#22c55e",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:2}}>{x.origen}{x.nivel&&<span style={{marginLeft:6,padding:"1px 6px",borderRadius:6,background:NIV_COL[x.nivel]+"22",color:NIV_COL[x.nivel]}}>{x.nivel}</span>}</div>
                           <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{x.nombre||x.concepto}</div>
                           {x.nombre&&<div style={{fontSize:10,color:"#64748b"}}>{x.concepto}</div>}
                         </div>
@@ -4026,6 +4036,11 @@ function App(){
                 {isIngExt&&(
                   <div style={{...S.infoBx("#475569")}}><span>ℹ</span><span>El estado (Pendiente/Programado/Recuperado) se actualiza automáticamente al vincular movimientos de ingreso.</span></div>
                 )}
+                {!isIngExt&&<div style={S.fg}><label style={S.fl}>{isAcr?"Prioridad de pago":"Probabilidad de recuperación"}</label>
+                  <div style={{display:"flex",gap:7,marginBottom:4}}>
+                    {["Alta","Media","Baja"].map(p=><button key={p} style={{...S.prioB2((formCartera.nivel||"Media")===p,NIV_COL[p]),flex:1,padding:"8px 0",fontSize:10}} onClick={()=>set("nivel",p)}>{p}</button>)}
+                  </div>
+                </div>}
                 <div style={S.fg}><label style={S.fl}>Condiciones actuales</label>
                   <textarea style={{...S.inp,minHeight:60,resize:"vertical",lineHeight:1.5}} value={formCartera.condiciones||""} onChange={e=>set("condiciones",e.target.value)} placeholder="Acuerdos, tasas, plazos…"/>
                 </div>
