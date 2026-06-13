@@ -1237,7 +1237,7 @@ const hoyISO=()=>new Date().toISOString().slice(0,10);
 function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
   const[nuevoCto,setNuevoCto]=useState(null);
   const[esCopia,setEsCopia]=useState(false);
-  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),...init}));
+  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const cid=f.contactoId||fixedContacto;
   const cont=contactos.find(c=>c.id===cid);
@@ -1249,8 +1249,19 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
     if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
     onSave({...f,contactoId:cid});
     if(f.estatus==="Cerrada"&&window.confirm("Actividad cerrada. ¿Agendar la siguiente acción para este contacto?")){
-      setF({contactoId:cid,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",tipoAccion:"",servicioSolucion:null,intencion:"",resultado:""});
+      setF({contactoId:cid,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",hora:null,prioridad:f.prioridad||"Media",tipoAccion:"",servicioSolucion:null,intencion:"",resultado:""});
       return;
+    }
+    onClose();
+  };
+  const cerrarSinRespuesta=()=>{
+    if(!cid){alert("Selecciona un contacto");return;}
+    if(!f.fecha){alert("Indica la fecha");return;}
+    if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
+    onSave({...f,contactoId:cid,estatus:"Cerrada",resultado:f.resultado||"Sin respuesta"});
+    if(window.confirm("Cerrada sin respuesta. ¿Agendar la siguiente acción para este contacto?")){
+      setF({contactoId:cid,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",hora:null,prioridad:f.prioridad||"Media",tipoAccion:f.tipoAccion||"",servicioSolucion:f.servicioSolucion||null,intencion:"",resultado:""});
+      setEsCopia(false);return;
     }
     onClose();
   };
@@ -1265,9 +1276,17 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
         </Field>}
     <div style={S.g2}>
       <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
+      <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
+    </div>
+    <div style={S.g2}>
       <Field label="Estatus">
         <select style={S.sel} value={f.estatus||"Programada"} onChange={e=>set("estatus",e.target.value)}>
           {(catalogos.estatusAccion||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
+        </select>
+      </Field>
+      <Field label="Prioridad">
+        <select style={S.sel} value={f.prioridad||"Media"} onChange={e=>set("prioridad",e.target.value)}>
+          {PRIOR.map(p=><option key={p} value={p}>{p}</option>)}
         </select>
       </Field>
     </div>
@@ -1283,29 +1302,32 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
     {(f.estatus==="Cerrada"||f.resultado)&&<Field label="Resultado (al concluir)"><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
     {/* Oportunidad: campo preparado, se activará con el módulo de Oportunidades */}
     <button style={S.saveB} onClick={save}>Guardar</button>
+    {init&&init.id&&!esCopia&&(f.estatus==="Programada"||f.estatus==="En Proceso")&&<button style={{...S.cancB,color:"#fb923c",borderColor:"#fb923c55"}} onClick={cerrarSinRespuesta}>Cerrar sin respuesta</button>}
     {init&&init.id&&!esCopia&&<button style={S.cancB} onClick={()=>{setF(p=>{const{id,...r}=p;return r;});setEsCopia(true);}}>Copiar como nueva</button>}
     {init&&init.id&&!esCopia&&<button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{if(window.confirm("¿Eliminar esta actividad?")){onDelete(init.id);onClose();}}}>Eliminar actividad</button>}
     <button style={S.cancB} onClick={onClose}>Cancelar</button>
   </div></div>;
 }
 
-function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel}){
-  const sorted=acts.slice().sort((a,b)=>asc?(a.fecha||"").localeCompare(b.fecha||""):(b.fecha||"").localeCompare(a.fecha||""));
+function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta}){
+  const sorted=noSort?acts:acts.slice().sort((a,b)=>{const fa=(a.fecha||"")+(a.hora||""),fb=(b.fecha||"")+(b.hora||"");return asc?fa.localeCompare(fb):fb.localeCompare(fa);});
+  let hoyIdx=-1;if(hoy){for(let i=0;i<sorted.length;i++){const fx=sorted[i].fecha||"";if(asc?(fx>=hoy):(fx<=hoy)){hoyIdx=i;break;}}}
   if(sorted.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades registradas.</div>;
-  return <div>{sorted.map(a=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";
-    return <div key={a.id} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:`1px solid ${col}33`,borderLeft:`3px solid ${col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"pointer"}}>
+  return <div>{sorted.map((a,i)=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";const _hoy=hoyISO();const _pend=(a.estatus==="Programada"||a.estatus==="En Proceso");const _rez=(_pend&&a.fecha&&a.fecha<_hoy)?Math.max(0,Math.round((Date.parse(_hoy)-Date.parse(a.fecha))/86400000)):0;const _rezC=_rez>=7?"#ef4444":_rez>=3?"#fb923c":_rez>=1?"#fbbf24":null;
+    return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"pointer"}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
         <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>{selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}<div style={{fontSize:12,fontWeight:700}}>{a.tipoAccion||"Actividad"}</div></div>
-        <span style={S.tag(col)}>{a.estatus}</span>
+        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>{_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}{a.prioridad&&<span style={S.tag(PRIOR_COLOR[a.prioridad]||"#64748b")}>{a.prioridad}</span>}<span style={S.tag(col)}>{a.estatus}</span></div>
       </div>
-      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{showContacto&&c?<span> · <span style={{color:GOLD,fontWeight:700}}>{c.nombreCompleto}</span></span>:""}{showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
+      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{a.hora?" · "+a.hora:""}{showContacto&&c?<span> · <span style={{color:GOLD,fontWeight:700}}>{c.nombreCompleto}</span></span>:""}{showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
       {showContacto&&((c&&c.etapaEspecifica)||(op&&op.etapa))&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>{c&&c.etapaEspecifica&&<span style={{fontSize:8,fontWeight:700,color:"#a78bfa",background:"#a78bfa1a",border:"1px solid #a78bfa44",borderRadius:5,padding:"1px 6px"}}>{c.etapaEspecifica}</span>}{op&&op.etapa&&<span style={{fontSize:8,fontWeight:700,color:oc(op.etapa),background:oc(op.etapa)+"1a",border:`1px solid ${oc(op.etapa)}44`,borderRadius:5,padding:"1px 6px"}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}</div>}
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
       {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
+      {onSinRespuesta&&_pend&&<div style={{textAlign:"right",marginTop:6}}><button onClick={(ev)=>{ev.stopPropagation();onSinRespuesta(a);}} style={{background:"transparent",border:"1px solid #fb923c55",borderRadius:8,color:"#fb923c",fontSize:10,fontWeight:700,padding:"4px 10px",cursor:"pointer"}}>Sin respuesta</button></div>}
     </div>;})}</div>;
 }
 
-function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs}){
+function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
   const[filtro,setFiltro]=useState("Todas");
   const[modo,setModo]=useState("lista");
   const[desde,setDesde]=useState("");
@@ -1317,6 +1339,10 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[fEtO,setFEtO]=useState("");
   const[q,setQ]=useState("");
   const[fEmpresa,setFEmpresa]=useState("");
+  const[fPrioridad,setFPrioridad]=useState([]);
+  const[ordCampo,setOrdCampo]=useState("fecha");
+  const[ordDir,setOrdDir]=useState("desc");
+  const[fRezago,setFRezago]=useState(false);
   const[selMode,setSelMode]=useState(false);
   const[sel,setSel]=useState([]);
   const[batch,setBatch]=useState(null);
@@ -1333,16 +1359,22 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(hasta&&(a.fecha||"")>hasta)return false;
     if(fContacto&&a.contactoId!==fContacto)return false;
     if(fEmpresa){const c=ctById(a.contactoId);if(!c||!cEmpresas(c).some(x=>x.empresaId===fEmpresa))return false;}
+    if(fPrioridad.length&&fPrioridad.indexOf(a.prioridad)<0)return false;
+    if(fRezago){const _h=hoyISO();if(!((a.estatus==="Programada"||a.estatus==="En Proceso")&&a.fecha&&a.fecha<_h))return false;}
     if(fTipos.length&&!fTipos.includes(a.tipoAccion))return false;
     if(fEtC){const c=ctById(a.contactoId);if(!c||c.etapaEspecifica!==fEtC)return false;}
     if(fEtO){const o=opById(a.oportunidadId);if(!o||o.etapa!==fEtO)return false;}
     if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.resultado,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
   });
-  const asc=filtro==="Programada";
-  const ordenadas=base.slice().sort((a,b)=>asc?(a.fecha||"").localeCompare(b.fecha||""):(b.fecha||"").localeCompare(a.fecha||""));
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");};
+  const ordenadas=base.slice().sort((a,b)=>{
+    let r;
+    if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=((a.fecha||"")+(a.hora||"")).localeCompare((b.fecha||"")+(b.hora||""));}
+    else r=((a.fecha||"")+(a.hora||"")).localeCompare((b.fecha||"")+(b.hora||""));
+    return ordDir==="asc"?r:-r;
+  });
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);};
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
@@ -1365,6 +1397,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={{...S.fl,marginTop:10}}>Tipo de acción</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={S.chip(fTipos.includes(t.nombre),GOLD)} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
+        <div style={{...S.fl,marginTop:10}}>Prioridad</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{PRIOR.map(p=><span key={p} style={S.chip(fPrioridad.includes(p),PRIOR_COLOR[p])} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
         <div style={S.g2}>
           <div><div style={{...S.fl,marginTop:10}}>Etapa contacto</div><select style={S.sel} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
           <div><div style={{...S.fl,marginTop:10}}>Etapa oportunidad</div><select style={S.sel} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
@@ -1378,7 +1412,18 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     </div>
     <div style={{...S.sec,paddingTop:4}}>
       {modo==="lista"
-        ? <><div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+        ? <><div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",fontSize:11}}>
+            <span style={{color:"#64748b"}}>Orden:</span>
+            <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
+            <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
+            <button style={{...S.pill(false,"#60a5fa"),padding:"5px 10px"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
+            <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 9px"}} onClick={()=>setFRezago(v=>!v)}>⚠ Rezago</button>
+            <div style={{flex:1}}/>
+            <button style={{...S.pill(false,"#2dd4bf"),padding:"5px 9px"}} onClick={()=>{const el=document.getElementById("ag-hoy");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});}}>Hoy</button>
+            <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>⤒</button>
+            <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"})}>⤓</button>
+          </div>
+          <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
             {!selMode
               ? <button style={{...S.pill(false,GOLD),padding:"6px 12px",fontWeight:700}} onClick={()=>{setSelMode(true);setSel([]);}}>Seleccionar</button>
               : <><span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
@@ -1388,7 +1433,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
                   <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:""});}}>Editar</button>
                   <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button></>}
           </div>
-          <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={asc} selectable={selMode} selected={sel} onToggleSel={toggleSel} onTap={(a)=>openAct(a,a.contactoId)}/></>
+          <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={ordCampo==="fecha"&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onTap={(a)=>openAct(a,a.contactoId)}/></>
         : (ordenadas.length===0
             ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
             : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
@@ -1429,6 +1474,9 @@ const OPO_COLOR={"Oportunidad Identificada":"#60a5fa","Oportunidad en Preparaci�
 const oc=(n)=>OPO_COLOR[n]||"#64748b";
 const RECUR=["Única","Mensual","Anual"];
 const PROB=["Alta","Media","Baja"];
+const PRIOR=["Muy Alta","Alta","Media","Baja"];
+const PRIOR_COLOR={"Muy Alta":"#ef4444","Alta":"#fb923c","Media":"#fbbf24","Baja":"#64748b"};
+const PRIOR_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
 const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
 const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
@@ -1717,6 +1765,7 @@ function App(){
   const delAct=(id)=>setActividades(prev=>prev.filter(a=>a.id!==id));
   const onEditActs=(ids,patch)=>setActividades(prev=>prev.map(a=>ids.indexOf(a.id)>-1?{...a,...patch}:a));
   const onCopyActs=(ids)=>setActividades(prev=>{let mx=Math.max(0,...prev.map(a=>parseInt((a.id||"a0").slice(1))||0));const cps=prev.filter(a=>ids.indexOf(a.id)>-1).map(a=>{mx+=1;const{id,...r}=a;return {...r,id:"a"+mx};});return [...prev,...cps];});
+  const sinRespuesta=(a)=>{setActividades(prev=>prev.map(x=>x.id===a.id?{...x,estatus:"Cerrada",resultado:x.resultado||"Sin respuesta"}:x));if(window.confirm("Cerrada sin respuesta. ¿Agendar la siguiente acción para este contacto?")){openAct({contactoId:a.contactoId,oportunidadId:a.oportunidadId||null,tipoAccion:a.tipoAccion||"",servicioSolucion:a.servicioSolucion||null,prioridad:a.prioridad||"Media",estatus:"Programada",fecha:""},a.contactoId);}};
   const openOpo=(init,fixed)=>setOpoModal({init,fixed:fixed||null});
   const saveOpo=(data)=>{setOportunidades(prev=>{
     if(data.id)return prev.map(o=>o.id===data.id?data:o);
@@ -1742,7 +1791,7 @@ function App(){
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
-    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs}/>}
+    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} oportunidades={oportunidades} onProductos={()=>go("productos")}/>}
