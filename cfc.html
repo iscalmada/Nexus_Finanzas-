@@ -1124,6 +1124,106 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
 }
 
 /* ════════ CONFIGURACIÓN ════════ */
+function BienesInmuebles({bienes,setBienes,catalogos,contactos,onBack}){
+  const EST=["Disponible","En proceso","Vinculado","Cerrado","No disponible"];
+  const TIPO=["Venta directa","Coinversión"];
+  const EST_COL={"Disponible":"#22c55e","En proceso":"#fbbf24","Vinculado":"#60a5fa","Cerrado":"#94a3b8","No disponible":"#64748b"};
+  const money=n=>"$"+Math.round(n||0).toLocaleString("es-MX");
+  const aliadosOpts=contactos.filter(c=>(c.tiposAliado||[]).length>0).map(c=>({id:c.id,label:c.nombreCompleto})).sort((a,b)=>(a.label||"").localeCompare(b.label||""));
+  const nomAliado=(id)=>{const c=contactos.find(x=>x.id===id);return c?c.nombreCompleto:"";};
+  const calcCom=(f)=>((parseFloat(f.valorPropiedad)||0)*(parseFloat(f.comProp)||0)/100)+((parseFloat(f.valorInversion)||0)*(parseFloat(f.comInv)||0)/100);
+  const[modal,setModal]=useState(null);
+  const[q,setQ]=useState("");
+  const[fEst,setFEst]=useState("");
+  const[fTipo,setFTipo]=useState("");
+  const set=(k,v)=>setModal(m=>({...m,[k]:v}));
+  const abrir=(b)=>setModal(b?{...b}:{denominacion:"",estatus:"Disponible",tipo:"Coinversión",descripcion:"",condiciones:"",aliadoEstId:"",aliadoComId:"",valorPropiedad:"",comProp:"",valorInversion:"",comInv:"",montoComision:"",comAuto:true,ubicacion:"",superficie:"",obs:""});
+  const guardar=()=>{
+    if(!modal.denominacion){alert("Indica la denominación");return;}
+    const auto=calcCom(modal);
+    const data={...modal,montoComision:modal.comAuto!==false?auto:(parseFloat(modal.montoComision)||0)};
+    setBienes(prev=>{ if(data.id)return prev.map(x=>x.id===data.id?data:x); return [...prev,{...data,id:"bi"+Date.now()}]; });
+    setModal(null);
+  };
+  const borrar=(id)=>{ if(window.confirm("¿Eliminar este inmueble?")){setBienes(prev=>prev.filter(x=>x.id!==id));setModal(null);} };
+  const lista=bienes.filter(b=>{
+    if(fEst&&b.estatus!==fEst)return false;
+    if(fTipo&&b.tipo!==fTipo)return false;
+    if(q){const s=(b.denominacion+" "+(b.descripcion||"")+" "+(b.ubicacion||"")).toLowerCase();if(s.indexOf(q.toLowerCase())<0)return false;}
+    return true;
+  });
+  const totalPipeline=bienes.filter(b=>b.estatus!=="Cerrado"&&b.estatus!=="No disponible").reduce((s,b)=>s+(b.montoComision||0),0);
+  return <div>
+    <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}><button style={S.back} onClick={onBack}>‹ Configuración</button></div>
+    <div style={S.sec}>
+      <div style={{fontSize:17,fontWeight:800,marginBottom:2}}>🏠 Bienes Inmuebles</div>
+      <div style={{fontSize:10,color:"#64748b",marginBottom:12}}>Propiedades para venta directa o coinversión.</div>
+      <div style={{...S.card(),borderColor:GOLD+"55",marginBottom:12}}>
+        <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Comisión proyectada (disponibles · en proceso · vinculados)</div>
+        <div style={{fontSize:22,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD}}>{money(totalPipeline)}</div>
+      </div>
+      <input style={{...S.inp,marginBottom:8}} placeholder="Buscar por denominación, descripción o ubicación…" value={q} onChange={e=>setQ(e.target.value)}/>
+      <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+        <select style={{...S.sel,flex:1,minWidth:130}} value={fEst} onChange={e=>setFEst(e.target.value)}><option value="">Estatus: Todos</option>{EST.map(o=><option key={o} value={o}>{o}</option>)}</select>
+        <select style={{...S.sel,flex:1,minWidth:130}} value={fTipo} onChange={e=>setFTipo(e.target.value)}><option value="">Tipo: Todos</option>{TIPO.map(o=><option key={o} value={o}>{o}</option>)}</select>
+      </div>
+      {lista.length===0&&<div style={{fontSize:11,color:"#475569",padding:"16px 0",textAlign:"center"}}>{bienes.length?"Sin inmuebles con ese filtro.":"Sin inmuebles registrados."}</div>}
+      {lista.map(b=><div key={b.id} style={{...S.card(),marginBottom:8,cursor:"pointer"}} onClick={()=>abrir(b)}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#e2e8f0"}}>{b.denominacion}</div>
+            <div style={{fontSize:10,color:"#64748b",marginTop:1}}>{b.tipo}{b.ubicacion?" · "+b.ubicacion:""}{b.superficie?" · "+b.superficie:""}</div>
+          </div>
+          <span style={S.tag(EST_COL[b.estatus]||"#64748b")}>{b.estatus}</span>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginTop:6,gap:8}}>
+          <div style={{fontSize:9,color:"#475569",minWidth:0,flex:1}}>{b.aliadoEstId?("Estr.: "+nomAliado(b.aliadoEstId)):""}{b.aliadoComId?(" · Com.: "+nomAliado(b.aliadoComId)):""}</div>
+          <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:8,color:"#64748b"}}>Comisión proy.</div><div style={{fontSize:14,fontWeight:800,color:GOLD}}>{money(b.montoComision)}</div></div>
+        </div>
+      </div>)}
+      <button style={{...S.saveB,marginTop:8}} onClick={()=>abrir(null)}>+ Nuevo inmueble</button>
+    </div>
+    {modal&&(()=>{const auto=calcCom(modal);return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:200}} onClick={()=>setModal(null)}>
+      <div onClick={e=>e.stopPropagation()} style={{background:"#0c0c16",border:"1px solid #1e293b",borderRadius:"16px 16px 0 0",padding:18,width:"100%",maxWidth:480,maxHeight:"90vh",overflowY:"auto"}}>
+        <div style={{fontSize:14,fontWeight:800,color:GOLD,marginBottom:12}}>{modal.id?"Editar inmueble":"Nuevo inmueble"}</div>
+        <Field label="Denominación"><input style={S.inp} value={modal.denominacion||""} onChange={e=>set("denominacion",e.target.value)}/></Field>
+        <div style={S.g2}>
+          <Field label="Estatus"><select style={S.sel} value={modal.estatus||"Disponible"} onChange={e=>set("estatus",e.target.value)}>{EST.map(o=><option key={o} value={o}>{o}</option>)}</select></Field>
+          <Field label="Tipo"><select style={S.sel} value={modal.tipo||"Coinversión"} onChange={e=>set("tipo",e.target.value)}>{TIPO.map(o=><option key={o} value={o}>{o}</option>)}</select></Field>
+        </div>
+        <Field label="Descripción"><input style={S.inp} value={modal.descripcion||""} onChange={e=>set("descripcion",e.target.value)}/></Field>
+        <Field label="Condiciones del escenario de negocio"><textarea style={S.ta} value={modal.condiciones||""} onChange={e=>set("condiciones",e.target.value)}/></Field>
+        <Field label="Aliado Estratégico"><BuscaSelect opciones={aliadosOpts} value={modal.aliadoEstId} onChange={v=>set("aliadoEstId",v)} placeholder="— Selecciona aliado —" vacioLabel="— Ninguno —"/></Field>
+        <Field label="Aliado Comercial"><BuscaSelect opciones={aliadosOpts} value={modal.aliadoComId} onChange={v=>set("aliadoComId",v)} placeholder="— Selecciona aliado —" vacioLabel="— Ninguno —"/></Field>
+        <div style={S.g2}>
+          <Field label="Valor de propiedad $"><input type="number" style={S.inp} value={modal.valorPropiedad||""} onChange={e=>set("valorPropiedad",e.target.value)}/></Field>
+          <Field label="% Comisión propiedad"><input type="number" style={S.inp} value={modal.comProp||""} onChange={e=>set("comProp",e.target.value)}/></Field>
+        </div>
+        <div style={S.g2}>
+          <Field label="Valor de inversión $"><input type="number" style={S.inp} value={modal.valorInversion||""} onChange={e=>set("valorInversion",e.target.value)}/></Field>
+          <Field label="% Comisión inversión"><input type="number" style={S.inp} value={modal.comInv||""} onChange={e=>set("comInv",e.target.value)}/></Field>
+        </div>
+        <div style={{...S.card(),background:"#10101e",marginBottom:11}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+            <span style={{fontSize:10,color:"#64748b"}}>Monto de comisión proyectada</span>
+            <button style={{...S.pill(modal.comAuto!==false,GOLD),padding:"4px 10px",fontSize:10}} onClick={()=>set("comAuto",!(modal.comAuto!==false))}>{modal.comAuto!==false?"Automático":"Manual"}</button>
+          </div>
+          {modal.comAuto!==false
+            ? <div style={{fontSize:18,fontWeight:800,color:GOLD}}>{money(auto)}</div>
+            : <input type="number" style={S.inp} value={modal.montoComision||""} onChange={e=>set("montoComision",e.target.value)} placeholder={String(Math.round(auto))}/>}
+          <div style={{fontSize:8,color:"#475569",marginTop:4,lineHeight:1.4}}>Auto = Valor propiedad × %prop + Valor inversión × %inv. Cambia a Manual para ajustarlo.</div>
+        </div>
+        <Field label="Ubicación"><input style={S.inp} value={modal.ubicacion||""} onChange={e=>set("ubicacion",e.target.value)}/></Field>
+        <Field label="Superficie"><input style={S.inp} value={modal.superficie||""} onChange={e=>set("superficie",e.target.value)} placeholder="Ej. 2.2 hectáreas"/></Field>
+        <Field label="Observaciones"><textarea style={S.ta} value={modal.obs||""} onChange={e=>set("obs",e.target.value)}/></Field>
+        <button style={S.saveB} onClick={guardar}>Guardar</button>
+        {modal.id&&<button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>borrar(modal.id)}>Eliminar</button>}
+        <button style={S.cancB} onClick={()=>setModal(null)}>Cancelar</button>
+      </div>
+    </div>;})()}
+  </div>;
+}
+
 function Configuracion({data,onRestore,onExcel,go}){
   const fileRef=useRef(null);
   const exportTotal=()=>{
@@ -1148,6 +1248,7 @@ function Configuracion({data,onRestore,onExcel,go}){
           +"• "+(d.actividades||[]).length+" actividades\n"
           +"• "+(d.oportunidades||[]).length+" oportunidades\n"
           +"• "+(d.productos||[]).length+" productos\n"
+          +"• "+(d.bienes||[]).length+" bienes inmuebles\n"
           +"• "+(d.catalogos?Object.keys(d.catalogos).length:0)+" catálogos\n\n¿Continuar?";
         if(window.confirm(resumen)){onRestore(d);alert("Respaldo recuperado. El contenido quedó idéntico al del archivo.");}
       }catch(err){alert("No se pudo leer el archivo: "+err.message);}
@@ -1161,7 +1262,8 @@ function Configuracion({data,onRestore,onExcel,go}){
     <div style={{...S.sec,paddingTop:10}}>
       {[["catalogos","☰","Catálogos","Listas y valores del sistema"],
         ["productos","📦","Productos por solución","Base de Oportunidades y Metas"],
-        ["aliados","🤝","Aliados","Estratégicos y comerciales"]].map(a=>
+        ["aliados","🤝","Aliados","Estratégicos y comerciales"],
+        ["bienes","🏠","Bienes Inmuebles","Propiedades para venta o coinversión"]].map(a=>
         <div key={a[0]} style={{...S.cCard(GOLD),display:"flex",alignItems:"center",gap:12,marginBottom:9}} onClick={()=>go(a[0])}>
           <span style={{fontSize:20}}>{a[1]}</span>
           <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{a[2]}</div><div style={{fontSize:10,color:"#64748b"}}>{a[3]}</div></div>
@@ -1373,6 +1475,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     else r=((a.fecha||"")+(a.hora||"")).localeCompare((b.fecha||"")+(b.hora||""));
     return ordDir==="asc"?r:-r;
   });
+  const repHoyIdx=(()=>{const h=hoyISO();const ascF=(ordCampo==="fecha"&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
   const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
   const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);};
   return <div>
@@ -1411,17 +1514,12 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {modo==="lista"
-        ? <><div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",fontSize:11}}>
+      <div id="ag-top" style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",fontSize:11}}>
             <span style={{color:"#64748b"}}>Orden:</span>
             <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
             <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
             <button style={{...S.pill(false,"#60a5fa"),padding:"5px 10px"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
             <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 9px"}} onClick={()=>setFRezago(v=>!v)}>⚠ Rezago</button>
-            <div style={{flex:1}}/>
-            <button style={{...S.pill(false,"#2dd4bf"),padding:"5px 9px"}} onClick={()=>{const el=document.getElementById("ag-hoy");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});}}>Hoy</button>
-            <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>window.scrollTo({top:0,behavior:"smooth"})}>⤒</button>
-            <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"})}>⤓</button>
           </div>
           <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
             {!selMode
@@ -1430,25 +1528,28 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
                   <button style={{...S.pill(false,"#60a5fa"),padding:"5px 9px"}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
                   <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>setSel([])}>Ninguna</button>
                   <div style={{flex:1}}/>
-                  <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:""});}}>Editar</button>
+                  <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
                   <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button></>}
           </div>
-          <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={ordCampo==="fecha"&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onTap={(a)=>openAct(a,a.contactoId)}/></>
+      {modo==="lista"
+        ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={ordCampo==="fecha"&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onTap={(a)=>openAct(a,a.contactoId)}/>
         : (ordenadas.length===0
             ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
             : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
                 <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:0.5,textTransform:"uppercase",padding:"8px 10px",borderBottom:"1px solid #1e293b"}}>
+                  {selMode&&<div style={{width:22,flexShrink:0}}/>}
                   <div style={{width:62,flexShrink:0}}>Fecha</div>
                   <div style={{flex:1,minWidth:0}}>Acción</div>
                   <div style={{flex:1,minWidth:0}}>Contacto</div>
-                  <div style={{width:70,flexShrink:0,textAlign:"right"}}>Estatus</div>
+                  <div style={{width:64,flexShrink:0,textAlign:"right"}}>Estatus</div>
                 </div>
-                {ordenadas.map(a=>{const col=EST_COLOR[a.estatus]||"#64748b";return (
-                  <div key={a.id} onClick={()=>openAct(a,a.contactoId)} style={{display:"flex",fontSize:11,padding:"8px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start"}}>
-                    <div style={{width:62,flexShrink:0,color:"#94a3b8"}}>{fmtF(a.fecha)}</div>
+                {ordenadas.map((a,i)=>{const col=EST_COLOR[a.estatus]||"#64748b";const isSel=selMode&&sel.indexOf(a.id)>-1;return (
+                  <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",fontSize:11,padding:"8px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"center",background:isSel?"#16213a":"transparent"}}>
+                    {selMode&&<span style={{width:15,height:15,flexShrink:0,marginRight:7,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:10,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+                    <div style={{width:62,flexShrink:0,color:"#94a3b8"}}>{fmtF(a.fecha)}{a.hora?<span style={{display:"block",fontSize:9,color:"#64748b"}}>{a.hora}</span>:""}</div>
                     <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word"}}>{a.tipoAccion||"Actividad"}</div>
                     <div style={{flex:1,minWidth:0,color:"#cbd5e1",paddingRight:4,wordBreak:"break-word"}}>{cn(a.contactoId)}</div>
-                    <div style={{width:70,flexShrink:0,textAlign:"right"}}><span style={{...S.tag(col),fontSize:8}}>{a.estatus}</span></div>
+                    <div style={{width:64,flexShrink:0,textAlign:"right"}}>{a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{a.estatus}</span></div>
                   </div>);})}
               </div>)}
     </div>
@@ -1459,12 +1560,19 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         <Field label="Fecha"><input type="date" style={S.inp} value={batch.fecha} onChange={e=>setBatch({...batch,fecha:e.target.value})}/></Field>
         <Field label="Estatus"><select style={S.sel} value={batch.estatus} onChange={e=>setBatch({...batch,estatus:e.target.value})}><option value="">— Sin cambio —</option>{["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}</select></Field>
         <Field label="Tipo de acción"><select style={S.sel} value={batch.tipoAccion} onChange={e=>setBatch({...batch,tipoAccion:e.target.value})}><option value="">— Sin cambio —</option>{(catalogos.tipoAccion||[]).map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}</select></Field>
+        <Field label="Prioridad"><select style={S.sel} value={batch.prioridad||""} onChange={e=>setBatch({...batch,prioridad:e.target.value})}><option value="">— Sin cambio —</option>{PRIOR.map(p=><option key={p} value={p}>{p}</option>)}</select></Field>
         <div style={{display:"flex",gap:8,marginTop:14}}>
           <button style={{...S.pill(false,"#64748b"),flex:1,padding:"10px 0"}} onClick={()=>setBatch(null)}>Cancelar</button>
-          <button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={()=>{const p={};if(batch.fecha)p.fecha=batch.fecha;if(batch.estatus)p.estatus=batch.estatus;if(batch.tipoAccion)p.tipoAccion=batch.tipoAccion;if(Object.keys(p).length)onEditActs(sel,p);setBatch(null);setSelMode(false);setSel([]);}}>Aplicar</button>
+          <button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={()=>{const p={};if(batch.fecha)p.fecha=batch.fecha;if(batch.estatus)p.estatus=batch.estatus;if(batch.tipoAccion)p.tipoAccion=batch.tipoAccion;if(batch.prioridad)p.prioridad=batch.prioridad;if(Object.keys(p).length)onEditActs(sel,p);setBatch(null);setSelMode(false);setSel([]);}}>Aplicar</button>
         </div>
       </div>
     </div>}
+    <div id="ag-bottom" style={{height:1}}/>
+    <div style={{position:"fixed",right:14,bottom:150,display:"flex",flexDirection:"column",gap:7,zIndex:97}}>
+      <button onClick={()=>{const el=document.getElementById("ag-top");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});}} style={{width:40,height:40,borderRadius:"50%",background:"rgba(16,16,30,.95)",border:"1px solid #2dd4bf66",color:"#2dd4bf",fontSize:18,cursor:"pointer",boxShadow:"0 2px 10px rgba(0,0,0,.6)"}}>↑</button>
+      <button onClick={()=>{const el=document.getElementById("ag-hoy");if(el)el.scrollIntoView({behavior:"smooth",block:"center"});}} style={{width:40,height:40,borderRadius:"50%",background:"rgba(16,16,30,.95)",border:"1px solid #C9A84C88",color:GOLD,fontSize:10,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 10px rgba(0,0,0,.6)"}}>Hoy</button>
+      <button onClick={()=>{const el=document.getElementById("ag-bottom");if(el)el.scrollIntoView({behavior:"smooth",block:"end"});}} style={{width:40,height:40,borderRadius:"50%",background:"rgba(16,16,30,.95)",border:"1px solid #2dd4bf66",color:"#2dd4bf",fontSize:18,cursor:"pointer",boxShadow:"0 2px 10px rgba(0,0,0,.6)"}}>↓</button>
+    </div>
     <button style={S.fab} onClick={()=>openAct({estatus:"Programada",fecha:hoyISO()},null)}>+</button>
   </div>;
 }
@@ -1738,6 +1846,7 @@ function App(){
     return ops;
   });
   const[productos,setProductos]=useState(()=>loadLS("productos",null)||[]);
+  const[bienes,setBienes]=useState(()=>loadLS("bienes",null)||[]);
   const[openContacto,setOpenContacto]=useState(null);
   const[actModal,setActModal]=useState(null);
   const[opoModal,setOpoModal]=useState(null);
@@ -1747,6 +1856,7 @@ function App(){
   useEffect(()=>saveLS("actividades",actividades),[actividades]);
   useEffect(()=>saveLS("oportunidades",oportunidades),[oportunidades]);
   useEffect(()=>saveLS("productos",productos),[productos]);
+  useEffect(()=>saveLS("bienes",bienes),[bienes]);
   useEffect(()=>saveLS("catalogos",catalogos),[catalogos]);
   useEffect(()=>{const l=document.getElementById("loading");if(l){l.classList.add("fade-out");setTimeout(()=>l.remove(),350);}},[]);
 
@@ -1782,6 +1892,7 @@ function App(){
     if(Array.isArray(d.oportunidades))setOportunidades(d.oportunidades);
     if(d.catalogos&&typeof d.catalogos==="object")setCatalogos(d.catalogos);
     if(Array.isArray(d.productos))setProductos(d.productos);
+    if(Array.isArray(d.bienes))setBienes(d.bienes);
     setView("configuracion");
   };
   const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["objetivos","Metas","📊"],["configuracion","Config.","⚙"]];
@@ -1794,10 +1905,11 @@ function App(){
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
+    {view==="bienes"&&<BienesInmuebles bienes={bienes} setBienes={setBienes} catalogos={catalogos} contactos={contactos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} oportunidades={oportunidades} onProductos={()=>go("productos")}/>}
-    {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
+    {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos,bienes}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
     <div style={S.nav}>
-      {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
+      {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"||view==="bienes"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
     {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} oportunidades={oportunidades} onSave={saveAct} onDelete={delAct} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setActModal(null)}/>}
