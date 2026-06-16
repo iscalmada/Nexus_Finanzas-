@@ -1401,6 +1401,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
       </select>
     </Field>}
     <Field label="Intención (al programar)"><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="Qué se busca lograr…"/></Field>
+    {(f.estatus==="En Proceso"||f.estatus==="Cerrada"||f.accionProceso)&&<Field label="Acción ejecutada (en proceso)"><textarea style={S.ta} value={f.accionProceso||""} onChange={e=>set("accionProceso",e.target.value||null)} placeholder="Qué se hizo: intento de llamada, mensaje enviado…"/></Field>}
     {(f.estatus==="Cerrada"||f.resultado)&&<Field label="Resultado (al concluir)"><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
     {/* Oportunidad: campo preparado, se activará con el módulo de Oportunidades */}
     <button style={S.saveB} onClick={save}>Guardar</button>
@@ -1418,12 +1419,13 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
   return <div>{sorted.map((a,i)=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";const _hoy=hoyISO();const _pend=(a.estatus==="Programada"||a.estatus==="En Proceso");const _rez=(_pend&&a.fecha&&a.fecha<_hoy)?Math.max(0,Math.round((Date.parse(_hoy)-Date.parse(a.fecha))/86400000)):0;const _rezC=_rez>=7?"#ef4444":_rez>=3?"#fb923c":_rez>=1?"#fbbf24":null;
     return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"pointer"}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-        <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>{selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}<div style={{fontSize:12,fontWeight:700}}>{a.tipoAccion||"Actividad"}</div></div>
+        <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>{selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}<div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad")}</div></div>
         <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>{_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}{a.prioridad&&<span style={S.tag(PRIOR_COLOR[a.prioridad]||"#64748b")}>{a.prioridad}</span>}<span style={S.tag(col)}>{a.estatus}</span></div>
       </div>
-      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{a.hora?" · "+a.hora:""}{showContacto&&c?<span> · <span style={{color:GOLD,fontWeight:700}}>{c.nombreCompleto}</span></span>:""}{showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
+      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{a.hora?" · "+a.hora:""}{showContacto&&a.tipoAccion?<span> · <span style={{color:"#cbd5e1",fontWeight:600}}>{a.tipoAccion}</span></span>:""}{showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}{a.servicioSolucion?` · ${a.servicioSolucion}`:""}{a.oportunidadId?" · 🎯":""}</div>
       {showContacto&&((c&&c.etapaEspecifica)||(op&&op.etapa))&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>{c&&c.etapaEspecifica&&<span style={{fontSize:8,fontWeight:700,color:"#a78bfa",background:"#a78bfa1a",border:"1px solid #a78bfa44",borderRadius:5,padding:"1px 6px"}}>{c.etapaEspecifica}</span>}{op&&op.etapa&&<span style={{fontSize:8,fontWeight:700,color:oc(op.etapa),background:oc(op.etapa)+"1a",border:`1px solid ${oc(op.etapa)}44`,borderRadius:5,padding:"1px 6px"}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}</div>}
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
+      {a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
       {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
       {onSinRespuesta&&_pend&&<div style={{textAlign:"right",marginTop:6}}><button onClick={(ev)=>{ev.stopPropagation();onSinRespuesta(a);}} style={{background:"transparent",border:"1px solid #fb923c55",borderRadius:8,color:"#fb923c",fontSize:10,fontWeight:700,padding:"4px 10px",cursor:"pointer"}}>Sin respuesta</button></div>}
     </div>;})}</div>;
@@ -1443,7 +1445,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[fEmpresa,setFEmpresa]=useState("");
   const[fPrioridad,setFPrioridad]=useState([]);
   const[ordCampo,setOrdCampo]=useState("fecha");
-  const[ordDir,setOrdDir]=useState("desc");
+  const[ordDir,setOrdDir]=useState("asc");
   const[fRezago,setFRezago]=useState(false);
   const[selMode,setSelMode]=useState(false);
   const[sel,setSel]=useState([]);
@@ -1466,13 +1468,13 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(fTipos.length&&!fTipos.includes(a.tipoAccion))return false;
     if(fEtC){const c=ctById(a.contactoId);if(!c||c.etapaEspecifica!==fEtC)return false;}
     if(fEtO){const o=opById(a.oportunidadId);if(!o||o.etapa!==fEtO)return false;}
-    if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.resultado,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
+    if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
   });
   const ordenadas=base.slice().sort((a,b)=>{
     let r;
     if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=((a.fecha||"")+(a.hora||"")).localeCompare((b.fecha||"")+(b.hora||""));}
-    else r=((a.fecha||"")+(a.hora||"")).localeCompare((b.fecha||"")+(b.hora||""));
+    else {r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
     return ordDir==="asc"?r:-r;
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=(ordCampo==="fecha"&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
