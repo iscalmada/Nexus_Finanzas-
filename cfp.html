@@ -1173,7 +1173,17 @@ function App(){
   const[movs,setMovs]=useState(()=>{
     const data=loadLS('movs', INIT_MOVS);
     // Migrar "Transferencia" → "Traspaso" en movimientos históricos
-    return data.map(m=>m.tipoOp==="Transferencia"?{...m,tipoOp:"Traspaso"}:m);
+    const migr=data.map(m=>m.tipoOp==="Transferencia"?{...m,tipoOp:"Traspaso"}:m);
+    // Blindar ids: únicos y numéricos (un id inválido o duplicado impide borrar/editar ese movimiento)
+    const seen=new Set(); let maxId=0;
+    migr.forEach(m=>{const n=Number(m.id);if(Number.isFinite(n))maxId=Math.max(maxId,n);});
+    return migr.map(m=>{
+      const n=Number(m.id);
+      let id=Number.isFinite(n)?n:(++maxId);
+      if(seen.has(id))id=++maxId;
+      seen.add(id);
+      return id===m.id?m:{...m,id};
+    });
   });
   const[cuentas,setCuentas]=useState(()=>loadLS('cuentas', INIT_CUENTAS));
   const[tarjetas,setTarjetas]=useState(()=>loadLS('tarjetas', INIT_TARJETAS));
@@ -1671,8 +1681,8 @@ function App(){
     return{meses,saldoInicial};
   },[presupuestos,catIng,catEg,movs,cuentas,prioI,prioE,proyMeses]);
 
-  const nextId=arr=>arr.length?Math.max(...arr.map(x=>x.id))+1:1;
-  const nextOrd=()=>movs.length?Math.max(...movs.map(x=>x.orden))+1:1;
+  const nextId=arr=>{const ids=arr.map(x=>Number(x.id)).filter(n=>Number.isFinite(n));return ids.length?Math.max(...ids)+1:1;};
+  const nextOrd=()=>{const o=movs.map(x=>Number(x.orden)).filter(n=>Number.isFinite(n));return o.length?Math.max(...o)+1:1;};
 
   const isEditReal=useMemo(()=>{
     if(!editMovId)return false;
@@ -1683,7 +1693,7 @@ function App(){
   const openNewMov=useCallback(()=>{setFormMov({...BLANK_MOV});setRecForm({...BLANK_REC,fechaInicio:todayStr()});setEditMovId(null);setSaveError("");setFieldErrors(null);setShowMov(true);},[]);
   const openEditMov=useCallback(r=>{setFormMov({...r,monto:String(r.monto||"")});setRecForm({...BLANK_REC,activo:false,fechaInicio:r.fecha||todayStr()});setEditMovId(r.id);setSaveError("");setFieldErrors(null);setShowMov(true);},[]);
   const copyMov=useCallback(r=>{
-    const copia={...r,id:null,orden:null,serieId:null,estatus:"PENDIENTE",cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false,monto:String(r.monto||""),fecha:todayStr()};
+    const copia={...r,id:null,orden:null,serieId:null,monto:String(r.monto||"")};
     setFormMov(copia);setRecForm({...BLANK_REC,activo:false,fechaInicio:todayStr()});
     setEditMovId(null);setSaveError("");setFieldErrors(null);setViewMov(null);setShowMov(true);
   },[]);
@@ -2770,24 +2780,20 @@ function App(){
                 onClick={()=>{
                   const hoy=todayStr();
                   const now2=new Date();
-                  // Si el modo es mes y el mes actual no coincide con el período visible, forzar cambio
+                  const irHoy=function(){
+                    const all=[].slice.call(document.querySelectorAll("[data-fecha]"));
+                    let target=null;
+                    all.forEach(function(el){if(el.getAttribute("data-fecha")===hoy&&!target)target=el;});
+                    if(!target){var bf=null;all.forEach(function(el){var f=el.getAttribute("data-fecha");if(f>=hoy&&(bf===null||f<bf)){bf=f;target=el;}});}
+                    if(!target){var bp=null;all.forEach(function(el){var f=el.getAttribute("data-fecha");if(f<hoy&&(bp===null||f>bp)){bp=f;target=el;}});}
+                    if(target) target.scrollIntoView({behavior:"smooth",block:"start"});
+                    else {var mb=document.getElementById("mov-bottom");if(mb)mb.scrollIntoView({behavior:"smooth"});}
+                  };
                   if(period.mode==="mes"&&(period.sm!==now2.getMonth()||period.sy!==now2.getFullYear())){
                     period.setSm(now2.getMonth());
                     period.setSy(now2.getFullYear());
-                    // Dar tiempo al render antes de scrollear
-                    setTimeout(function(){
-                      const all2=document.querySelectorAll("[data-fecha]");
-                      let found2=null;
-                      all2.forEach(function(el){if(el.getAttribute("data-fecha")===hoy&&!found2)found2=el;});
-                      if(found2) found2.scrollIntoView({behavior:"smooth",block:"start"});
-                    },150);
-                  } else {
-                    const all=document.querySelectorAll("[data-fecha]");
-                    let found=null;
-                    all.forEach(function(el){if(el.getAttribute("data-fecha")===hoy&&!found)found=el;});
-                    if(found) found.scrollIntoView({behavior:"smooth",block:"start"});
-                    else document.getElementById("mov-bottom").scrollIntoView({behavior:"smooth"});
-                  }
+                    setTimeout(irHoy,150);
+                  } else { irHoy(); }
                 }} title="Ir a hoy">Hoy</button>
               <button style={{width:40,height:40,borderRadius:20,background:"#10101e",border:"1px solid #1e293b",color:"#C9A84C",fontSize:14,fontWeight:800,cursor:"pointer",boxShadow:"0 2px 10px rgba(0,0,0,0.4)",display:"flex",alignItems:"center",justifyContent:"center"}}
                 onClick={()=>document.getElementById("mov-bottom").scrollIntoView({behavior:"smooth"})} title="Ir al final">↓</button>
@@ -4702,7 +4708,7 @@ function App(){
         {confirmDel&&(
           <div style={S.delCon}>
             <div style={S.delBox}>
-              <div style={{fontSize:13,fontWeight:700,color:"#f87171",marginBottom:7}}>{confirmDel.type==="multi"?`¿Eliminar ${selected.size} movimientos?`:"¿Eliminar registro?"}</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#f87171",marginBottom:7}}>{confirmDel.type==="multi"?`¿Eliminar ${selected.size} movimientos?`:(confirmDel.type==="mov"?(()=>{const m=movs.find(x=>x.id===confirmDel.id);if(!m)return "¿Eliminar registro?";const cta=m.usaTarjeta?(tarjetas.find(t=>t.id===m.tarjetaId)||{}).nombre:(cuentas.find(c=>c.id===m.cuentaId)||{}).nombre;return `¿Eliminar ${m.tipoOp||"movimiento"} de ${fmt(m.monto)}${cta?" · "+cta:""}?`;})():"¿Eliminar registro?")}</div>
               <div style={{fontSize:11,color:"#94a3b8",marginBottom:18}}>Esta acción no se puede deshacer.</div>
               <button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>{
                 if(confirmDel.type==="multi"){setMovs(p=>p.filter(r=>!selected.has(r.id)));setSelected(new Set());setMultiMode(false);}
