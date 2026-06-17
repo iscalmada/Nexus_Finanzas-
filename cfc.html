@@ -1432,7 +1432,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
 }
 
 function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
-  const[filtro,setFiltro]=useState("Todas");
+  const[filtro,setFiltro]=useState("Programada");
   const[modo,setModo]=useState("lista");
   const[desde,setDesde]=useState("");
   const[hasta,setHasta]=useState("");
@@ -1444,7 +1444,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[q,setQ]=useState("");
   const[fEmpresa,setFEmpresa]=useState("");
   const[fPrioridad,setFPrioridad]=useState([]);
-  const[ordCampo,setOrdCampo]=useState("fecha");
+  const[ordCampo,setOrdCampo]=useState("fechaPrio");
   const[ordDir,setOrdDir]=useState("asc");
   const[fRezago,setFRezago]=useState(false);
   const[selMode,setSelMode]=useState(false);
@@ -1474,10 +1474,11 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const ordenadas=base.slice().sort((a,b)=>{
     let r;
     if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=((a.fecha||"")+(a.hora||"")).localeCompare((b.fecha||"")+(b.hora||""));}
+    else if(ordCampo==="fecha"){r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
     else {r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
     return ordDir==="asc"?r:-r;
   });
-  const repHoyIdx=(()=>{const h=hoyISO();const ascF=(ordCampo==="fecha"&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
+  const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
   const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
   const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);};
   return <div>
@@ -1518,6 +1519,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     <div style={{...S.sec,paddingTop:4}}>
       <div id="ag-top" style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",fontSize:11}}>
             <span style={{color:"#64748b"}}>Orden:</span>
+            <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
             <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
             <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
             <button style={{...S.pill(false,"#60a5fa"),padding:"5px 10px"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
@@ -1534,7 +1536,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
                   <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button></>}
           </div>
       {modo==="lista"
-        ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={ordCampo==="fecha"&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onTap={(a)=>openAct(a,a.contactoId)}/>
+        ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onTap={(a)=>openAct(a,a.contactoId)}/>
         : (ordenadas.length===0
             ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
             : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
