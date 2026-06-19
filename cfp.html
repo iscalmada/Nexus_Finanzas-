@@ -2561,7 +2561,7 @@ function App(){
                 {showFilterPrioEg&&(
                   <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #f8717144",borderRadius:10,padding:"10px 12px",minWidth:185,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
                     <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:7}}>PRIORIDAD — EGRESOS</div>
-                    {[[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"]].map(([v,l,c])=>{
+                    {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>{
                       const sel=filterPrioEg.has(v);
                       return(
                         <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
@@ -2612,7 +2612,7 @@ function App(){
                 {(showPrioPanel==="eg"||showPrioPanel===true)&&(<>
                 <div style={{fontSize:9,color:"#f87171",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos (proyección)</div>
                 <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:9}}>
-                  {[[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"],[5,"Todos","#64748b"]].map(([v,l,c])=>(
+                  {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"],[5,"Todos","#64748b"]].map(([v,l,c])=>(
                     <button key={v} style={{...S.prioB(prioE===v,c),flex:1,minWidth:50,fontSize:8,padding:"6px 2px"}} onClick={()=>setPrioE(v)}>{l}</button>
                   ))}
                 </div>
@@ -4128,7 +4128,7 @@ function App(){
               <button style={{...S.prioB2(catMode==="ing","#22c55e"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("ing")}>↑ Ingresos</button>
             </div>
             {catMode==="eg"&&<div style={{marginBottom:11}}>
-              <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%"}} onClick={()=>setShowPrioLbl(v=>!v)}>{showPrioLbl?"▲ Ocultar etiquetas de prioridad":"✎ Editar etiquetas de prioridad (capas)"}</button>
+              <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%"}} onClick={()=>setShowPrioLbl(v=>!v)}>{showPrioLbl?"▲ Ocultar etiquetas de prioridad":"✎ Editar etiquetas de prioridad"}</button>
               {showPrioLbl&&<div style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:11,padding:12,marginTop:7}}>
                 <div style={{fontSize:9,color:"#64748b",marginBottom:9,lineHeight:1.4}}>Renombra las 4 prioridades sin afectar el funcionamiento del consolidado. Se aplica al guardar.</div>
                 {[1,2,3,4].map(n=>(
