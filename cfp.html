@@ -243,6 +243,7 @@ const INIT_CAT_EG = [
   {id:"e4",nombre:"Personal",      subs:[{id:"e4s1",nombre:"Alimentación"},{id:"e4s2",nombre:"Salud"}]},
   {id:"e5",nombre:"Financiero",    subs:[{id:"e5s1",nombre:"Intereses TC"},{id:"e5s2",nombre:"Comisiones TC"}]},
 ];
+const INIT_CAPAS = [{id:"cap1",nombre:"Básicos"},{id:"cap2",nombre:"Restablecimiento 1"},{id:"cap3",nombre:"Restablecimiento 2"},{id:"cap4",nombre:"Acreedores 1"},{id:"cap5",nombre:"Acreedores 2"}];
 const INIT_CUENTAS = [
   {id:1,nombre:"Stori",    saldoInicial:0,    color:"#C9A84C"},
   {id:2,nombre:"Carl",     saldoInicial:0,    color:"#60a5fa"},
@@ -570,7 +571,7 @@ function BudgetBar({gasto,presupuesto,color="#C9A84C",esIngreso=false}){
 const ModalMov=memo(function ModalMov({
   formMov,setFormMov,editMovId,isEditReal,recForm,setRecForm,
   cuentas,cuentaSaldos,tarjetas,tarjetaSaldos,catIng,catEg,
-  acreedores,deudores,ingresosExt,oportunidades,etapasAvance,getEtapa,getPrioDefEg,
+  acreedores,deudores,ingresosExt,oportunidades,etapasAvance,getEtapa,getPrioDefEg,capas,getCapaDefEg,
   movs,saldoPendienteFn,saldoIngExtFn,
   onSave,onClose,saveError,fieldErrors
 }){
@@ -694,7 +695,8 @@ const ModalMov=memo(function ModalMov({
               <select style={S.sel} value={formMov.cat} onChange={e=>{
                 const newCat=e.target.value;
                 const newPrio=formMov.tipoOp==="Egreso"&&getPrioDefEg?getPrioDefEg(newCat,""):formMov.prioridad;
-                setFormMov(f=>({...f,cat:newCat,subcat:"",prioridad:newPrio}));
+                const newCapa=formMov.tipoOp==="Egreso"&&getCapaDefEg?getCapaDefEg(newCat,""):formMov.capa;
+                setFormMov(f=>({...f,cat:newCat,subcat:"",prioridad:newPrio,capa:newCapa}));
               }}>
                 <option value="">— —</option>{cats.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
@@ -703,7 +705,8 @@ const ModalMov=memo(function ModalMov({
               <select style={S.sel} value={formMov.subcat} onChange={e=>{
                 const newSub=e.target.value;
                 const newPrio=formMov.tipoOp==="Egreso"&&getPrioDefEg?getPrioDefEg(formMov.cat,newSub):formMov.prioridad;
-                setFormMov(f=>({...f,subcat:newSub,prioridad:newPrio}));
+                const newCapa=formMov.tipoOp==="Egreso"&&getCapaDefEg?getCapaDefEg(formMov.cat,newSub):formMov.capa;
+                setFormMov(f=>({...f,subcat:newSub,prioridad:newPrio,capa:newCapa}));
               }}>
                 <option value="">— —</option>{subcats.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
               </select>
@@ -743,6 +746,7 @@ const ModalMov=memo(function ModalMov({
               </div>
             }
           </div>
+          {formMov.tipoOp==="Egreso"&&capas&&<div style={S.fg}><label style={S.fl}>Capa (proyección)</label><select style={S.sel} value={formMov.capa||""} onChange={e=>set("capa",e.target.value)}><option value="">— Sin capa —</option>{capas.map(cp=><option key={cp.id} value={cp.id}>{cp.nombre}</option>)}</select></div>}
           <div style={S.fg}><label style={S.fl}>Observaciones</label><textarea style={{...S.inp,minHeight:60,resize:"vertical",lineHeight:1.5}} value={formMov.obs} onChange={e=>set("obs",e.target.value)}/></div>
           {/* Vinculación a Cartera — filtrada por tipo de movimiento */}
           {(formMov.tipoOp==="Egreso"||formMov.tipoOp==="Ingreso")&&(
@@ -1189,6 +1193,7 @@ function App(){
   const[tarjetas,setTarjetas]=useState(()=>loadLS('tarjetas', INIT_TARJETAS));
   const[catIng,setCatIng]=useState(()=>loadLS('catIng', INIT_CAT_ING));
   const[catEg,setCatEg]=useState(()=>loadLS('catEg', INIT_CAT_EG));
+  const[capas,setCapas]=useState(()=>loadLS('capas', INIT_CAPAS));
   const[presupuestos,setPresupuestos]=useState(()=>loadLS('presupuestos', INIT_PRESUPUESTOS));
   const[acreedores,setAcreedores]=useState(()=>loadLS('acreedores', []));
   const[deudores,setDeudores]=useState(()=>loadLS('deudores', []));
@@ -1218,6 +1223,7 @@ function App(){
   useEffect(()=>{ saveLS('tarjetas', tarjetas); }, [tarjetas]);
   useEffect(()=>{ saveLS('catIng', catIng); }, [catIng]);
   useEffect(()=>{ saveLS('catEg', catEg); }, [catEg]);
+  useEffect(()=>{ saveLS('capas', capas); }, [capas]);
   useEffect(()=>{ saveLS('presupuestos', presupuestos); }, [presupuestos]);
   useEffect(()=>{ saveLS('acreedores', acreedores); }, [acreedores]);
   useEffect(()=>{ saveLS('oportunidades', oportunidades); }, [oportunidades]);
@@ -1271,6 +1277,7 @@ function App(){
   const[catMode,setCatMode]=useState("eg");
   const[prioLblEdit,setPrioLblEdit]=useState(()=>({...PRIO_EG_LBL}));
   const[showPrioLbl,setShowPrioLbl]=useState(false);
+  const[showCapas,setShowCapas]=useState(false);
 
   // filtros movimientos
   const[filterTipo,setFilterTipo]=useState("TODOS");
@@ -1397,6 +1404,7 @@ function App(){
   const drag=useDrag(setMovs);
   const catIngDrag=useCatDrag(setCatIng);
   const catEgDrag=useCatDrag(setCatEg);
+  const capasDrag=useCatDrag(setCapas);
   const etapasDrag=useCatDrag(setEtapasAvance);
   const solDrag=useCatDrag(setSolucionesNexus);
   const aliEstDrag=useCatDrag(setAliadosEst);
@@ -1972,6 +1980,7 @@ function App(){
   const getEtapa = useCallback((etapaId,etapas)=>etapas.find(e=>e.id===etapaId)||etapas[0],[]);
 
   // Helper: prioridad por defecto de una cat/subcat de egreso
+  const getCapaDefEg = useCallback((catId,subcatId)=>{const cat=catEg.find(c=>c.id===catId);if(!cat) return "";if(subcatId){const sub=cat.subs.find(s=>s.id===subcatId);if(sub&&sub.capa) return sub.capa;}return cat.capa||"";},[catEg]);
   const getPrioDefEg = useCallback((catId,subcatId)=>{
     const cat=catEg.find(c=>c.id===catId);
     if(!cat) return 3;
@@ -2134,7 +2143,7 @@ function App(){
   },[acreedores,deudores,ingresosExt,movs]);
 
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,exportedAt:new Date().toISOString(),version:"v8"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,exportedAt:new Date().toISOString(),version:"v8"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
@@ -2155,6 +2164,7 @@ function App(){
         if(data.tarjetas){setTarjetas(data.tarjetas);saveLS('tarjetas',data.tarjetas);}
         if(data.catIng){setCatIng(data.catIng);saveLS('catIng',data.catIng);}
         if(data.catEg){setCatEg(data.catEg);saveLS('catEg',data.catEg);}
+        if(data.capas){setCapas(data.capas);saveLS('capas',data.capas);}
         if(data.presupuestos){setPresupuestos(data.presupuestos);saveLS('presupuestos',data.presupuestos);}
         if(data.acreedores){setAcreedores(data.acreedores);saveLS('acreedores',data.acreedores);}
         if(data.deudores){setDeudores(data.deudores);saveLS('deudores',data.deudores);}
@@ -4139,6 +4149,18 @@ function App(){
                 ))}
                 <button style={{...S.saveB,marginTop:4}} onClick={()=>{const clean={1:(prioLblEdit[1]||"").trim()||"Prioridad 1",2:(prioLblEdit[2]||"").trim()||"Prioridad 2",3:(prioLblEdit[3]||"").trim()||"Prioridad 3",4:(prioLblEdit[4]||"").trim()||"Prioridad 4"};try{localStorage.setItem("nexus_prioEgLabels",JSON.stringify(clean));}catch(e){}if(window.confirm("Etiquetas guardadas. La app se recargará para aplicarlas en todos lados. ¿Continuar?"))location.reload();}}>Guardar etiquetas</button>
               </div>}
+              <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%",marginTop:7}} onClick={()=>setShowCapas(v=>!v)}>{showCapas?"▲ Ocultar capas (proyección)":"▦ Editar capas (proyección)"}</button>
+              {showCapas&&<div style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:11,padding:12,marginTop:7}}>
+                <div style={{fontSize:9,color:"#64748b",marginBottom:9,lineHeight:1.4}}>Capas para la proyección de mediano plazo. Arrastra para reordenar (ese orden define la presentación de la proyección).</div>
+                {capas.map(cp=>(
+                  <div key={cp.id} draggable onDragStart={()=>capasDrag.start(cp.id)} onDragOver={e=>{e.preventDefault();capasDrag.enter(cp.id);}} onDrop={capasDrag.commit} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6,background:capasDrag.aId===cp.id?"#1e2a1e":capasDrag.oViz===cp.id?"#1a2030":"transparent",borderRadius:8,padding:"3px 4px",cursor:"grab"}}>
+                    <span style={{color:"#475569",fontSize:12}}>☰</span>
+                    <input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:12}} value={cp.nombre} onChange={e=>setCapas(p=>p.map(x=>x.id===cp.id?{...x,nombre:e.target.value}:x))}/>
+                    <button style={S.smBtn("#f87171")} onClick={()=>{if(window.confirm("¿Eliminar la capa \""+cp.nombre+"\"? Las categorías/movimientos que la usen quedarán Sin capa."))setCapas(p=>p.filter(x=>x.id!==cp.id));}}>✕</button>
+                  </div>
+                ))}
+                <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%",marginTop:4}} onClick={()=>setCapas(p=>[...p,{id:"cap"+Date.now(),nombre:"Nueva capa"}])}>+ Agregar capa</button>
+              </div>}
             </div>}
             <div style={{fontSize:9,color:"#475569",marginBottom:9}}>☰ arrastra para reordenar · toca el nombre para editar</div>
             {cats_.filter(c=>!c.nexus).map(cat=>(
@@ -4161,6 +4183,11 @@ function App(){
                                 onClick={()=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,prio:v}:x))}>{l}</button>
                             ))}
                           </div>
+                          <div style={{fontSize:8,color:"#475569",margin:"7px 0 3px"}}>Capa (proyección)</div>
+                          <select style={{...S.sel,padding:"5px 8px",fontSize:11}} value={cat.capa||""} onChange={e=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,capa:e.target.value||undefined}:x))}>
+                            <option value="">— Sin capa —</option>
+                            {capas.map(cp=><option key={cp.id} value={cp.id}>{cp.nombre}</option>)}
+                          </select>
                         </div>}
                       </div>
                       :(<><span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>{catMode==="eg"&&cat.subs&&cat.subs.length===0&&cat.prio&&(<span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:(PRIO_EG_COLOR[cat.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[cat.prio]||"#64748b",marginLeft:5}}>{PRIO_EG_LBL[cat.prio]}</span>)}</>)
@@ -4354,6 +4381,8 @@ function App(){
             acreedores={acreedores} deudores={deudores} ingresosExt={ingresosExt}
             oportunidades={oportunidades} etapasAvance={etapasAvance} getEtapa={getEtapa}
             getPrioDefEg={getPrioDefEg}
+            capas={capas}
+            getCapaDefEg={getCapaDefEg}
             movs={movs} saldoPendienteFn={saldoPendiente} saldoIngExtFn={saldoIngExt}
             onSave={saveMov} onClose={()=>{setShowMov(false);setEditMovId(null);setSaveError("");setFieldErrors(null);}}
             saveError={saveError} fieldErrors={fieldErrors}/>
