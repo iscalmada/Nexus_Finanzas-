@@ -181,11 +181,11 @@ const DIAS_SEM      = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const MESES         = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 const MESES_FULL    = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const PRIO_LBL      = {1:"Alta",2:"Media",3:"Baja"};
-const PRIO_EG_LBL   = {1:"Esencial",2:"Importante",3:"Discrecional",4:"Extraordinario"};
+const PRIO_EG_LBL   = (()=>{try{const v=JSON.parse(localStorage.getItem("nexus_prioEgLabels"));if(v&&v[1]&&v[2]&&v[3]&&v[4])return v;}catch(e){}return {1:"Esencial",2:"Importante",3:"Discrecional",4:"Extraordinario"};})();
 const PRIO_EG_COLOR = {1:"#22c55e",2:"#60a5fa",3:"#fbbf24",4:"#f87171"};
 // Para egresos: 5 niveles donde 5 = "Todos"
 const PRIO_ING_OPTS  = [[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]];
-const PRIO_EG_OPTS   = [[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"],[5,"Todos","#64748b"]];
+const PRIO_EG_OPTS   = [[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"],[5,"Todos","#64748b"]];
 const ORIG_ACREEDOR = ["Sicresa","Familia","Terceros"];
 // Catálogo inicial de Etapas de Avance (editable en app)
 const INIT_ETAPAS_AVANCE = [
@@ -737,7 +737,7 @@ const ModalMov=memo(function ModalMov({
             {formMov.tipoOp==="Ingreso"
               ?<div style={S.prioR}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=><button key={v} style={S.prioB2(formMov.prioridad===v,c)} onClick={()=>set("prioridad",v)}>{l}</button>)}</div>
               :<div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-                {[[1,"Esencial","#22c55e"],[2,"Importante","#60a5fa"],[3,"Discrecional","#fbbf24"],[4,"Extraordinario","#f87171"]].map(([v,l,c])=>(
+                {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>(
                   <button key={v} style={{...S.prioB2(formMov.prioridad===v,c),flex:1,minWidth:60,padding:"7px 4px",fontSize:9}} onClick={()=>set("prioridad",v)}>{l}</button>
                 ))}
               </div>
@@ -1269,6 +1269,8 @@ function App(){
   const[editingSubId,setEditingSubId]=useState(null);
   const[editingSubName,setEditingSubName]=useState("");
   const[catMode,setCatMode]=useState("eg");
+  const[prioLblEdit,setPrioLblEdit]=useState(()=>({...PRIO_EG_LBL}));
+  const[showPrioLbl,setShowPrioLbl]=useState(false);
 
   // filtros movimientos
   const[filterTipo,setFilterTipo]=useState("TODOS");
@@ -4125,6 +4127,19 @@ function App(){
               <button style={{...S.prioB2(catMode==="eg","#f87171"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("eg")}>↓ Egresos</button>
               <button style={{...S.prioB2(catMode==="ing","#22c55e"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("ing")}>↑ Ingresos</button>
             </div>
+            {catMode==="eg"&&<div style={{marginBottom:11}}>
+              <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%"}} onClick={()=>setShowPrioLbl(v=>!v)}>{showPrioLbl?"▲ Ocultar etiquetas de prioridad":"✎ Editar etiquetas de prioridad (capas)"}</button>
+              {showPrioLbl&&<div style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:11,padding:12,marginTop:7}}>
+                <div style={{fontSize:9,color:"#64748b",marginBottom:9,lineHeight:1.4}}>Renombra las 4 prioridades sin afectar el funcionamiento del consolidado. Se aplica al guardar.</div>
+                {[1,2,3,4].map(n=>(
+                  <div key={n} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
+                    <span style={{width:11,height:11,borderRadius:3,background:PRIO_EG_COLOR[n],flexShrink:0}}/>
+                    <input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:12}} value={prioLblEdit[n]||""} onChange={e=>setPrioLblEdit(p=>({...p,[n]:e.target.value}))}/>
+                  </div>
+                ))}
+                <button style={{...S.saveB,marginTop:4}} onClick={()=>{const clean={1:(prioLblEdit[1]||"").trim()||"Prioridad 1",2:(prioLblEdit[2]||"").trim()||"Prioridad 2",3:(prioLblEdit[3]||"").trim()||"Prioridad 3",4:(prioLblEdit[4]||"").trim()||"Prioridad 4"};try{localStorage.setItem("nexus_prioEgLabels",JSON.stringify(clean));}catch(e){}if(window.confirm("Etiquetas guardadas. La app se recargará para aplicarlas en todos lados. ¿Continuar?"))location.reload();}}>Guardar etiquetas</button>
+              </div>}
+            </div>}
             <div style={{fontSize:9,color:"#475569",marginBottom:9}}>☰ arrastra para reordenar · toca el nombre para editar</div>
             {cats_.filter(c=>!c.nexus).map(cat=>(
               <div key={cat.id} draggable onDragStart={()=>catDrag.start(cat.id)} onDragOver={e=>{e.preventDefault();catDrag.enter(cat.id);}} onDrop={catDrag.commit}
