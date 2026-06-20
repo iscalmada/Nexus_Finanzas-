@@ -1371,6 +1371,7 @@ function App(){
   const[proyVistaMode,setProyVistaMode]=useState("acordeon"); // "acordeon" | "swipe"
   const[proyOpenMes,setProyOpenMes]=useState(null);
   const[proySwipeIdx,setProySwipeIdx]=useState(0);
+  const[listCapExp,setListCapExp]=useState({});
   const[proyTooltipIdx,setProyTooltipIdx]=useState(null);
 
   // exportar
@@ -3225,17 +3226,9 @@ function App(){
                           {mes.detalleIng.length>0&&(<>
                             <div style={{fontSize:9,color:"#22c55e",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>↑ Ingresos</div>
                             {mes.detalleIng.map((c,i)=>(
-                              <div key={c.id} style={{marginBottom:5}}>
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:c.subs.length?2:0}}>
-                                  <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
-                                  <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(c.pres)}</span>
-                                </div>
-                                {c.subs.map(s=>(
-                                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #22c55e33"}}>
-                                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
-                                    <span style={{fontSize:10,fontWeight:700,color:"#22c55e"}}>{fmt(s.pres)}</span>
-                                  </div>
-                                ))}
+                              <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                                <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
+                                <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(c.pres)}</span>
                               </div>
                             ))}
                           </>)}
@@ -3246,11 +3239,32 @@ function App(){
                                 <div style={{fontSize:8,color:"#C9A84C",fontWeight:700,marginBottom:5,letterSpacing:1}}>POR CAPA · SALDO ACUMULADO</div>
                                 {mes.capasEg.map(cp=>{
                                   const neg=cp.saldoTras<0;
+                                  const ekey=mes.sm+"-"+mes.sy+"-"+cp.capaId;
+                                  const op=!!listCapExp[ekey];
+                                  const sinCapa=cp.capaId==="";
                                   return(
-                                  <div key={cp.capaId} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3,padding:"2px 0"}}>
-                                    <span style={{fontSize:10,color:"#94a3b8",fontWeight:600,flex:1}}>{cp.nombre}</span>
+                                  <div key={cp.capaId} style={{marginBottom:3}}>
+                                  <div onClick={()=>setListCapExp(e=>({...e,[ekey]:!e[ekey]}))} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"2px 0",cursor:"pointer"}}>
+                                    <span style={{fontSize:10,color:sinCapa?"#fbbf24":"#94a3b8",fontWeight:600,flex:1}}>{op?"\u25B2 ":"\u25BC "}{cp.nombre}</span>
                                     <span style={{fontSize:10,color:"#f87171",fontWeight:700,marginRight:10}}>{fmt(cp.subtotal)}</span>
                                     <span style={{fontSize:10,fontWeight:800,color:neg?"#f87171":"#C9A84C",minWidth:70,textAlign:"right"}}>{neg?"\u2212":""}{fmt(Math.abs(cp.saldoTras))}</span>
+                                  </div>
+                                  {op&&<div style={{padding:"1px 0 5px 13px"}}>
+                                    {cp.cats.map(c=>(
+                                      <div key={c.id} style={{marginBottom:1}}>
+                                        <div style={{display:"flex",justifyContent:"space-between"}}>
+                                          <span style={{fontSize:9,color:"#64748b"}}>{c.nombre}</span>
+                                          <span style={{fontSize:9,color:"#94a3b8",fontWeight:700}}>{fmt(c.pres)}</span>
+                                        </div>
+                                        {c.subs.map(s=>(
+                                          <div key={s.id} style={{display:"flex",justifyContent:"space-between",paddingLeft:10}}>
+                                            <span style={{fontSize:8,color:"#475569"}}>{s.nombre}</span>
+                                            <span style={{fontSize:8,color:"#64748b",fontWeight:700}}>{fmt(s.pres)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ))}
+                                  </div>}
                                   </div>
                                 );})}
                               </div>
