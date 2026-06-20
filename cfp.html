@@ -541,6 +541,7 @@ const S={
 };
 
 // ─── BUDGET BAR ───────────────────────────────────────────────
+function semColor(real,pres){if(!pres||pres<=0)return "#64748b";const p=real/pres;return p>1?"#f87171":p>=0.85?"#fbbf24":"#22c55e";}
 function BudgetBar({gasto,presupuesto,color="#C9A84C",esIngreso=false}){
   if(!presupuesto)return null;
   const pct=gasto/presupuesto;
@@ -1365,6 +1366,7 @@ function App(){
   // presupuestos vista
   const[budgetOpenCat,setBudgetOpenCat]=useState(null);
   const[budgetTab,setBudgetTab]=useState("eg"); // "eg" | "ing"
+  const[budgetCapaOpen,setBudgetCapaOpen]=useState({});
 
   // proyección presupuestal
   const[proyMeses,setProyMeses]=useState(12);
@@ -1674,6 +1676,28 @@ function App(){
     const getPres=id=>presupuestos[presKey(id,budgetPeriod.sm,budgetPeriod.sy)]||0;
     return{gastosEg,gastosIng,getPres};
   },[movs,budgetPeriod.sm,budgetPeriod.sy,budgetPeriod.inP,presupuestos]);
+
+  const budgetByCapa=useMemo(()=>{
+    const g=budgetData.gastosEg;const getPres=budgetData.getPres;
+    const orden=[...capas.map(cp=>({id:cp.id,nombre:cp.nombre})),{id:"",nombre:"Sin capa"}];
+    let totalPres=0,totalReal=0;
+    const grupos=orden.map(oc=>{
+      const cats=[];
+      catEg.forEach(c=>{
+        if(c.subs.length>0){
+          const subs=c.subs.filter(s=>((s.capa||c.capa||""))===oc.id).map(s=>({id:s.id,nombre:s.nombre,pres:getPres(s.id),real:g[s.id]||0})).filter(s=>s.pres>0||s.real>0);
+          if(subs.length>0){const pres=subs.reduce((a,s)=>a+s.pres,0),real=subs.reduce((a,s)=>a+s.real,0);cats.push({id:c.id,nombre:c.nombre,pres,real,subs});}
+        } else {
+          if((c.capa||"")===oc.id){const pres=getPres(c.id),real=g[c.id]||0;if(pres>0||real>0)cats.push({id:c.id,nombre:c.nombre,pres,real,subs:[]});}
+        }
+      });
+      if(cats.length===0)return null;
+      const pres=cats.reduce((a,x)=>a+x.pres,0),real=cats.reduce((a,x)=>a+x.real,0);
+      totalPres+=pres;totalReal+=real;
+      return{capaId:oc.id,nombre:oc.nombre,pres,real,cats};
+    }).filter(Boolean);
+    return{grupos,totalPres,totalReal};
+  },[budgetData,catEg,capas]);
 
   // ── PROYECCIÓN PRESUPUESTAL ──────────────────────────────────
   const proyData=useMemo(()=>{
@@ -3100,6 +3124,55 @@ function App(){
             <div style={{fontSize:9,color:"#475569",marginBottom:9}}>
               Toca la categoría para ver subcuentas · Toca el presupuesto para editar o proyectar meses
             </div>
+            {budgetTab==="eg"&&budgetByCapa.grupos.length>0&&(()=>{
+              const tp=budgetByCapa.totalPres,tr=budgetByCapa.totalReal;
+              const tsc=semColor(tr,tp);
+              const now=new Date();
+              const mesPct=(now.getMonth()===budgetPeriod.sm&&now.getFullYear()===budgetPeriod.sy)?Math.round(now.getDate()/new Date(budgetPeriod.sy,budgetPeriod.sm+1,0).getDate()*100):null;
+              return(
+              <div style={{marginBottom:15}}>
+                <div style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:10,color:"#94a3b8"}}>Presupuestado</span><span style={{fontSize:11,fontWeight:700,color:"#C9A84C"}}>{fmt(tp)}</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:10,color:"#94a3b8"}}>Gastado real</span><span style={{fontSize:12,fontWeight:800,color:tsc}}>{fmt(tr)}</span></div>
+                  <div style={{height:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:5}}><div style={{height:"100%",width:Math.min(100,tp>0?Math.round(tr/tp*100):0)+"%",background:tsc,borderRadius:4}}/></div>
+                  <div style={{display:"flex",justifyContent:"space-between"}}>
+                    <span style={{fontSize:9,fontWeight:700,color:tsc}}>Consumido {tp>0?Math.round(tr/tp*100):0}%</span>
+                    {mesPct!=null&&<span style={{fontSize:9,color:"#64748b"}}>Mes transcurrido {mesPct}%</span>}
+                  </div>
+                </div>
+                <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,letterSpacing:1,marginBottom:8}}>REAL VS PRESUPUESTO POR CAPA</div>
+                {budgetByCapa.grupos.map(grp=>{
+                  const sc=semColor(grp.real,grp.pres);const op=!!budgetCapaOpen[grp.capaId];const pct=grp.pres>0?Math.round(grp.real/grp.pres*100):0;const sinC=grp.capaId==="";
+                  return(
+                  <div key={grp.capaId} style={{marginBottom:7}}>
+                    <div onClick={()=>setBudgetCapaOpen(e=>({...e,[grp.capaId]:!e[grp.capaId]}))} style={{background:"#10101e",border:`1px solid ${sc}44`,borderLeft:`3px solid ${sc}`,borderRadius:10,padding:"10px 12px",cursor:"pointer"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{fontSize:11,fontWeight:700,color:sinC?"#fbbf24":"#e2e8f0"}}>{op?"▲ ":"▼ "}{grp.nombre}</span>
+                        <span style={{fontSize:11,fontWeight:800,color:sc}}>{fmt(grp.real)} <span style={{fontSize:9,color:"#475569",fontWeight:400}}>/ {fmt(grp.pres)}</span></span>
+                      </div>
+                      <div style={{height:6,borderRadius:3,background:"#1e293b",overflow:"hidden",marginTop:7}}><div style={{height:"100%",width:Math.min(100,pct)+"%",background:sc,borderRadius:3}}/></div>
+                      <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+                        <span style={{fontSize:8,color:sc,fontWeight:700}}>{pct}%</span>
+                        <span style={{fontSize:8,color:grp.real>grp.pres?"#f87171":"#22c55e"}}>{grp.pres<=0?"sin presupuesto":grp.real>grp.pres?"Exceso "+fmt(grp.real-grp.pres):"Disp. "+fmt(grp.pres-grp.real)}</span>
+                      </div>
+                    </div>
+                    {op&&<div style={{padding:"7px 0 2px 10px"}}>
+                      {grp.cats.map(cc=>{const csc=semColor(cc.real,cc.pres);return(
+                        <div key={cc.id} style={{marginBottom:6}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}><span style={{fontSize:10,color:"#94a3b8",fontWeight:600}}>{cc.nombre}</span><span style={{fontSize:10,fontWeight:700,color:csc}}>{fmt(cc.real)} <span style={{color:"#475569",fontWeight:400}}>/ {fmt(cc.pres)}</span></span></div>
+                          {cc.subs.map(ss=>{const ssc=semColor(ss.real,ss.pres);return(
+                            <div key={ss.id} style={{display:"flex",justifyContent:"space-between",paddingLeft:11,marginTop:2}}><span style={{fontSize:9,color:"#64748b"}}>{ss.nombre}</span><span style={{fontSize:9,fontWeight:700,color:ssc}}>{fmt(ss.real)} <span style={{color:"#334155",fontWeight:400}}>/ {fmt(ss.pres)}</span></span></div>
+                          );})}
+                        </div>
+                      );})}
+                    </div>}
+                  </div>
+                  );
+                })}
+                <div style={{fontSize:8,color:"#334155",marginTop:4,textAlign:"center"}}>🟢 dentro · 🟡 ≥85% · 🔴 rebasado · Detalle editable abajo por categoría</div>
+              </div>
+              );
+            })()}
             {(budgetTab==="eg"?catEg:catIng).map((cat,ci)=>{
               const color=PIE_PALETTE[ci%PIE_PALETTE.length];
               const gastos=budgetTab==="eg"?budgetData.gastosEg:budgetData.gastosIng;
@@ -3225,12 +3298,25 @@ function App(){
                         <div style={{background:"#0d0d1a",border:`1px solid ${sc}22`,borderRadius:"0 0 11px 11px",padding:"10px 14px",marginTop:-4}}>
                           {mes.detalleIng.length>0&&(<>
                             <div style={{fontSize:9,color:"#22c55e",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:6}}>↑ Ingresos</div>
-                            {mes.detalleIng.map((c,i)=>(
-                              <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                                <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
-                                <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(c.pres)}</span>
+                            {mes.detalleIng.map((c,i)=>{
+                              const ikey=mes.sm+"-"+mes.sy+"-i-"+c.id;
+                              const op=!!listCapExp[ikey];
+                              const hasSubs=c.subs.length>0;
+                              return(
+                              <div key={c.id} style={{marginBottom:4}}>
+                                <div onClick={()=>hasSubs&&setListCapExp(e=>({...e,[ikey]:!e[ikey]}))} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:hasSubs?"pointer":"default"}}>
+                                  <span style={{fontSize:11,color:"#94a3b8"}}>{hasSubs&&<span style={{fontSize:8,color:"#475569",marginRight:4}}>{op?"\u25B2":"\u25BC"}</span>}{c.nombre}</span>
+                                  <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(c.pres)}</span>
+                                </div>
+                                {op&&c.subs.map(s=>(
+                                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #22c55e33"}}>
+                                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
+                                    <span style={{fontSize:10,fontWeight:700,color:"#22c55e"}}>{fmt(s.pres)}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                              );
+                            })}
                           </>)}
                           {mes.detalleEg.length>0&&(<>
                             {/* Por capa — saldo acumulado (vista lista compacta) */}
