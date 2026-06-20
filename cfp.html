@@ -1076,6 +1076,7 @@ function ModalPresupuesto({data,presupuestos,setPresupuestos,sm,sy,onClose}){
 // ─── PROY SWIPE CARD (componente para evitar IIFE en JSX) ────
 function ProySwipeCard({mes,total,idx,setIdx,semColor,fmt,fmtShort}){
   const sc=semColor(mes.semaforo);
+  const[capExp,setCapExp]=useState({});
   return(
     <div>
       <div style={{background:"#10101e",border:`1px solid ${sc}44`,borderRadius:14,padding:"16px 18px",marginBottom:9}}>
@@ -1125,22 +1126,42 @@ function ProySwipeCard({mes,total,idx,setIdx,semColor,fmt,fmtShort}){
               </div>
             ))}
           </>)}
-          {mes.detalleEg.length>0&&(<>
-            <div style={{fontSize:9,color:"#f87171",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:7,marginTop:mes.detalleIng.length?10:0}}>↓ Egresos presupuestados</div>
-            {mes.detalleEg.map(c=>(
-              <div key={c.id} style={{marginBottom:5}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:c.subs.length?2:0}}>
-                  <span style={{fontSize:11,color:"#94a3b8"}}>{c.nombre}</span>
-                  <span style={{fontSize:11,fontWeight:700,color:"#f87171"}}>{fmt(c.pres)}</span>
-                </div>
-                {c.subs.map(s=>(
-                  <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"2px 0 2px 10px",borderLeft:"2px solid #f8717133"}}>
-                    <span style={{fontSize:10,color:"#64748b"}}>{s.nombre}</span>
-                    <span style={{fontSize:10,fontWeight:700,color:"#f87171"}}>{fmt(s.pres)}</span>
+          {mes.capasEg&&mes.capasEg.length>0&&(<>
+            <div style={{fontSize:9,color:"#f87171",fontWeight:700,letterSpacing:1.2,textTransform:"uppercase",marginBottom:7,marginTop:mes.detalleIng.length?10:0}}>↓ Egresos por capa</div>
+            {mes.capasEg.map(cp=>{
+              const op=!!capExp[cp.capaId];
+              const neg=cp.saldoTras<0;
+              return(
+              <div key={cp.capaId} style={{marginBottom:6,border:"1px solid "+(neg?"#f8717155":"#1e293b"),borderRadius:9,overflow:"hidden"}}>
+                <div onClick={()=>setCapExp(e=>({...e,[cp.capaId]:!e[cp.capaId]}))} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:neg?"#f871710f":"#13131f",cursor:"pointer"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <span style={{fontSize:9,color:"#475569"}}>{op?"\u25B2":"\u25BC"}</span>
+                    <span style={{fontSize:11,fontWeight:700,color:"#e2e8f0"}}>{cp.nombre}</span>
                   </div>
-                ))}
+                  <span style={{fontSize:11,fontWeight:700,color:"#f87171"}}>{fmt(cp.subtotal)}</span>
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 10px",background:neg?"#f871711a":"#0d0d1a",borderTop:"1px solid "+(neg?"#f8717133":"#1e293b66")}}>
+                  <span style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:0.5}}>SALDO ACUMULADO</span>
+                  <span style={{fontSize:11,fontWeight:800,color:neg?"#f87171":"#C9A84C"}}>{neg?"\u2212":""}{fmt(Math.abs(cp.saldoTras))}</span>
+                </div>
+                {op&&<div style={{padding:"6px 10px",background:"#0d0d1a"}}>
+                  {cp.cats.map(c=>(
+                    <div key={c.id} style={{marginBottom:4}}>
+                      <div style={{display:"flex",justifyContent:"space-between"}}>
+                        <span style={{fontSize:10,color:"#94a3b8"}}>{c.nombre}</span>
+                        <span style={{fontSize:10,fontWeight:700,color:"#f87171"}}>{fmt(c.pres)}</span>
+                      </div>
+                      {c.subs.map(s=>(
+                        <div key={s.id} style={{display:"flex",justifyContent:"space-between",padding:"1px 0 1px 10px",borderLeft:"2px solid #f8717133"}}>
+                          <span style={{fontSize:9,color:"#64748b"}}>{s.nombre}</span>
+                          <span style={{fontSize:9,fontWeight:700,color:"#f87171"}}>{fmt(s.pres)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>}
               </div>
-            ))}
+            );})}
           </>)}
         </div>
       )}
@@ -1390,7 +1411,7 @@ function App(){
 
   const[exportPeriod,setExportPeriod]=useState({sm:new Date().getMonth(),sy:new Date().getFullYear(),mode:"mes"});
 
-  const BLANK_MOV={fecha:todayStr(),estatus:"PENDIENTE",tipoOp:"Egreso",concepto:"",cat:"",subcat:"",prioridad:1,monto:"",cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false,obs:"",serieId:null,vinculoTipo:null,vinculoId:null,tipoAbono:null};
+  const BLANK_MOV={fecha:todayStr(),estatus:"PENDIENTE",tipoOp:"Egreso",concepto:"",cat:"",subcat:"",prioridad:1,capa:"",monto:"",cuentaId:null,cuentaDestinoId:null,tarjetaId:null,usaTarjeta:false,obs:"",serieId:null,vinculoTipo:null,vinculoId:null,tipoAbono:null};
   const BLANK_REC={activo:false,recurrencia:"Mensual",diasSemana:[],fechaInicio:todayStr(),finTipo:"repeticiones",finReps:6,finFecha:addM_(todayStr(),6)};
 
   const[formMov,setFormMov]=useState(BLANK_MOV);
@@ -1685,11 +1706,22 @@ function App(){
         const catPres=c.subs.length>0?subs.reduce((s,x)=>s+x.pres,0):(presupuestos[presKey(c.id,sm2,sy2)]||0);
         return{...c,pres:catPres,subs};
       }).filter(c=>c.pres>0);
-      meses.push({sm:sm2,sy:sy2,label:`${MESES_FULL[sm2]} ${sy2}`,labelCorto:`${MESES[sm2]} ${sy2}`,saldoInicial:saldoAcum,totalIng,totalEg,resultado,saldoFin,semaforo,detalleIng,detalleEg});
+      // Agrupar egresos por capa (orden del catálogo + "Sin capa" al final, contando en totales)
+      const disponibleMes=saldoAcum+totalIng;
+      let egAcumCapa=0;
+      const ordenCapas=[...capas.map(cp=>({id:cp.id,nombre:cp.nombre})),{id:"",nombre:"Sin capa"}];
+      const capasEg=ordenCapas.map(oc=>{
+        const cats=detalleEg.filter(c=>(c.capa||"")===oc.id);
+        if(cats.length===0)return null;
+        const subtotal=cats.reduce((s,c)=>s+c.pres,0);
+        egAcumCapa+=subtotal;
+        return{capaId:oc.id,nombre:oc.nombre,cats,subtotal,saldoTras:disponibleMes-egAcumCapa};
+      }).filter(Boolean);
+      meses.push({sm:sm2,sy:sy2,label:`${MESES_FULL[sm2]} ${sy2}`,labelCorto:`${MESES[sm2]} ${sy2}`,saldoInicial:saldoAcum,totalIng,totalEg,resultado,saldoFin,semaforo,detalleIng,detalleEg,capasEg});
       saldoAcum=saldoFin;
     }
     return{meses,saldoInicial};
-  },[presupuestos,catIng,catEg,movs,cuentas,prioI,prioE,proyMeses]);
+  },[presupuestos,catIng,catEg,capas,movs,cuentas,prioI,prioE,proyMeses]);
 
   const nextId=arr=>{const ids=arr.map(x=>Number(x.id)).filter(n=>Number.isFinite(n));return ids.length?Math.max(...ids)+1:1;};
   const nextOrd=()=>{const o=movs.map(x=>Number(x.orden)).filter(n=>Number.isFinite(n));return o.length?Math.max(...o)+1:1;};
@@ -2149,7 +2181,7 @@ function App(){
     const a=document.createElement("a");
     a.href=url;a.download=`NexusFinanzas_${new Date().toISOString().split("T")[0]}.json`;
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-  },[movs,cuentas,tarjetas,catIng,catEg,presupuestos]);
+  },[movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos]);
 
   const importJSON=useCallback((e)=>{
     const file=e.target.files[0];if(!file)return;
@@ -3224,6 +3256,21 @@ function App(){
                                 );})}
                               </div>
                             );})}
+                            {/* Por capa — saldo acumulado (vista lista compacta) */}
+                            {mes.capasEg&&mes.capasEg.length>0&&(
+                              <div style={{borderTop:"1px solid #C9A84C33",marginTop:7,paddingTop:7}}>
+                                <div style={{fontSize:8,color:"#C9A84C",fontWeight:700,marginBottom:5,letterSpacing:1}}>POR CAPA · SALDO ACUMULADO</div>
+                                {mes.capasEg.map(cp=>{
+                                  const neg=cp.saldoTras<0;
+                                  return(
+                                  <div key={cp.capaId} style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3,padding:"2px 0"}}>
+                                    <span style={{fontSize:10,color:"#94a3b8",fontWeight:600,flex:1}}>{cp.nombre}</span>
+                                    <span style={{fontSize:10,color:"#f87171",fontWeight:700,marginRight:10}}>{fmt(cp.subtotal)}</span>
+                                    <span style={{fontSize:10,fontWeight:800,color:neg?"#f87171":"#C9A84C",minWidth:70,textAlign:"right"}}>{neg?"\u2212":""}{fmt(Math.abs(cp.saldoTras))}</span>
+                                  </div>
+                                );})}
+                              </div>
+                            )}
                             {/* Subtotales por prioridad */}
                             {(()=>{
                               const tots=[1,2,3,4].map(p=>{
@@ -4178,9 +4225,9 @@ function App(){
                         {catMode==="eg"&&<div>
                           <div style={{fontSize:8,color:"#475569",marginBottom:3}}>Prioridad por defecto</div>
                           <div style={{display:"flex",gap:3}}>
-                            {[[1,"Esen","#22c55e"],[2,"Imp","#60a5fa"],[3,"Disc","#fbbf24"],[4,"Extr","#f87171"]].map(([v,l,c])=>(
+                            {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>(
                               <button key={v} style={{...S.prioB2((cat.prio||3)===v,c),flex:1,padding:"4px 2px",fontSize:8}}
-                                onClick={()=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,prio:v}:x))}>{l}</button>
+                                onClick={()=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,prio:v}:x))}>{(l||"").substring(0,6)}</button>
                             ))}
                           </div>
                           <div style={{fontSize:8,color:"#475569",margin:"7px 0 3px"}}>Capa (proyección)</div>
@@ -4205,11 +4252,15 @@ function App(){
                           <button style={S.smBtn("#475569")} onClick={()=>setEditingSubId(null)}>✕</button>
                         </div>
                         {catMode==="eg"&&<div style={{display:"flex",gap:3}}>
-                          {[[1,"Esen","#22c55e"],[2,"Imp","#60a5fa"],[3,"Disc","#fbbf24"],[4,"Extr","#f87171"]].map(([v,l,c])=>(
+                          {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>(
                             <button key={v} style={{...S.prioB2((sub.prio||3)===v,c),flex:1,padding:"3px 2px",fontSize:7}}
-                              onClick={()=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,subs:x.subs.map(s=>s.id===sub.id?{...s,prio:v}:s)}:x))}>{l}</button>
+                              onClick={()=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,subs:x.subs.map(s=>s.id===sub.id?{...s,prio:v}:s)}:x))}>{(l||"").substring(0,6)}</button>
                           ))}
                         </div>}
+                        {catMode==="eg"&&<select style={{...S.sel,padding:"4px 7px",fontSize:10,marginTop:4,width:"100%"}} value={sub.capa||""} onChange={e=>setCats_(p=>p.map(x=>x.id===cat.id?{...x,subs:x.subs.map(s=>s.id===sub.id?{...s,capa:e.target.value||undefined}:s)}:x))}>
+                          <option value="">— Sin capa —</option>
+                          {capas.map(cp=><option key={cp.id} value={cp.id}>{cp.nombre}</option>)}
+                        </select>}
                       </div>
                       :<>
                         <span style={{fontSize:11,color:"#94a3b8",cursor:"pointer",flex:1}} onClick={()=>{setEditingSubId(sub.id);setEditingSubName(sub.nombre);}}>{sub.nombre}</span>
