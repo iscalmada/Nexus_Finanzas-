@@ -1285,7 +1285,7 @@ function Configuracion({data,onRestore,onExcel,go}){
 function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView,catalogos,productos}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   const[limite,setLimite]=useState("");
-  const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
+  const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>{let r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");return r;});
   const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada");
   const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   const opCuant=opAb.filter(o=>(Number(o.comisionEstimada)||0)>0);
@@ -1327,7 +1327,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
         <div style={S.sTit}>Próximas actividades{prox.length?` (${prox.length})`:""}</div>
         <input type="date" style={{width:"auto",background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"5px 8px",color:"#e2e8f0",fontSize:11,outline:"none"}} value={limite} onChange={e=>setLimite(e.target.value)} title="Hasta fecha"/>
       </div>
-      <ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} onTap={(a)=>openAct(a,a.contactoId)}/>
+      <ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} noSort={true} onTap={(a)=>openAct(a,a.contactoId)}/>
     </div>
   </div>;
 }
