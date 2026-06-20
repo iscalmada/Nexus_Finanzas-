@@ -1711,7 +1711,15 @@ function App(){
       let egAcumCapa=0;
       const ordenCapas=[...capas.map(cp=>({id:cp.id,nombre:cp.nombre})),{id:"",nombre:"Sin capa"}];
       const capasEg=ordenCapas.map(oc=>{
-        const cats=detalleEg.filter(c=>(c.capa||"")===oc.id);
+        const cats=[];
+        detalleEg.forEach(c=>{
+          if(c.subs.length>0){
+            const subs=c.subs.filter(s=>((s.capa||c.capa||""))===oc.id);
+            if(subs.length>0){const pres=subs.reduce((s,x)=>s+x.pres,0);cats.push({...c,pres,subs});}
+          } else {
+            if((c.capa||"")===oc.id) cats.push(c);
+          }
+        });
         if(cats.length===0)return null;
         const subtotal=cats.reduce((s,c)=>s+c.pres,0);
         egAcumCapa+=subtotal;
