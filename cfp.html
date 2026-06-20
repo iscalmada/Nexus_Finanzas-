@@ -4237,7 +4237,7 @@ function App(){
                           </select>
                         </div>}
                       </div>
-                      :(<><span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>{catMode==="eg"&&cat.subs&&cat.subs.length===0&&cat.prio&&(<span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:(PRIO_EG_COLOR[cat.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[cat.prio]||"#64748b",marginLeft:5}}>{PRIO_EG_LBL[cat.prio]}</span>)}</>)
+                      :(<><span style={{fontSize:12,fontWeight:700,color:catMode==="ing"?"#22c55e":"#f87171",cursor:"pointer"}} onClick={()=>{setEditingCatId(cat.id);setEditingCatName(cat.nombre);}}>☰ {cat.nombre}</span>{catMode==="eg"&&cat.subs&&cat.subs.length===0&&cat.prio&&(<span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:(PRIO_EG_COLOR[cat.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[cat.prio]||"#64748b",marginLeft:5}}>{PRIO_EG_LBL[cat.prio]}</span>)}{catMode==="eg"&&cat.capa&&(()=>{const cn=(capas.find(cp=>cp.id===cat.capa)||{}).nombre;return cn?<span style={{fontSize:8,padding:"2px 7px",borderRadius:5,fontWeight:700,background:"#C9A84C22",color:"#C9A84C",marginLeft:5}}>▦ {cn}</span>:null;})()}</>)
                     }
                   </div>
                   {editingCatId!==cat.id&&<div style={{display:"flex",gap:5}}><button style={S.smBtn("#C9A84C")} onClick={()=>setAddingSubTo(cat.id===addingSubTo?null:cat.id)}>+ Sub</button><button style={S.smBtn("#f87171")} onClick={()=>delCat(cat.id)}>✕</button></div>}
@@ -4264,7 +4264,7 @@ function App(){
                       </div>
                       :<>
                         <span style={{fontSize:11,color:"#94a3b8",cursor:"pointer",flex:1}} onClick={()=>{setEditingSubId(sub.id);setEditingSubName(sub.nombre);}}>{sub.nombre}</span>
-                        {catMode==="eg"&&sub.prio&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:4,background:(PRIO_EG_COLOR[sub.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[sub.prio]||"#64748b",fontWeight:700}}>{(PRIO_EG_LBL[sub.prio]||"").substring(0,4)}</span>}
+                        {catMode==="eg"&&sub.prio&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:4,background:(PRIO_EG_COLOR[sub.prio]||"#64748b")+"22",color:PRIO_EG_COLOR[sub.prio]||"#64748b",fontWeight:700}}>{(PRIO_EG_LBL[sub.prio]||"").substring(0,4)}</span>}{catMode==="eg"&&(()=>{const eff=sub.capa||cat.capa;if(!eff)return null;const cn=(capas.find(cp=>cp.id===eff)||{}).nombre;return cn?<span title={sub.capa?"capa propia":"heredada de la categoría"} style={{fontSize:8,padding:"1px 5px",borderRadius:4,background:"#C9A84C22",color:"#C9A84C",fontWeight:700,marginLeft:4,opacity:sub.capa?1:0.55}}>▦ {cn.substring(0,7)}</span>:null;})()}
                         <button style={S.smBtn("#f87171")} onClick={()=>delSub(cat.id,sub.id)}>✕</button>
                       </>
                     }
