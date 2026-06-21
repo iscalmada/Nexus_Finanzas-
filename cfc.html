@@ -1313,6 +1313,7 @@ function Configuracion({data,onRestore,onExcel,go}){
 function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView,catalogos,productos}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   const[limite,setLimite]=useState("");
+  const[proxOpen,setProxOpen]=useState(false);
   const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>{let r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");return r;});
   const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada");
   const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
@@ -1351,11 +1352,11 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
       </div>
     </div>
     <div style={S.sec}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-        <div style={S.sTit}>Próximas actividades{prox.length?` (${prox.length})`:""}</div>
-        <input type="date" style={{width:"auto",background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"5px 8px",color:"#e2e8f0",fontSize:11,outline:"none"}} value={limite} onChange={e=>setLimite(e.target.value)} title="Hasta fecha"/>
+      <div onClick={()=>setProxOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:proxOpen?8:0}}>
+        <div style={S.sTit}>{proxOpen?"\u25BE ":"\u25B8 "}Próximas actividades{prox.length?` (${prox.length})`:""}</div>
+        {proxOpen&&<input type="date" onClick={e=>e.stopPropagation()} style={{width:"auto",background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"5px 8px",color:"#e2e8f0",fontSize:11,outline:"none"}} value={limite} onChange={e=>setLimite(e.target.value)} title="Hasta fecha"/>}
       </div>
-      <ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} noSort={true} onTap={(a)=>openAct(a,a.contactoId)}/>
+      {proxOpen&&<ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} noSort={true} onTap={(a)=>openAct(a,a.contactoId)}/>}
     </div>
   </div>;
 }
