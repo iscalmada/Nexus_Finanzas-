@@ -113,6 +113,15 @@ function Tablero(){
         <div style={card}><div style={lbl}>Egresos Proyectado</div><div style={val("#f87171")}>{M(r.egresosProy)}</div></div>
       </div>
     </div>
+    {(()=>{const last=(()=>{try{return localStorage.getItem("nexus_flow_lastBackup");}catch(e){return null;}})();const fmt=(iso)=>{try{return new Date(iso).toLocaleString();}catch(e){return iso;}};return (
+    <div onClick={onBackup} style={{display:"flex",alignItems:"center",gap:10,background:"#10101e",border:"1px solid "+(last?"#1e293b":"#fbbf2455"),borderRadius:12,padding:"11px 13px",cursor:"pointer",marginTop:2}}>
+      <span style={{fontSize:18}}>🛡️</span>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:11,fontWeight:700,color:GOLD}}>Respaldo · CFP + CFC</div>
+        <div style={{fontSize:10,color:last?"#64748b":"#fbbf24",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{last?("Último: "+fmt(last)):"Aún no has respaldado · toca aquí"}</div>
+      </div>
+      <span style={{fontSize:16,color:"#475569"}}>›</span>
+    </div>);})()}
     <div style={{fontSize:9,color:"#475569",textAlign:"center",marginTop:1}}>Valores proyectados del mes actual</div>
   </div>;
 }
@@ -186,7 +195,7 @@ function Lock({onOk}){
   </div>;
 }
 
-function Home({ir}){
+function Home({ir,onBackup}){
   const[nombre,setNombre]=useState(()=>String(lsCFP('nombreUsuario','')));
   const[pinOn,setPinOn]=useState(()=>!!lsCFP('pinActivo',false)&&!!String(lsCFP('pinApp','')));
   const[huellaOn,setHuellaOn]=useState(()=>!!String(lsCFP('huellaCred','')));
@@ -299,11 +308,69 @@ function Home({ir}){
   </div>;
 }
 
+const BK_EXCL=["nexus_pinApp","nexus_pinActivo","nexus_pinTimeout","nexus_huellaCred","nexus_autobackup","nexus_crm_autobackup","nexus_lastFileBackup","nexus_crm_lastFileBackup","nexus_flow_lastBackup","nexus_flow_ultima"];
+function recolectarKeys(){const out={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf("nexus_")===0&&BK_EXCL.indexOf(k)<0){out[k]=localStorage.getItem(k);}}return out;}
+function contarPorApp(keys){let cfp=0,cfc=0;Object.keys(keys||{}).forEach(k=>{if(k.indexOf("nexus_crm_")===0)cfc++;else cfp++;});return {cfp:cfp,cfc:cfc};}
+function BackupModal({onClose}){
+  const fileRef=React.useRef(null);
+  const last=(()=>{try{return localStorage.getItem("nexus_flow_lastBackup");}catch(e){return null;}})();
+  const fmt=(iso)=>{try{return new Date(iso).toLocaleString();}catch(e){return iso;}};
+  const exportar=()=>{
+    const keys=recolectarKeys();const cc=contarPorApp(keys);
+    const payload={app:"Nexus Flow",tipo:"respaldo-combinado",version:1,fecha:new Date().toISOString(),keys:keys};
+    const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});const url=URL.createObjectURL(blob);
+    const d=new Date();const pad=(n)=>String(n).padStart(2,"0");
+    const nombre="NexusFlow_Respaldo_"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"_"+pad(d.getHours())+"-"+pad(d.getMinutes())+".json";
+    const a=document.createElement("a");a.href=url;a.download=nombre;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    try{localStorage.setItem("nexus_flow_lastBackup",new Date().toISOString());}catch(e){}
+    alert("Respaldo combinado generado:\n• "+cc.cfp+" claves de CFP\n• "+cc.cfc+" claves de CFC\n\nGuárdalo en Google Drive o un lugar seguro.");
+    onClose();
+  };
+  const onFile=(e)=>{
+    const file=e.target.files&&e.target.files[0];if(!file)return;
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const p=JSON.parse(r.result);const keys=p&&p.keys?p.keys:null;
+        if(!keys||typeof keys!=="object"){alert("El archivo no parece un respaldo combinado de Nexus Flow.");e.target.value="";return;}
+        const cc=contarPorApp(keys);
+        if(window.confirm("Esto REEMPLAZARÁ los datos actuales de CFP y CFC por los del respaldo:\n\n• "+cc.cfp+" claves de CFP (Personal)\n• "+cc.cfc+" claves de CFC (Comercial)\n\nRespaldo del "+(p.fecha?fmt(p.fecha):"—")+".\n\n¿Continuar?")){
+          Object.keys(keys).forEach(k=>{try{localStorage.setItem(k,keys[k]);}catch(err){}});
+          try{localStorage.setItem("nexus_flow_lastBackup",new Date().toISOString());}catch(err){}
+          alert("Respaldo restaurado. La app se recargará para aplicar los datos.");location.reload();
+        }
+      }catch(err){alert("No se pudo leer el archivo: "+err.message);}
+      e.target.value="";
+    };
+    r.readAsText(file);
+  };
+  const card={background:"#10101e",border:"1px solid #1e293b",borderRadius:12,padding:"13px 14px",cursor:"pointer"};
+  return <div style={{position:"fixed",inset:0,background:"rgba(8,8,15,0.96)",zIndex:9999,display:"flex",flexDirection:"column",justifyContent:"center",alignItems:"center",padding:"0 22px"}}>
+    <div style={{maxWidth:380,width:"100%"}}>
+      <div style={{fontFamily:"'Cinzel',serif",fontSize:15,letterSpacing:3,color:GOLD,textAlign:"center",marginBottom:4}}>RESPALDO</div>
+      <div style={{fontSize:11,color:"#64748b",textAlign:"center",marginBottom:18}}>CFP + CFC en un solo archivo</div>
+      <div style={{background:"#0b0b16",border:"1px solid #1e293b",borderRadius:12,padding:"11px 13px",marginBottom:13,fontSize:11,lineHeight:1.7}}>
+        <span style={{color:"#94a3b8"}}>Último respaldo: </span><strong style={{color:last?"#e2e8f0":"#f87171"}}>{last?fmt(last):"nunca"}</strong>
+        {!last&&<div style={{color:"#fbbf24",marginTop:6,lineHeight:1.5}}>⚠ Aún no has generado un respaldo. Hazlo y guárdalo en Drive para no perder tu información si limpias el caché o cambias de dispositivo.</div>}
+      </div>
+      <div onClick={exportar} style={{...card,borderColor:GOLD+"55",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:11}}><span style={{fontSize:18}}>💾</span><div><div style={{fontSize:13,fontWeight:700,color:GOLD}}>Generar respaldo combinado</div><div style={{fontSize:10,color:"#64748b"}}>Descarga un archivo con todo CFP y CFC</div></div></div>
+      </div>
+      <div onClick={()=>fileRef.current&&fileRef.current.click()} style={{...card,borderColor:"#60a5fa55",marginBottom:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:11}}><span style={{fontSize:18}}>📂</span><div><div style={{fontSize:13,fontWeight:700,color:"#60a5fa"}}>Restaurar respaldo</div><div style={{fontSize:10,color:"#64748b"}}>Carga un archivo y reemplaza los datos</div></div></div>
+      </div>
+      <input ref={fileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={onFile}/>
+      <div style={{fontSize:10,color:"#475569",lineHeight:1.6,marginTop:4}}>El archivo cae en Descargas con nombre fechado (NexusFlow_Respaldo_…). Súbelo a Google Drive como respaldo seguro.</div>
+      <div style={{textAlign:"center",marginTop:14}}><button onClick={onClose} style={{background:"transparent",border:"none",color:"#64748b",fontSize:14,cursor:"pointer",padding:8}}>Cerrar</button></div>
+    </div>
+  </div>;
+}
 function App(){
   const pinActivo=lsCFP('pinActivo',false);
   const pinApp=String(lsCFP('pinApp',''));
   const[abierto,setAbierto]=useState(()=>!(pinActivo&&pinApp));
   const[vista,setVista]=useState("home");
+  const[showBackup,setShowBackup]=useState(false);
   const[cargado,setCargado]=useState({cfp:false,cfc:false});
   useEffect(()=>{const el=document.getElementById('loading');if(el){el.classList.add('fade-out');setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},380);}},[]);
   useEffect(()=>{let hid=null;const onHide=()=>{hid=Date.now();};const onShow=()=>{if(hid==null)return;const mins=Number(lsCFP('pinTimeout',5));const pa=lsCFP('pinActivo',false),pk=String(lsCFP('pinApp',''));if(pa&&pk&&mins>=0&&(Date.now()-hid)/60000>=mins)setAbierto(false);hid=null;};const vis=()=>{document.hidden?onHide():onShow();};document.addEventListener('visibilitychange',vis);window.addEventListener('focus',onShow);window.addEventListener('blur',onHide);return()=>{document.removeEventListener('visibilitychange',vis);window.removeEventListener('focus',onShow);window.removeEventListener('blur',onHide);};},[]);
@@ -321,11 +388,12 @@ function App(){
     )}
     <div style={{flex:1,position:"relative",overflow:"hidden"}}>
       <div style={{position:"absolute",inset:0,overflowY:"auto",padding:"18px 16px",display:vista==="home"?"block":"none"}}>
-        <Home ir={ir}/>
+        <Home ir={ir} onBackup={()=>setShowBackup(true)}/>
       </div>
       <div style={{position:"absolute",inset:0,display:vista==="cfp"?"block":"none"}}>{cargado.cfp&&<iframe src="cfp.html" title="CFP"/>}</div>
       <div style={{position:"absolute",inset:0,display:vista==="cfc"?"block":"none"}}>{cargado.cfc&&<iframe src="cfc.html" title="CFC"/>}</div>
     </div>
+    {showBackup&&<BackupModal onClose={()=>setShowBackup(false)}/>}
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
