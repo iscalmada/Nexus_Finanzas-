@@ -213,6 +213,22 @@ function Home({ir,onBackup}){
   const quitarHuella=()=>{setLS('huellaCred','');setHuellaOn(false);setHuellaMsg('');};
   const card={background:"#10101e",border:"1px solid #1e293b",borderRadius:14,padding:"14px 16px"};
   const lbl={fontSize:10,color:"#64748b",letterSpacing:1,textTransform:"uppercase"};
+  const borrarTodo=()=>{
+    if(!window.confirm("Vas a BORRAR TODA la información de CFP y CFC (movimientos, contactos, oportunidades, actividades, presupuestos y catálogos editados).\n\nLos catálogos volverán a los de fábrica. El PIN y la huella se conservan.\n\nESTO NO SE PUEDE DESHACER. Te recomiendo generar un respaldo antes.\n\n¿Continuar?"))return;
+    const t=window.prompt("Para confirmar, escribe BORRAR (en mayúsculas):");
+    if(t==null)return;
+    if(String(t).trim().toUpperCase()!=="BORRAR"){alert("No se borró nada (el texto no coincide).");return;}
+    try{
+      const KEEP={"nexus_pinApp":1,"nexus_pinActivo":1,"nexus_pinTimeout":1,"nexus_huellaCred":1};
+      const VACIO={"nexus_crm_contactos":"[]","nexus_crm_empresas":"[]","nexus_crm_actividades":"[]","nexus_crm_oportunidades":"[]","nexus_crm_productos":"[]","nexus_crm_bienes":"[]","nexus_crm_metaProspContactos":"0","nexus_movs":"[]","nexus_cuentas":"[]","nexus_tarjetas":"[]","nexus_acreedores":"[]","nexus_deudores":"[]","nexus_ingresosExt":"[]","nexus_oportunidades":"[]"};
+      const borrar=[];
+      for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf("nexus_")===0&&!KEEP[k])borrar.push(k);}
+      borrar.forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});
+      Object.keys(VACIO).forEach(k=>{try{localStorage.setItem(k,VACIO[k]);}catch(e){}});
+    }catch(e){alert("Error al borrar: "+e.message);return;}
+    alert("Listo. Todo quedó borrado y las apps se reiniciarán de cero, con los catálogos de fábrica.");
+    location.reload();
+  };
 
   if(cfg) return <div>
     <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,paddingTop:4}}>
@@ -278,6 +294,12 @@ function Home({ir,onBackup}){
         ))}
       </div>
       <div style={{fontSize:10,color:"#475569",marginTop:8}}>Si dejas Nexus Flow en segundo plano y regresas pasado este tiempo, se pedirá el PIN de nuevo.</div>
+    </div>
+
+    <div style={{...card,marginBottom:10,borderColor:"#f8717155"}}>
+      <div style={{...lbl,color:"#f87171"}}>Zona de peligro</div>
+      <div style={{fontSize:11,color:"#94a3b8",lineHeight:1.6,marginTop:6,marginBottom:10}}>Borra toda la información de CFP y CFC y deja las apps como recién instaladas (catálogos de fábrica). Conserva el PIN y la huella. Genera un respaldo antes.</div>
+      <button onClick={borrarTodo} style={{width:"100%",background:"transparent",border:"1px solid #f8717155",borderRadius:9,color:"#f87171",fontWeight:700,fontSize:13,padding:"10px 0",cursor:"pointer"}}>Borrar todo (CFP + CFC)</button>
     </div>
 
     {setter&&<PinSetter onDone={activarPin} onCancel={()=>setSetter(false)}/>}
