@@ -1242,6 +1242,9 @@ function BienesInmuebles({bienes,setBienes,catalogos,contactos,onBack}){
 
 function Configuracion({data,onRestore,onExcel,go}){
   const fileRef=useRef(null);
+  const ab=loadLS("autobackup",null); const fb=loadLS("lastFileBackup",null);
+  const fmtFecha=(iso)=>{try{return new Date(iso).toLocaleString();}catch(e){return iso;}};
+  const recuperarAuto=()=>{ if(!ab||!ab.data){alert("Aún no hay respaldo automático en este dispositivo.");return;} if(window.confirm("Esto REEMPLAZARÁ el contenido actual por el último respaldo automático ("+fmtFecha(ab.fecha)+").\n\n¿Continuar?")){onRestore(ab.data);alert("Respaldo automático recuperado.");} };
   const exportTotal=()=>{
     const payload={app:"Nexus CFC",tipo:"respaldo-total",version:1,fecha:new Date().toISOString(),data};
     const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
@@ -1249,6 +1252,7 @@ function Configuracion({data,onRestore,onExcel,go}){
     const a=document.createElement("a");
     a.href=url;a.download="Nexus_CFC_respaldo_"+new Date().toISOString().slice(0,10)+".json";
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    try{saveLS("lastFileBackup",new Date().toISOString());}catch(e){}
   };
   const onFile=(e)=>{
     const file=e.target.files&&e.target.files[0];if(!file){return;}
@@ -1290,6 +1294,14 @@ function Configuracion({data,onRestore,onExcel,go}){
       <button style={{...S.cancB,borderColor:"#2dd4bf55",color:"#2dd4bf",marginTop:0}} onClick={exportTotal}>⬇ Generar respaldo total (JSON)</button>
       <button style={{...S.cancB,borderColor:"#fbbf2455",color:"#fbbf24"}} onClick={()=>fileRef.current&&fileRef.current.click()}>⬆ Recuperar respaldo (JSON)</button>
       <input ref={fileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={onFile}/>
+      <div style={{...S.card("#2dd4bf33"),marginTop:10,fontSize:12,lineHeight:1.55}}>
+        <div style={{color:"#2dd4bf",fontWeight:700,marginBottom:6}}>Estado de respaldo</div>
+        <div style={{color:"#94a3b8"}}>Automático (este dispositivo): <b style={{color:"#e2e8f0"}}>{ab?fmtFecha(ab.fecha):"—"}</b></div>
+        <div style={{color:"#94a3b8"}}>Último respaldo en archivo: <b style={{color:fb?"#e2e8f0":"#f87171"}}>{fb?fmtFecha(fb):"nunca"}</b></div>
+        {!fb&&<div style={{color:"#fbbf24",marginTop:6}}>⚠ Aún no guardas un respaldo en archivo. El automático vive solo en este dispositivo y se pierde si limpias el caché del navegador. Genera un respaldo en archivo (JSON) y guárdalo aparte.</div>}
+        <button style={{...S.cancB,borderColor:"#a78bfa55",color:"#a78bfa",marginTop:8}} onClick={recuperarAuto}>↺ Recuperar respaldo automático</button>
+        <div style={{color:"#64748b",marginTop:6,fontSize:11}}>El respaldo automático se guarda solo al cerrar o cambiar de app. Para un respaldo a prueba de todo, genera el archivo JSON y consérvalo fuera del teléfono.</div>
+      </div>
       <div style={{...S.sTit,marginTop:14}}>Exportar a Excel</div>
       <div style={{fontSize:9,color:"#475569",marginBottom:8,lineHeight:1.5}}>Archivo de lectura (no restaurable) con Contactos, Empresas y Oportunidades.</div>
       <button style={{...S.cancB,borderColor:GOLD+"55",color:GOLD,marginTop:0}} onClick={onExcel}>⬇ Exportar a Excel</button>
@@ -1902,6 +1914,13 @@ function App(){
   useEffect(()=>saveLS("productos",productos),[productos]);
   useEffect(()=>saveLS("bienes",bienes),[bienes]);
   useEffect(()=>saveLS("catalogos",catalogos),[catalogos]);
+  useEffect(()=>{
+    const snap=()=>{try{const data={contactos,empresas,actividades,oportunidades,catalogos,productos,bienes,metaProspContactos:loadLS("metaProspContactos",0)};saveLS("autobackup",{fecha:new Date().toISOString(),data});}catch(e){}};
+    const onHide=()=>{if(document.visibilityState==="hidden")snap();};
+    document.addEventListener("visibilitychange",onHide);
+    window.addEventListener("pagehide",snap);
+    return ()=>{document.removeEventListener("visibilitychange",onHide);window.removeEventListener("pagehide",snap);};
+  },[contactos,empresas,actividades,oportunidades,catalogos,productos,bienes]);
   useEffect(()=>{const l=document.getElementById("loading");if(l){l.classList.add("fade-out");setTimeout(()=>l.remove(),350);}},[]);
 
   const openAct=(init,fixed)=>setActModal({init,fixed:fixed||null});
@@ -1937,6 +1956,7 @@ function App(){
     if(d.catalogos&&typeof d.catalogos==="object")setCatalogos(d.catalogos);
     if(Array.isArray(d.productos))setProductos(d.productos);
     if(Array.isArray(d.bienes))setBienes(d.bienes);
+    if(typeof d.metaProspContactos!=="undefined"){try{saveLS("metaProspContactos",d.metaProspContactos);}catch(e){}}
     setView("configuracion");
   };
   const NAV=[["inicio","Inicio","⌂"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["objetivos","Metas","📊"],["configuracion","Config.","⚙"]];
@@ -1951,7 +1971,7 @@ function App(){
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="bienes"&&<BienesInmuebles bienes={bienes} setBienes={setBienes} catalogos={catalogos} contactos={contactos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} oportunidades={oportunidades} onProductos={()=>go("productos")}/>}
-    {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos,bienes}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
+    {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos,bienes,metaProspContactos:loadLS("metaProspContactos",0)}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
     <div style={S.nav}>
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"||view==="bienes"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}

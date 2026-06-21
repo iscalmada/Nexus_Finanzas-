@@ -2211,13 +2211,29 @@ function App(){
     setViewCartera(null);
   },[acreedores,deudores,ingresosExt,movs]);
 
+  useEffect(()=>{
+    const snap=()=>{try{const labels=(()=>{try{return JSON.parse(localStorage.getItem("nexus_prioEgLabels")||"null");}catch(e){return null;}})();const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,prioEgLabels:labels,tiempoBloqueo:loadLS('tiempoBloqueo',null)};saveLS('autobackup',{fecha:new Date().toISOString(),data});}catch(e){}};
+    const onHide=()=>{if(document.visibilityState==="hidden")snap();};
+    document.addEventListener("visibilitychange",onHide);
+    window.addEventListener("pagehide",snap);
+    return ()=>{document.removeEventListener("visibilitychange",onHide);window.removeEventListener("pagehide",snap);};
+  },[movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario]);
+  const restoreAuto=useCallback(()=>{
+    const ab=loadLS('autobackup',null);
+    if(!ab||!ab.data){alert("Aún no hay respaldo automático en este dispositivo.");return;}
+    if(!window.confirm("Esto REEMPLAZARÁ los datos actuales por el respaldo automático ("+new Date(ab.fecha).toLocaleString()+").\n\n¿Continuar?"))return;
+    const d=ab.data;
+    try{['movs','cuentas','tarjetas','catIng','catEg','capas','presupuestos','acreedores','deudores','ingresosExt','oportunidades','etapasAvance','solucionesNexus','aliadosEst','aliadosCom','metaFondo','gastoFamiliarEsencial','factorFEF','nombreUsuario','tiempoBloqueo'].forEach(k=>{if(d[k]!==undefined)saveLS(k,d[k]);});if(d.prioEgLabels)localStorage.setItem("nexus_prioEgLabels",JSON.stringify(d.prioEgLabels));}catch(e){}
+    location.reload();
+  },[]);
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,exportedAt:new Date().toISOString(),version:"v8"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,prioEgLabels:(()=>{try{return JSON.parse(localStorage.getItem("nexus_prioEgLabels")||"null");}catch(e){return null;}})(),tiempoBloqueo:loadLS('tiempoBloqueo',null),exportedAt:new Date().toISOString(),version:"v8"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
     a.href=url;a.download=`NexusFinanzas_${new Date().toISOString().split("T")[0]}.json`;
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+    try{saveLS('lastFileBackup',new Date().toISOString());}catch(e){}
   },[movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos]);
 
   const importJSON=useCallback((e)=>{
@@ -2246,8 +2262,12 @@ function App(){
         if(data.solucionesNexus){setSolucionesNexus(data.solucionesNexus);saveLS('solucionesNexus',data.solucionesNexus);}
         if(data.aliadosEst){setAliadosEst(data.aliadosEst);saveLS('aliadosEst',data.aliadosEst);}
         if(data.aliadosCom){setAliadosCom(data.aliadosCom);saveLS('aliadosCom',data.aliadosCom);}
+        if(data.prioEgLabels){try{localStorage.setItem("nexus_prioEgLabels",JSON.stringify(data.prioEgLabels));}catch(e){}}
+        if(data.nombreUsuario!==undefined){saveLS('nombreUsuario',data.nombreUsuario);}
+        if(data.tiempoBloqueo!==undefined){saveLS('tiempoBloqueo',data.tiempoBloqueo);}
+        saveLS('lastFileBackup',loadLS('lastFileBackup',null));
         setShowJsonModal(false);
-        setView("dashboard");
+        if(window.confirm("Respaldo importado correctamente. La app se recargará para aplicar todo (incluidas las etiquetas de prioridad).")){location.reload();}else{setView("dashboard");}
       }catch(err){setJsonImportError("Archivo inválido. Usa un JSON exportado desde esta app.");}
     };
     reader.readAsText(file);
@@ -4473,6 +4493,14 @@ function App(){
             <div style={{...S.card()}} onClick={()=>{setShowJsonModal(true);setJsonImportError("");}}>
               <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}><div style={{...S.menuIco,background:"rgba(96,165,250,0.12)"}}><span>📂</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#60a5fa"}}>Importar datos (JSON)</div><div style={{fontSize:10,color:"#475569"}}>Restaura un respaldo previo</div></div></div>
             </div>
+            {(()=>{const ab=loadLS('autobackup',null);const fb=loadLS('lastFileBackup',null);const fmt=(iso)=>{try{return new Date(iso).toLocaleString();}catch(e){return iso;}};return (
+            <div style={{...S.card(),marginTop:7}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#2dd4bf",marginBottom:5}}>Estado de respaldo</div>
+              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.7}}>Automático (este dispositivo): <strong style={{color:"#e2e8f0"}}>{ab?fmt(ab.fecha):"—"}</strong></div>
+              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.7}}>Último respaldo en archivo: <strong style={{color:fb?"#e2e8f0":"#f87171"}}>{fb?fmt(fb):"nunca"}</strong></div>
+              {!fb&&<div style={{fontSize:10,color:"#fbbf24",lineHeight:1.6,marginTop:4}}>⚠ Aún no guardas un archivo. El automático vive solo en este dispositivo y se pierde al limpiar el caché. Exporta el JSON y guárdalo aparte.</div>}
+              <div onClick={restoreAuto} style={{...S.card(),cursor:"pointer",marginTop:7,borderColor:"#a78bfa55"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(167,139,250,0.12)"}}><span>↺</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#a78bfa"}}>Recuperar respaldo automático</div><div style={{fontSize:10,color:"#475569"}}>Restaura el último snapshot de este dispositivo</div></div></div></div>
+            </div>);})()}
             <div style={{...S.infoBx("#475569"),marginTop:7}}><span>ℹ</span><span>El filtro de proyección (prioridades) se configura en la vista de Movimientos con el botón ⚙.</span></div>
           </div>
         )}
