@@ -3676,16 +3676,24 @@ function App(){
                           onClick={()=>setCarteraEstado(e)}>{e}</button>
                       ))}
                     </div>
-                    <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>PRIORIDAD</div>
+                    <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>ORIGEN</div>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
+                      {(carteraTab==="acreedores"?["Todos",...ORIG_ACREEDOR]:["Todos",...ORIG_DEUDOR]).map(o=>{
+                        const cnt=o==="Todos"?(carteraTab==="acreedores"?acreedores:deudores).length:(carteraTab==="acreedores"?acreedores:deudores).filter(x=>x.origen===o).length;
+                        return(<button key={o} style={{...S.chip(carteraOrigen===o,carteraTab==="acreedores"?"#f87171":"#22c55e"),flex:"none",padding:"5px 10px",fontSize:9}}
+                          onClick={()=>setCarteraOrigen(o)}>{o}{cnt>0&&<span style={{opacity:0.7}}> ({cnt})</span>}</button>);
+                      })}
+                    </div>
+                    <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>PRIORIDAD DE PAGO</div>
                     <div style={{display:"flex",gap:5,marginBottom:10}}>
                       {["Todos","Alta","Media","Baja"].map(n=>(
                         <button key={n} style={{...S.chip(carteraNivel===n,n==="Todos"?"#64748b":n==="Alta"?"#f87171":n==="Media"?"#fbbf24":"#22c55e"),flex:1}}
                           onClick={()=>setCarteraNivel(n)}>{n}</button>
                       ))}
                     </div>
-                    {(carteraEstado!=="Todos"||carteraNivel!=="Todos")&&(
+                    {(carteraEstado!=="Todos"||carteraNivel!=="Todos"||carteraOrigen!=="Todos")&&(
                       <button style={{...S.acBtn("#475569"),fontSize:10,width:"100%"}}
-                        onClick={()=>{setCarteraEstado("Todos");setCarteraNivel("Todos");}}>✕ Limpiar filtros</button>
+                        onClick={()=>{setCarteraEstado("Todos");setCarteraNivel("Todos");setCarteraOrigen("Todos");}}>✕ Limpiar filtros</button>
                     )}
                   </div>
                 )}
@@ -3704,18 +3712,6 @@ function App(){
                 .filter(x=>{if(carteraEstado==="Todos")return true;const s=saldoPendiente(x,movs);return carteraEstado==="Vigentes"?s>0:s<=0;});
               const total=acrFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
-                {/* Selector de origen */}
-                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
-                  {origenes.map(o=>{
-                    const cnt=o==="Todos"?acreedores.length:acreedores.filter(x=>x.origen===o).length;
-                    return(<button key={o} style={{...S.prioB2(carteraOrigen===o,"#f87171"),flex:"none",padding:"5px 10px",fontSize:9}}
-                      onClick={()=>setCarteraOrigen(o)}>{o} {cnt>0&&<span style={{opacity:0.7}}>({cnt})</span>}</button>);
-                  })}
-                </div>
-                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Prioridad de pago</span>
-                  {["Todos","Alta","Media","Baja"].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]),flex:"none",padding:"5px 10px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
-                </div>
                 {(()=>{
                   const totalInicial=acrFiltrados.reduce((s,x)=>s+(x.montoActual||0),0);
                   const totalTodos=acreedores.reduce((s,x)=>s+saldoPendiente(x,movs),0);
@@ -3787,18 +3783,6 @@ function App(){
                 .filter(x=>{if(carteraEstado==="Todos")return true;const s=saldoPendiente(x,movs);return carteraEstado==="Vigentes"?s>0:s<=0;});
               const total=deuFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
-                {/* Selector de origen */}
-                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap"}}>
-                  {origenes.map(o=>{
-                    const cnt=o==="Todos"?deudores.length:deudores.filter(x=>x.origen===o).length;
-                    return(<button key={o} style={{...S.prioB2(carteraOrigen===o,"#22c55e"),flex:"none",padding:"5px 10px",fontSize:9}}
-                      onClick={()=>setCarteraOrigen(o)}>{o} {cnt>0&&<span style={{opacity:0.7}}>({cnt})</span>}</button>);
-                  })}
-                </div>
-                <div style={{display:"flex",gap:5,marginBottom:10,flexWrap:"wrap",alignItems:"center"}}>
-                  <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Probabilidad de recuperación</span>
-                  {["Todos","Alta","Media","Baja"].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]),flex:"none",padding:"5px 10px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
-                </div>
                 {(()=>{
                   const totalInicial=deuFiltrados.reduce((s,x)=>s+(x.montoActual||0),0);
                   const totalCobrado=deuFiltrados.reduce((s,x)=>s+abonado(x,movs),0);
