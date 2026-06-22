@@ -558,11 +558,11 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     </div>}
     <div style={S.line}/>
     <div style={S.sec}>
-      <input style={S.srch} placeholder="🔍 Buscar por nombre…" value={q} onChange={e=>setQ(e.target.value)}/>
-      <div style={{display:"flex",gap:8,marginTop:8,alignItems:"center"}}>
-        <button style={{...S.pill(panel||activos>0,GOLD),flex:1,padding:"9px 0",fontWeight:700}} onClick={()=>setPanel(p=>!p)}>⚙ Filtros{activos>0?` (${activos})`:""} {panel?"▲":"▾"}</button>
-        {activos>0&&<button style={S.pill(false,"#f87171")} onClick={limpiar}>✕ Limpiar</button>}
-        <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap"}}>Act: {list.length}</span>
+      <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
+        <input style={{...S.srch,flex:1}} placeholder="🔍 Buscar por nombre…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <button style={{...S.pill(panel||activos>0,GOLD),padding:"9px 12px",fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}} onClick={()=>setPanel(p=>!p)}>⚙{activos>0?` (${activos})`:""} {panel?"▲":"▾"}</button>
+        {activos>0&&<button style={{...S.pill(false,"#f87171"),flexShrink:0}} onClick={limpiar}>✕</button>}
+        <span style={{fontSize:9,color:"#475569",flexShrink:0,whiteSpace:"nowrap"}}>Act: {list.length}</span>
       </div>
       {panel&&<div style={{...S.card(),marginTop:10}}>
         {aliadosOnly ? (<>
@@ -1281,30 +1281,40 @@ function Configuracion({data,onRestore,onExcel,go}){
     r.readAsText(file);
   };
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Configuración</div><div style={S.sub}>Personalización, seguridad, exportar y herramientas</div></div></div>
+    <div style={S.hdr}><div><div style={S.logo}>Configuración</div><div style={S.sub}>Módulos, personalización, seguridad y exportar</div></div></div>
     <div style={S.line}/>
     <div style={{...S.sec,paddingTop:10}}>
 
-      {/* ── 1. PERSONALIZACIÓN ── */}
-      <div style={S.sTit}>🎨 PERSONALIZACIÓN</div>
+      {/* ── 1. MÓDULOS BASE ── */}
+      <div style={S.sTit}>🗂 MÓDULOS BASE</div>
+      {[["catalogos","☰","Catálogos","Listas y valores del sistema"],
+        ["productos","📦","Productos por solución","Base de Oportunidades y Metas"],
+        ["aliados","🤝","Aliados","Estratégicos y comerciales"],
+        ["bienes","🏠","Bienes Inmuebles","Propiedades para venta o coinversión"]].map(a=>
+        <div key={a[0]} style={{...S.cCard(GOLD),display:"flex",alignItems:"center",gap:12,marginBottom:9}} onClick={()=>go(a[0])}>
+          <span style={{fontSize:20}}>{a[1]}</span>
+          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{a[2]}</div><div style={{fontSize:10,color:"#64748b"}}>{a[3]}</div></div>
+          <span style={{color:"#64748b"}}>›</span>
+        </div>)}
+
+      {/* ── 2. PERSONALIZACIÓN ── */}
+      <div style={{...S.sTit,marginTop:6}}>🎨 PERSONALIZACIÓN</div>
       <div style={{...S.cCard(GOLD),marginBottom:9}}>
         <div style={{fontSize:11,color:"#64748b",marginBottom:9}}>Catálogos del sistema — edita listas, tipos y valores</div>
-        <div style={{display:"flex",flexDirection:"column",gap:7}}>
-          <div style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer",padding:"8px 0",borderBottom:"1px solid #1e293b33"}} onClick={()=>go("catalogos")}>
-            <span style={{fontSize:18}}>☰</span>
-            <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>Catálogos</div><div style={{fontSize:10,color:"#64748b"}}>Listas y valores del sistema</div></div>
-            <span style={{color:"#64748b"}}>›</span>
-          </div>
+        <div style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>go("catalogos")}>
+          <span style={{fontSize:18}}>☰</span>
+          <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>Editar Catálogos</div><div style={{fontSize:10,color:"#64748b"}}>Listas y valores del sistema</div></div>
+          <span style={{color:"#64748b"}}>›</span>
         </div>
       </div>
 
-      {/* ── 2. SEGURIDAD ── */}
+      {/* ── 3. SEGURIDAD ── */}
       <div style={S.sTit}>🔒 SEGURIDAD</div>
       <div style={{...S.cCard("#475569"),marginBottom:9}}>
         <div style={{fontSize:10,color:"#475569",lineHeight:1.5}}>La seguridad (PIN y bloqueo automático) se gestiona desde el shell de <span style={{color:GOLD,fontWeight:700}}>Nexus Flow</span>, que protege todas las apps con un único punto de acceso.</div>
       </div>
 
-      {/* ── 3. EXPORTAR ── */}
+      {/* ── 4. EXPORTAR ── */}
       <div style={S.sTit}>📥 EXPORTAR</div>
       <div style={{...S.cCard("#22c55e33"),marginBottom:9,cursor:"pointer"}} onClick={onExcel}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -1317,21 +1327,6 @@ function Configuracion({data,onRestore,onExcel,go}){
         </div>
       </div>
       <div style={{...S.infoBx("#475569"),marginBottom:13}}><span>ℹ</span><span>Los respaldos JSON se gestionan desde Nexus Flow (shell principal).</span></div>
-
-      {/* ── 4. HERRAMIENTAS ── */}
-      <div style={{display:"flex",alignItems:"center",gap:8,margin:"4px 0 10px"}}>
-        <div style={{flex:1,height:1,background:"#1e293b"}}/>
-        <div style={{fontSize:9,fontWeight:800,color:"#475569",letterSpacing:1.5,padding:"4px 10px",border:"1px solid #1e293b",borderRadius:20}}>⚡ HERRAMIENTAS</div>
-        <div style={{flex:1,height:1,background:"#1e293b"}}/>
-      </div>
-      {[["productos","📦","Productos por solución","Base de Oportunidades y Metas"],
-        ["aliados","🤝","Aliados","Estratégicos y comerciales"],
-        ["bienes","🏠","Bienes Inmuebles","Propiedades para venta o coinversión"]].map(a=>
-        <div key={a[0]} style={{...S.cCard(GOLD),display:"flex",alignItems:"center",gap:12,marginBottom:9}} onClick={()=>go(a[0])}>
-          <span style={{fontSize:20}}>{a[1]}</span>
-          <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{a[2]}</div><div style={{fontSize:10,color:"#64748b"}}>{a[3]}</div></div>
-          <span style={{color:"#64748b"}}>›</span>
-        </div>)}
       <input ref={fileRef} type="file" accept="application/json,.json" style={{display:"none"}} onChange={onFile}/>
     </div>
   </div>;

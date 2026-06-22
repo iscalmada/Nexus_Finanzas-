@@ -1237,6 +1237,7 @@ function App(){
   const[gastoFamiliarEsencial,setGastoFamiliarEsencial]=useState(()=>loadLS('gastoFamiliarEsencial',0));
   const[factorFEF,setFactorFEF]=useState(()=>loadLS('factorFEF',2.5));
   const[fondoOpen,setFondoOpen]=useState(false);
+  const[fefMenuOpen,setFefMenuOpen]=useState(false);
   const[prioFEF_ing,setPrioFEF_ing]=useState(2);
   const[showFEFDesglose,setShowFEFDesglose]=useState(false);
   const[horizonteFEF,setHorizonteFEF]=useState(()=>{
@@ -1405,6 +1406,7 @@ function App(){
   const[showOpoFiltroSol,setShowOpoFiltroSol]=useState(false);
   const[showOpoCatalogos,setShowOpoCatalogos]=useState(false); // modal catálogos Nexus
   const[opoBusq,setOpoBusq]=useState("");
+  const[opoFiltroContacto,setOpoFiltroContacto]=useState("");
   const[showFiltrosOpo,setShowFiltrosOpo]=useState(false);
   const[opoCatTab,setOpoCatTab]=useState("etapas"); // "etapas"|"soluciones"|"aliadosEst"|"aliadosCom"
   const[newOpoCatItem,setNewOpoCatItem]=useState({nombre:"",descripcion:"",pctAvance:""});
@@ -2627,28 +2629,27 @@ function App(){
             )}
             {/* ── BARRA BÚSQUEDA + FILTROS UNIFICADOS ── */}
             {(()=>{
-              const anyFilterActive=filterTipo!=="TODOS"||filterEst!=="TODOS"||filterRetrasados||(filterCatIng&&filterCatIng.size>0)||(filterCatEg&&filterCatEg.size>0)||(filterCuentas&&filterCuentas.size>0)||(filterTarjetasFiltro&&filterTarjetasFiltro.size>0)||filterProbIng.size>0||filterPrioEg.size>0||prioI<3||prioE<5;
-              const badgeN=[filterTipo!=="TODOS"&&1,filterEst!=="TODOS"&&1,filterRetrasados&&1,(filterCatIng&&filterCatIng.size>0)&&1,(filterCatEg&&filterCatEg.size>0)&&1,(filterCuentas&&filterCuentas.size>0)&&1,(filterTarjetasFiltro&&filterTarjetasFiltro.size>0)&&1,filterProbIng.size>0&&1,filterPrioEg.size>0&&1,(prioI<3)&&1,(prioE<5)&&1].filter(Boolean).length;
+              const advFilterActive=filterRetrasados||(filterCatIng&&filterCatIng.size>0)||(filterCatEg&&filterCatEg.size>0)||(filterCuentas&&filterCuentas.size>0)||(filterTarjetasFiltro&&filterTarjetasFiltro.size>0)||filterProbIng.size>0||filterPrioEg.size>0||prioI<3||prioE<5;
+              const badgeN=[filterRetrasados&&1,(filterCatIng&&filterCatIng.size>0)&&1,(filterCatEg&&filterCatEg.size>0)&&1,(filterCuentas&&filterCuentas.size>0)&&1,(filterTarjetasFiltro&&filterTarjetasFiltro.size>0)&&1,filterProbIng.size>0&&1,filterPrioEg.size>0&&1,(prioI<3)&&1,(prioE<5)&&1].filter(Boolean).length;
               return(
                 <>
-                  <div style={{display:"flex",gap:5,marginBottom:7,alignItems:"center"}}>
+                  {/* Fila 1: búsqueda + botón avanzados + contador */}
+                  <div style={{display:"flex",gap:5,marginBottom:6,alignItems:"center"}}>
                     <input style={{...S.srch,flex:1,marginBottom:0}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar concepto, monto…"/>
-                    <button style={{...S.prioTag(anyFilterActive||showFiltrosMov),flexShrink:0,whiteSpace:"nowrap"}}
+                    <button style={{...S.prioTag(advFilterActive||showFiltrosMov),flexShrink:0,whiteSpace:"nowrap"}}
                       onClick={()=>setShowFiltrosMov(v=>!v)}>
                       ⚙{badgeN>0?` (${badgeN})`:""} {showFiltrosMov?"▲":"▾"}
                     </button>
                     <span style={{fontSize:9,color:"#475569",flexShrink:0,whiteSpace:"nowrap"}}>Act: {filtered.length}</span>
                   </div>
+                  {/* Fila 2: Tipo — siempre visible */}
+                  <div style={{...S.chips,marginBottom:4}}>{["TODOS",...TIPO_OP].map(t=><button key={t} style={S.chip(filterTipo===t)} onClick={()=>setFilterTipo(t)}>{t}</button>)}</div>
+                  {/* Fila 3: Estatus — siempre visible */}
+                  <div style={{...S.chips,marginBottom:7}}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
+                  {/* Panel avanzado colapsable */}
                   {showFiltrosMov&&(
                     <div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:11,padding:"10px 12px",marginBottom:7}}>
-                      {/* Tipo */}
-                      <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>TIPO</div>
-                      <div style={{...S.chips,marginBottom:9}}>{["TODOS",...TIPO_OP].map(t=><button key={t} style={S.chip(filterTipo===t)} onClick={()=>setFilterTipo(t)}>{t}</button>)}</div>
-                      {/* Etapa */}
-                      <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>ESTATUS</div>
-                      <div style={{...S.chips,marginBottom:9}}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
-                      {/* Filtros avanzados */}
-                      <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>FILTROS AVANZADOS</div>
+                      <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:8}}>FILTROS AVANZADOS</div>
                       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                         {/* Probabilidad ingresos */}
                         <div style={{position:"relative",display:"inline-block"}}>
@@ -2672,10 +2673,8 @@ function App(){
                                 );
                               })}
                               <div style={{display:"flex",gap:5,marginTop:8}}>
-                                <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
-                                  onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>✕ Limpiar</button>
-                                <button style={{...S.smBtn("#22c55e"),flex:1,fontSize:8}}
-                                  onClick={()=>setShowFilterProbIng(false)}>✓ Aplicar</button>
+                                <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}} onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>✕ Limpiar</button>
+                                <button style={{...S.smBtn("#22c55e"),flex:1,fontSize:8}} onClick={()=>setShowFilterProbIng(false)}>✓ Aplicar</button>
                               </div>
                             </div>
                           )}
@@ -2702,10 +2701,8 @@ function App(){
                                 );
                               })}
                               <div style={{display:"flex",gap:5,marginTop:8}}>
-                                <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
-                                  onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>✕ Limpiar</button>
-                                <button style={{...S.smBtn("#f87171"),flex:1,fontSize:8}}
-                                  onClick={()=>setShowFilterPrioEg(false)}>✓ Aplicar</button>
+                                <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}} onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>✕ Limpiar</button>
+                                <button style={{...S.smBtn("#f87171"),flex:1,fontSize:8}} onClick={()=>setShowFilterPrioEg(false)}>✓ Aplicar</button>
                               </div>
                             </div>
                           )}
@@ -3468,7 +3465,13 @@ function App(){
           const comAb=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
           const prodAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
           const comCon=concret.reduce((s,o)=>s+(Number(o.comisionEstimada)||Number(o.montoEstimado)||0),0);
-          const lista=opos.filter(o=>!opoFiltroEtapa||o.etapa===opoFiltroEtapa).filter(o=>!opoBusq||(o.concepto||"").toLowerCase().includes(opoBusq.toLowerCase())).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+          const lista=opos
+            .filter(o=>!opoFiltroEtapa||o.etapa===opoFiltroEtapa)
+            .filter(o=>!opoFiltroSol.size||opoFiltroSol.has(o.solucionId))
+            .filter(o=>!opoFiltroContacto||(o.contactoPrincipalId||o.contactoId)===opoFiltroContacto||o.contactoOperativoId===opoFiltroContacto)
+            .filter(o=>!opoBusq||(o.concepto||"").toLowerCase().includes(opoBusq.toLowerCase())||(contName(o.contactoPrincipalId||o.contactoId)||"").toLowerCase().includes(opoBusq.toLowerCase()))
+            .slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+          const nFiltrosOpo=(opoFiltroEtapa?1:0)+(opoFiltroSol.size?1:0)+(opoFiltroContacto?1:0);
           const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
           const cardS={background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8};
           return (
@@ -3483,20 +3486,30 @@ function App(){
               </div>
               {/* ── BARRA BÚSQUEDA + FILTROS UNIFICADOS ── */}
               <div style={{display:"flex",gap:5,marginBottom:7,alignItems:"center"}}>
-                <input style={{...S.srch,flex:1,marginBottom:0}} value={opoBusq} onChange={e=>setOpoBusq(e.target.value)} placeholder="🔍 Buscar oportunidad…"/>
-                <button style={{...S.prioTag(!!opoFiltroEtapa||showFiltrosOpo),flexShrink:0,whiteSpace:"nowrap"}}
+                <input style={{...S.srch,flex:1,marginBottom:0}} value={opoBusq} onChange={e=>setOpoBusq(e.target.value)} placeholder="🔍 Buscar concepto, contacto…"/>
+                <button style={{...S.prioTag(nFiltrosOpo>0||showFiltrosOpo),flexShrink:0,whiteSpace:"nowrap"}}
                   onClick={()=>setShowFiltrosOpo(v=>!v)}>
-                  ⚙{opoFiltroEtapa?" (1)":""} {showFiltrosOpo?"▲":"▾"}
+                  ⚙{nFiltrosOpo>0?` (${nFiltrosOpo})`:""} {showFiltrosOpo?"▲":"▾"}
                 </button>
                 <span style={{fontSize:9,color:"#475569",flexShrink:0,whiteSpace:"nowrap"}}>Act: {lista.length}</span>
               </div>
               {showFiltrosOpo&&(
                 <div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:11,padding:"10px 12px",marginBottom:9}}>
                   <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>ETAPA</div>
-                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible",marginBottom:9}}>
                     <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
                     {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
                   </div>
+                  <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>SOLUCIÓN</div>
+                  <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible",marginBottom:9}}>
+                    {sols.map(s=><button key={s.id} style={S.chip(opoFiltroSol.has(s.id),"#C9A84C")} onClick={()=>setOpoFiltroSol(prev=>{const n=new Set(prev);n.has(s.id)?n.delete(s.id):n.add(s.id);return n;})}>{(s.nombre||"").length>20?(s.nombre||"").slice(0,20)+"…":s.nombre}</button>)}
+                  </div>
+                  <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>CONTACTO</div>
+                  <select style={{...S.inp,fontSize:12,marginBottom:9}} value={opoFiltroContacto} onChange={e=>setOpoFiltroContacto(e.target.value)}>
+                    <option value="">— Todos —</option>
+                    {conts.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+                  </select>
+                  {nFiltrosOpo>0&&<button style={{...S.acBtn("#f87171"),fontSize:10,width:"100%"}} onClick={()=>{setOpoFiltroEtapa(null);setOpoFiltroSol(new Set());setOpoFiltroContacto("");}}>✕ Limpiar filtros</button>}
                 </div>
               )}
               {lista.map(o=>{ const monto=o.comisionEstimada||o.montoEstimado; return (
@@ -3605,6 +3618,60 @@ function App(){
                 </div>
               ))}
             </div>)}
+            {/* ── Fondo de Estabilidad Financiera (presentación) ── */}
+            {(()=>{
+              const hoyStr=todayStr();
+              const ingProg=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Ingreso"&&(parseInt(r.prioridad)||1)<=prioFEF_ing&&r.fecha&&r.fecha>=hoyStr&&r.fecha<=horizonteFEF).reduce((s,r)=>s+r.monto,0);
+              const egNoEsencialesTotal=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Egreso"&&!r.usaTarjeta&&(parseInt(r.prioridad)||3)>1&&r.fecha&&r.fecha>=hoyStr&&r.fecha<=horizonteFEF).reduce((s,r)=>s+r.monto,0);
+              const fef=stats.saldoReal+ingProg-egNoEsencialesTotal;
+              const metaFEF=gastoFamiliarEsencial>0?gastoFamiliarEsencial*factorFEF:0;
+              const mesesFEF=gastoFamiliarEsencial>0?(fef/gastoFamiliarEsencial).toFixed(1):null;
+              const pctFEF=metaFEF>0?Math.min(120,(fef/metaFEF)*100):0;
+              const semFEF=pctFEF>=100?"#22c55e":pctFEF>=50?"#fbbf24":"#f87171";
+              return(
+                <div style={{...S.card("rgba(201,168,76,0.2)"),padding:0,overflow:"hidden",marginBottom:10}}>
+                  {/* Cabecera siempre visible — toca para colapsar/expandir */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",cursor:"pointer"}}
+                    onClick={()=>setFefMenuOpen(v=>!v)}>
+                    <div style={{display:"flex",alignItems:"center",gap:9}}>
+                      <span style={{fontSize:16}}>🏦</span>
+                      <div>
+                        <div style={{fontSize:11,fontWeight:800,color:"#C9A84C"}}>Fondo de Estabilidad Financiera</div>
+                        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+                          <span style={{fontSize:13,fontWeight:800,color:semFEF}}>{fmt(fef)}</span>
+                          {mesesFEF&&<span style={{fontSize:9,color:semFEF,fontWeight:700,background:semFEF+"18",padding:"1px 7px",borderRadius:7}}>{mesesFEF} meses</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <span style={{color:"#475569",fontSize:14}}>{fefMenuOpen?"▲":"▸"}</span>
+                  </div>
+                  {/* Detalle colapsable */}
+                  {fefMenuOpen&&(
+                    <div style={{borderTop:"1px solid #C9A84C22",padding:"10px 14px"}}>
+                      {metaFEF>0&&(<>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:4}}>
+                          <span>Meta: {fmt(metaFEF)} ({factorFEF}x GFE)</span>
+                          <span style={{color:semFEF,fontWeight:700}}>{Math.round(pctFEF)}%</span>
+                        </div>
+                        <div style={{height:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:9}}>
+                          <div style={{height:"100%",borderRadius:4,background:pctFEF>=100?"linear-gradient(90deg,#22c55e,#86efac,#22c55e)":semFEF,width:Math.min(100,pctFEF)+"%",transition:"width 0.5s"}}/>
+                        </div>
+                      </>)}
+                      <div style={{display:"flex",flexDirection:"column",gap:3,marginBottom:6}}>
+                        {[["Saldo Real",stats.saldoReal,"#C9A84C"],[`+ Ingresos Prog.`,ingProg,"#22c55e"],["− Eg. No Esenciales",egNoEsencialesTotal,"#f87171"]].map(([l,v,c])=>(
+                          <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:9}}>
+                            <span style={{color:"#64748b"}}>{l}</span>
+                            <span style={{fontWeight:700,color:c}}>{l.startsWith("−")?"−":"+ê"}{l.startsWith("−")?"":""}{fmt(v)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {!metaFEF&&<div style={{fontSize:9,color:"#475569",marginTop:4}}>Configura GFE y factor en Configuración → FEF para ver la meta.</div>}
+                      <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%",marginTop:4}} onClick={()=>setView("movimientos")}>Ver en Movimientos →</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div style={{...S.card(),marginTop:4}}>
               <div style={S.sTit}>RESUMEN RÁPIDO</div>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:10}}><span style={{color:"#64748b"}}>Saldo Real</span><span style={{fontWeight:700,color:"#C9A84C"}}>{fmt(stats.saldoReal)}</span></div>
@@ -4470,10 +4537,8 @@ function App(){
                 <input style={{...S.inp,marginTop:4}} value={nombreUsuario} onChange={e=>setNombreUsuario(e.target.value)} placeholder="Ej. Ing. Almada"/>
                 <div style={{fontSize:9,color:"#475569",marginTop:3}}>Aparece en la pantalla de carga y en el PIN de desbloqueo</div>
               </div>
-              <div style={{borderTop:"1px solid #1e293b",paddingTop:11,display:"flex",flexDirection:"column",gap:7}}>
-                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>{setCatMode("eg");setView("catalogos");}}>✎ Editar etiquetas de prioridad</button>
-                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>{setCatMode("eg");setView("catalogos");}}>▦ Editar capas de proyección</button>
-                <button style={{...S.acBtn("#475569"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>setView("catalogos")}>🔗 Catálogos (Cuentas, Categorías)</button>
+              <div style={{borderTop:"1px solid #1e293b",paddingTop:11}}>
+                <button style={{...S.acBtn("#475569"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>setView("catalogos")}>🔗 Catálogos (Cuentas, Categorías y más)</button>
               </div>
             </div>
 
@@ -4533,13 +4598,6 @@ function App(){
               <div style={{flex:1,height:1,background:"#1e293b"}}/>
               <div style={{fontSize:9,fontWeight:800,color:"#475569",letterSpacing:1.5,padding:"4px 10px",border:"1px solid #1e293b",borderRadius:20}}>⚡ HERRAMIENTAS ESPECIALES</div>
               <div style={{flex:1,height:1,background:"#1e293b"}}/>
-            </div>
-            <div style={{...S.card(),marginBottom:9}}>
-              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:9}}>Catálogos Nexus</div>
-              <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>setView("oportunidades")}>💡 Soluciones Nexus</button>
-                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>setView("cartera")}>🤝 Aliados Estratégicos</button>
-              </div>
             </div>
             <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid #f8717122",borderRadius:13,padding:"11px 13px",marginBottom:9}}>
               <div style={{fontSize:10,color:"#f87171",fontWeight:700,marginBottom:9}}>⚠ Zona de operaciones críticas — úsalas con cuidado</div>
