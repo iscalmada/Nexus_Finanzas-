@@ -218,6 +218,7 @@ function opoProbLabel(pct){
 const ORIG_DEUDOR   = ["Sicresa","Terceros"];
 const ORIG_ING_EXT  = ["Patrimonio","Sicresa"];
 const EST_ING_EXT   = ["Pendiente","Programado","Parcial","Recuperado"];
+const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e",Rezagado:"#ef4444",Cancelado:"#64748b"};
 const COLOR_ING_EXT = {Pendiente:"#fbbf24",Programado:"#a78bfa",Parcial:"#60a5fa",Recuperado:"#22c55e"};
 const OP_COLORS     = {Ingreso:"#22c55e",Egreso:"#f87171",Traspaso:"#a78bfa","Pago Tarjeta":"#60a5fa"};
 const COLOR_EST     = {
@@ -1235,6 +1236,7 @@ function App(){
   const pinLastActiveRef=React.useRef(Date.now());
   const[gastoFamiliarEsencial,setGastoFamiliarEsencial]=useState(()=>loadLS('gastoFamiliarEsencial',0));
   const[factorFEF,setFactorFEF]=useState(()=>loadLS('factorFEF',2.5));
+  const[fondoOpen,setFondoOpen]=useState(false);
   const[prioFEF_ing,setPrioFEF_ing]=useState(2);
   const[showFEFDesglose,setShowFEFDesglose]=useState(false);
   const[horizonteFEF,setHorizonteFEF]=useState(()=>{
@@ -1315,6 +1317,7 @@ function App(){
   const[filterPrioEg,setFilterPrioEg]=useState(new Set());  // Set vacío = todas
   const[showFilterProbIng,setShowFilterProbIng]=useState(false);
   const[showFilterPrioEg,setShowFilterPrioEg]=useState(false);
+  const[showFiltrosMov,setShowFiltrosMov]=useState(false);
   // filtro categorías - sets de ids seleccionados (null = todas)
   const[filterCatIng,setFilterCatIng]=useState(null);
   const[filterCuentas,setFilterCuentas]=useState(new Set()); // Set vacío = sin filtro
@@ -1381,6 +1384,7 @@ function App(){
   const[carteraTab,setCarteraTab]=useState("acreedores"); // acreedores|deudores|ingresosExt
   const[carteraOrigen,setCarteraOrigen]=useState("Todos");
   const[carteraNivel,setCarteraNivel]=useState("Todos");
+  const[carteraBusq,setCarteraBusq]=useState("");
   const[showCarteraForm,setShowCarteraForm]=useState(false);
   const[editCarteraId,setEditCarteraId]=useState(null);
   const[formCartera,setFormCartera]=useState({});
@@ -1400,6 +1404,8 @@ function App(){
   const[showOpoFiltroAliCom,setShowOpoFiltroAliCom]=useState(false);
   const[showOpoFiltroSol,setShowOpoFiltroSol]=useState(false);
   const[showOpoCatalogos,setShowOpoCatalogos]=useState(false); // modal catálogos Nexus
+  const[opoBusq,setOpoBusq]=useState("");
+  const[showFiltrosOpo,setShowFiltrosOpo]=useState(false);
   const[opoCatTab,setOpoCatTab]=useState("etapas"); // "etapas"|"soluciones"|"aliadosEst"|"aliadosCom"
   const[newOpoCatItem,setNewOpoCatItem]=useState({nombre:"",descripcion:"",pctAvance:""});
   const[editOpoCatId,setEditOpoCatId]=useState(null);
@@ -2619,89 +2625,116 @@ function App(){
                 <button style={S.cancB} onClick={()=>setShowPeriod(false)}>Cerrar</button>
               </div>
             )}
-            {/* Filtros */}
-            <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
-              {/* Filtro visualización Ingresos por probabilidad */}
-              <div style={{position:"relative",display:"inline-block"}}>
-                <button style={S.prioTag(filterProbIng.size>0)}
-                  onClick={()=>{setShowFilterProbIng(v=>!v);setShowFilterPrioEg(false);}}>
-                  ↑ Prob.{filterProbIng.size>0?" ("+filterProbIng.size+")":""}
-                </button>
-                {showFilterProbIng&&(
-                  <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 12px",minWidth:165,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
-                    <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:7}}>PROBABILIDAD — INGRESOS</div>
-                    {[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=>{
-                      const sel=filterProbIng.has(v);
-                      return(
-                        <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
-                          onClick={()=>setFilterProbIng(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
-                          <div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}
-                          </div>
-                          <span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
-                        </div>
-                      );
-                    })}
-                    <div style={{display:"flex",gap:5,marginTop:8}}>
-                      <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
-                        onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>✕ Limpiar</button>
-                      <button style={{...S.smBtn("#22c55e"),flex:1,fontSize:8}}
-                        onClick={()=>setShowFilterProbIng(false)}>✓ Aplicar</button>
-                    </div>
+            {/* ── BARRA BÚSQUEDA + FILTROS UNIFICADOS ── */}
+            {(()=>{
+              const anyFilterActive=filterTipo!=="TODOS"||filterEst!=="TODOS"||filterRetrasados||(filterCatIng&&filterCatIng.size>0)||(filterCatEg&&filterCatEg.size>0)||(filterCuentas&&filterCuentas.size>0)||(filterTarjetasFiltro&&filterTarjetasFiltro.size>0)||filterProbIng.size>0||filterPrioEg.size>0||prioI<3||prioE<5;
+              const badgeN=[filterTipo!=="TODOS"&&1,filterEst!=="TODOS"&&1,filterRetrasados&&1,(filterCatIng&&filterCatIng.size>0)&&1,(filterCatEg&&filterCatEg.size>0)&&1,(filterCuentas&&filterCuentas.size>0)&&1,(filterTarjetasFiltro&&filterTarjetasFiltro.size>0)&&1,filterProbIng.size>0&&1,filterPrioEg.size>0&&1,(prioI<3)&&1,(prioE<5)&&1].filter(Boolean).length;
+              return(
+                <>
+                  <div style={{display:"flex",gap:5,marginBottom:7,alignItems:"center"}}>
+                    <input style={{...S.srch,flex:1,marginBottom:0}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar concepto, monto…"/>
+                    <button style={{...S.prioTag(anyFilterActive||showFiltrosMov),flexShrink:0,whiteSpace:"nowrap"}}
+                      onClick={()=>setShowFiltrosMov(v=>!v)}>
+                      ⚙{badgeN>0?` (${badgeN})`:""} {showFiltrosMov?"▲":"▾"}
+                    </button>
+                    <span style={{fontSize:9,color:"#475569",flexShrink:0,whiteSpace:"nowrap"}}>Act: {filtered.length}</span>
                   </div>
-                )}
-              </div>
-              {/* Filtro visualización Egresos por prioridad */}
-              <div style={{position:"relative",display:"inline-block"}}>
-                <button style={S.prioTag(filterPrioEg.size>0)}
-                  onClick={()=>{setShowFilterPrioEg(v=>!v);setShowFilterProbIng(false);}}>
-                  ↓ Prior.{filterPrioEg.size>0?" ("+filterPrioEg.size+")":""}
-                </button>
-                {showFilterPrioEg&&(
-                  <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #f8717144",borderRadius:10,padding:"10px 12px",minWidth:185,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
-                    <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:7}}>PRIORIDAD — EGRESOS</div>
-                    {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>{
-                      const sel=filterPrioEg.has(v);
-                      return(
-                        <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
-                          onClick={()=>setFilterPrioEg(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
-                          <div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}
-                          </div>
-                          <span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
+                  {showFiltrosMov&&(
+                    <div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:11,padding:"10px 12px",marginBottom:7}}>
+                      {/* Tipo */}
+                      <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>TIPO</div>
+                      <div style={{...S.chips,marginBottom:9}}>{["TODOS",...TIPO_OP].map(t=><button key={t} style={S.chip(filterTipo===t)} onClick={()=>setFilterTipo(t)}>{t}</button>)}</div>
+                      {/* Etapa */}
+                      <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>ESTATUS</div>
+                      <div style={{...S.chips,marginBottom:9}}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
+                      {/* Filtros avanzados */}
+                      <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>FILTROS AVANZADOS</div>
+                      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                        {/* Probabilidad ingresos */}
+                        <div style={{position:"relative",display:"inline-block"}}>
+                          <button style={S.prioTag(filterProbIng.size>0)}
+                            onClick={()=>{setShowFilterProbIng(v=>!v);setShowFilterPrioEg(false);}}>
+                            ↑ Prob.{filterProbIng.size>0?" ("+filterProbIng.size+")":""}
+                          </button>
+                          {showFilterProbIng&&(
+                            <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 12px",minWidth:165,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
+                              <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:7}}>PROBABILIDAD — INGRESOS</div>
+                              {[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=>{
+                                const sel=filterProbIng.has(v);
+                                return(
+                                  <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
+                                    onClick={()=>setFilterProbIng(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
+                                    <div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                      {sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}
+                                    </div>
+                                    <span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
+                                  </div>
+                                );
+                              })}
+                              <div style={{display:"flex",gap:5,marginTop:8}}>
+                                <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
+                                  onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>✕ Limpiar</button>
+                                <button style={{...S.smBtn("#22c55e"),flex:1,fontSize:8}}
+                                  onClick={()=>setShowFilterProbIng(false)}>✓ Aplicar</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      );
-                    })}
-                    <div style={{display:"flex",gap:5,marginTop:8}}>
-                      <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
-                        onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>✕ Limpiar</button>
-                      <button style={{...S.smBtn("#f87171"),flex:1,fontSize:8}}
-                        onClick={()=>setShowFilterPrioEg(false)}>✓ Aplicar</button>
+                        {/* Prioridad egresos */}
+                        <div style={{position:"relative",display:"inline-block"}}>
+                          <button style={S.prioTag(filterPrioEg.size>0)}
+                            onClick={()=>{setShowFilterPrioEg(v=>!v);setShowFilterProbIng(false);}}>
+                            ↓ Prior.{filterPrioEg.size>0?" ("+filterPrioEg.size+")":""}
+                          </button>
+                          {showFilterPrioEg&&(
+                            <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #f8717144",borderRadius:10,padding:"10px 12px",minWidth:185,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
+                              <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:7}}>PRIORIDAD — EGRESOS</div>
+                              {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>{
+                                const sel=filterPrioEg.has(v);
+                                return(
+                                  <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
+                                    onClick={()=>setFilterPrioEg(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
+                                    <div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                      {sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}
+                                    </div>
+                                    <span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
+                                  </div>
+                                );
+                              })}
+                              <div style={{display:"flex",gap:5,marginTop:8}}>
+                                <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
+                                  onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>✕ Limpiar</button>
+                                <button style={{...S.smBtn("#f87171"),flex:1,fontSize:8}}
+                                  onClick={()=>setShowFilterPrioEg(false)}>✓ Aplicar</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <button style={S.prioTag(prioI<3)} onClick={()=>setShowPrioPanel(v=>v==="ing"?false:"ing")}>
+                          ⚙↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}
+                        </button>
+                        <button style={S.prioTag(prioE<5)} onClick={()=>setShowPrioPanel(v=>v==="eg"?false:"eg")}>
+                          ⚙↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}
+                        </button>
+                        <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>
+                          {retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados
+                        </button>
+                        <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>
+                          📂 Categoría{hasCatFilterActive?" ✓":""}
+                        </button>
+                        <button style={S.prioTag(filterCuentas.size>0||filterTarjetasFiltro.size>0)}
+                          onClick={()=>{setTempFilterCuentas(new Set(filterCuentas));setTempFilterTarjetas(new Set(filterTarjetasFiltro));setShowCuentaFilter(true);}}>
+                          🏦 Cuentas{(filterCuentas.size+filterTarjetasFiltro.size)>0?" ("+(filterCuentas.size+filterTarjetasFiltro.size)+")":""}
+                        </button>
+                        <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
+                        <button style={{...S.prioTag(simMode),color:simMode?"#fbbf24":"#64748b",borderColor:simMode?"#fbbf24":"#334155",background:simMode?"rgba(251,191,36,0.15)":"none"}}
+                          onClick={()=>{if(simMode)salirSim();else setSimMode(true);}}>⚗ Simular{simMode?" ●":""}</button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-              {/* Botones del saldo consolidado (panel ⚙) */}
-              <button style={S.prioTag(prioI<3)} onClick={()=>setShowPrioPanel(v=>v==="ing"?false:"ing")}>
-                ⚙↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}
-              </button>
-              <button style={S.prioTag(prioE<5)} onClick={()=>setShowPrioPanel(v=>v==="eg"?false:"eg")}>
-                ⚙↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}
-              </button>
-              <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>
-                {retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados
-              </button>
-              <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>
-                📂 Categoría{hasCatFilterActive?" ✓":""}
-              </button>
-              <button style={S.prioTag(filterCuentas.size>0||filterTarjetasFiltro.size>0)}
-                onClick={()=>{setTempFilterCuentas(new Set(filterCuentas));setTempFilterTarjetas(new Set(filterTarjetasFiltro));setShowCuentaFilter(true);}}>
-                🏦 Cuentas{(filterCuentas.size+filterTarjetasFiltro.size)>0?" ("+(filterCuentas.size+filterTarjetasFiltro.size)+")":""}
-              </button>
-              <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
-              <button style={{...S.prioTag(simMode),color:simMode?"#fbbf24":"#64748b",borderColor:simMode?"#fbbf24":"#334155",background:simMode?"rgba(251,191,36,0.15)":"none"}}
-                onClick={()=>{if(simMode)salirSim();else setSimMode(true);}}>⚗ Simular{simMode?" ●":""}</button>
-            </div>
+                  )}
+                </>
+              );
+            })()}
             {showPrioPanel&&(
               <div style={S.prioPanel}>
                 {(showPrioPanel==="ing"||showPrioPanel===true)&&(<>
@@ -2720,7 +2753,6 @@ function App(){
                 <button style={S.cancB} onClick={()=>setShowPrioPanel(false)}>Cerrar</button>
               </div>
             )}
-            <input style={S.srch} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar en movimientos y cartera…"/>
             {hasGlobalResults&&search.length>=2&&(
               <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:11,padding:"10px 13px",marginBottom:9}}>
                 <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,letterSpacing:1.5,marginBottom:8}}>TAMBIÉN EN CARTERA</div>
@@ -2756,9 +2788,6 @@ function App(){
                 ))}
               </div>
             )}
-            <div style={S.chips}>{["TODOS",...TIPO_OP].map(t=><button key={t} style={S.chip(filterTipo===t)} onClick={()=>setFilterTipo(t)}>{t}</button>)}</div>
-            <div style={S.chips}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
-
             {/* Totales filtrados — Reales + Proyectados */}
             <div style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:10,padding:"9px 13px",marginBottom:9}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
@@ -3439,7 +3468,7 @@ function App(){
           const comAb=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
           const prodAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
           const comCon=concret.reduce((s,o)=>s+(Number(o.comisionEstimada)||Number(o.montoEstimado)||0),0);
-          const lista=opos.filter(o=>!opoFiltroEtapa||o.etapa===opoFiltroEtapa).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+          const lista=opos.filter(o=>!opoFiltroEtapa||o.etapa===opoFiltroEtapa).filter(o=>!opoBusq||(o.concepto||"").toLowerCase().includes(opoBusq.toLowerCase())).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
           const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
           const cardS={background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8};
           return (
@@ -3452,10 +3481,24 @@ function App(){
                 <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Producción Proyectada</div><div style={{fontSize:17,fontWeight:800,color:"#22c55e"}}>{fmt(prodAb)}</div></div>
                 <div style={{flex:1,...cardS,marginBottom:0}}><div style={S.lbl}>Participación Proyectada</div><div style={{fontSize:17,fontWeight:800,color:"#C9A84C"}}>{fmt(comAb)}</div></div>
               </div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
-                <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
-                {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
+              {/* ── BARRA BÚSQUEDA + FILTROS UNIFICADOS ── */}
+              <div style={{display:"flex",gap:5,marginBottom:7,alignItems:"center"}}>
+                <input style={{...S.srch,flex:1,marginBottom:0}} value={opoBusq} onChange={e=>setOpoBusq(e.target.value)} placeholder="🔍 Buscar oportunidad…"/>
+                <button style={{...S.prioTag(!!opoFiltroEtapa||showFiltrosOpo),flexShrink:0,whiteSpace:"nowrap"}}
+                  onClick={()=>setShowFiltrosOpo(v=>!v)}>
+                  ⚙{opoFiltroEtapa?" (1)":""} {showFiltrosOpo?"▲":"▾"}
+                </button>
+                <span style={{fontSize:9,color:"#475569",flexShrink:0,whiteSpace:"nowrap"}}>Act: {lista.length}</span>
               </div>
+              {showFiltrosOpo&&(
+                <div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:11,padding:"10px 12px",marginBottom:9}}>
+                  <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>ETAPA</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
+                    {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
+                  </div>
+                </div>
+              )}
               {lista.map(o=>{ const monto=o.comisionEstimada||o.montoEstimado; return (
                 <div key={o.id} style={{...cardS,cursor:"pointer",borderColor:etColor(o.etapa)+"55"}} onClick={()=>setVerRef(o)}>
                   <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
@@ -3581,18 +3624,20 @@ function App(){
             </div>
 
             {/* Tabs */}
-            <div style={{display:"flex",borderBottom:"1px solid #1e293b",marginBottom:13}}>
+            <div style={{display:"flex",borderBottom:"1px solid #1e293b",marginBottom:9}}>
               {[["acreedores","🔴 Acreedores"],["deudores","🟢 Deudores"],["ingresosExt","⭐ Ing. Ext."]].map(([k,l])=>(
                 <button key={k} style={{flex:1,padding:"8px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
                   color:carteraTab===k?"#C9A84C":"#334155",borderBottom:carteraTab===k?"2px solid #C9A84C":"2px solid transparent"}}
-                  onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");}}>{l}</button>
+                  onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");setCarteraBusq("");}}>{l}</button>
               ))}
             </div>
+            {/* Búsqueda cartera */}
+            <input style={{...S.srch,marginBottom:9}} value={carteraBusq} onChange={e=>setCarteraBusq(e.target.value)} placeholder="🔍 Buscar nombre o concepto…"/>
 
             {/* ── ACREEDORES ── */}
             {carteraTab==="acreedores"&&(()=>{
               const origenes=["Todos",...ORIG_ACREEDOR];
-              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
+              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()));
               const total=acrFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector de origen */}
@@ -3672,7 +3717,7 @@ function App(){
             {/* ── DEUDORES ── */}
             {carteraTab==="deudores"&&(()=>{
               const origenes=["Todos",...ORIG_DEUDOR];
-              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
+              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()));
               const total=deuFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector de origen */}
@@ -3753,7 +3798,7 @@ function App(){
             {/* ── INGRESOS EXTRAORDINARIOS ── */}
             {carteraTab==="ingresosExt"&&(()=>{
               const origenes=["Todos",...ORIG_ING_EXT];
-              const ingFiltrados=carteraOrigen==="Todos"?ingresosExt:ingresosExt.filter(x=>x.origen===carteraOrigen);
+              const ingFiltrados=(carteraOrigen==="Todos"?ingresosExt:ingresosExt.filter(x=>x.origen===carteraOrigen)).filter(x=>!carteraBusq||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()));
               const totalPend=ingFiltrados.filter(x=>x.estado!=="Recuperado").reduce((s,x)=>s+(x.monto||0),0);
               return(<>
                 {/* Selector de origen */}
@@ -4377,82 +4422,124 @@ function App(){
         {view==="configuracion"&&(
           <div style={S.sec}>
             <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CONFIGURACIÓN</span></div>
-            <div style={S.sTit}>EXPORTAR</div>
-            <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setShowExportModal(true)}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(34,197,94,0.12)"}}><span>📥</span></div><div><div style={{fontSize:12,fontWeight:700}}>Exportar a Excel</div><div style={{fontSize:10,color:"#475569"}}>Exporta los movimientos del período seleccionado</div></div></div>
-            </div>
-            <div style={S.sTit}>FONDO DE ESTABILIDAD FINANCIERA</div>
-            <div style={S.card()}>
-              <div style={{marginBottom:11}}>
-                <div style={S.lbl}>Gasto Familiar Esencial (GFE) $</div>
-                <input style={{...S.inp,marginTop:4}} type="number"
-                  value={gastoFamiliarEsencial||""} onChange={e=>setGastoFamiliarEsencial(parseFloat(e.target.value)||0)}
-                  placeholder="0.00"/>
-                <div style={{fontSize:9,color:"#475569",marginTop:3}}>Estimación mensual de gastos esenciales fijos</div>
+
+            {/* ── 1. FONDO DE ESTABILIDAD FINANCIERA (colapsable) ── */}
+            <div style={{...S.card(),marginBottom:9,padding:0,overflow:"hidden"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",cursor:"pointer"}} onClick={()=>setFondoOpen(v=>!v)}>
+                <div style={{display:"flex",alignItems:"center",gap:9}}>
+                  <span style={{fontSize:16}}>📊</span>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700}}>Fondo de Estabilidad Financiera</div>
+                    {!fondoOpen&&gastoFamiliarEsencial>0&&<div style={{fontSize:9,color:"#C9A84C",marginTop:1}}>Meta: {fmt(gastoFamiliarEsencial*(factorFEF||2.5))}</div>}
+                  </div>
+                </div>
+                <span style={{color:"#475569",fontSize:14}}>{fondoOpen?"▲":"▸"}</span>
               </div>
-              <div style={{marginBottom:11}}>
-                <div style={S.lbl}>Factor multiplicador</div>
-                <input style={{...S.inp,marginTop:4}} type="number" step="0.5" min="1" max="24"
-                  value={factorFEF||""} onChange={e=>setFactorFEF(parseFloat(e.target.value)||2.5)}
-                  placeholder="2.5"/>
-                <div style={{fontSize:9,color:"#475569",marginTop:3}}>Número de meses objetivo de cobertura (default 2.5)</div>
-              </div>
-              {gastoFamiliarEsencial>0&&(
-                <div style={{background:"rgba(201,168,76,0.1)",border:"1px solid #C9A84C33",borderRadius:9,padding:"9px 12px"}}>
-                  <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,marginBottom:3}}>Meta calculada</div>
-                  <div style={{fontSize:16,fontWeight:800,color:"#C9A84C"}}>{fmt(gastoFamiliarEsencial*(factorFEF||2.5))}</div>
-                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{fmt(gastoFamiliarEsencial)} × {factorFEF||2.5} meses</div>
+              {fondoOpen&&(
+                <div style={{borderTop:"1px solid #1e293b",padding:"13px 14px"}}>
+                  <div style={{marginBottom:11}}>
+                    <div style={S.lbl}>Gasto Familiar Esencial (GFE) $</div>
+                    <input style={{...S.inp,marginTop:4}} type="number"
+                      value={gastoFamiliarEsencial||""} onChange={e=>setGastoFamiliarEsencial(parseFloat(e.target.value)||0)}
+                      placeholder="0.00"/>
+                    <div style={{fontSize:9,color:"#475569",marginTop:3}}>Estimación mensual de gastos esenciales fijos</div>
+                  </div>
+                  <div style={{marginBottom:11}}>
+                    <div style={S.lbl}>Factor multiplicador</div>
+                    <input style={{...S.inp,marginTop:4}} type="number" step="0.5" min="1" max="24"
+                      value={factorFEF||""} onChange={e=>setFactorFEF(parseFloat(e.target.value)||2.5)}
+                      placeholder="2.5"/>
+                    <div style={{fontSize:9,color:"#475569",marginTop:3}}>Número de meses objetivo de cobertura (default 2.5)</div>
+                  </div>
+                  {gastoFamiliarEsencial>0&&(
+                    <div style={{background:"rgba(201,168,76,0.1)",border:"1px solid #C9A84C33",borderRadius:9,padding:"9px 12px"}}>
+                      <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,marginBottom:3}}>Meta calculada</div>
+                      <div style={{fontSize:16,fontWeight:800,color:"#C9A84C"}}>{fmt(gastoFamiliarEsencial*(factorFEF||2.5))}</div>
+                      <div style={{fontSize:9,color:"#475569",marginTop:2}}>{fmt(gastoFamiliarEsencial)} × {factorFEF||2.5} meses</div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            <div style={S.sTit}>PERSONALIZACIÓN Y SEGURIDAD</div>
+
+            {/* ── 2. PERSONALIZACIÓN ── */}
+            <div style={S.sTit}>🎨 PERSONALIZACIÓN</div>
             <div style={S.card()}>
               <div style={{marginBottom:13}}>
                 <div style={S.lbl}>Nombre para bienvenida</div>
                 <input style={{...S.inp,marginTop:4}} value={nombreUsuario} onChange={e=>setNombreUsuario(e.target.value)} placeholder="Ej. Ing. Almada"/>
                 <div style={{fontSize:9,color:"#475569",marginTop:3}}>Aparece en la pantalla de carga y en el PIN de desbloqueo</div>
               </div>
-              <div style={{borderTop:"1px solid #1e293b",paddingTop:13}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                  <div>
-                    <div style={S.lbl}>PIN de acceso</div>
-                    <div style={{fontSize:9,color:"#475569",marginTop:2}}>{pinActivo?"Activo — la app pide PIN al abrir":"Desactivado"}</div>
-                  </div>
-                  <button style={{...S.prioB2(pinActivo,"#C9A84C"),padding:"6px 14px",fontSize:10}}
-                    onClick={()=>{
-                      if(pinActivo){
-                        if(window.confirm("¿Desactivar el PIN de acceso?")){{setPinActivo(false);setPinApp('');}}
-                      } else {
-                        setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');
-                      }
-                    }}>{pinActivo?"Desactivar":"Activar"}</button>
-                </div>
-                {pinActivo&&(<>
-                  <div style={{marginTop:9}}>
-                    <div style={{...S.lbl,marginBottom:6}}>Bloquear después de</div>
-                    <div style={{display:"flex",gap:5}}>
-                      {[[1,"1 min"],[5,"5 min"],[15,"15 min"],[30,"30 min"]].map(([v,l])=>(
-                        <button key={v} style={{...S.prioB2(tiempoBloqueo===v,"#C9A84C"),flex:1,padding:"5px 0",fontSize:9}} onClick={()=>setTiempoBloqueo(v)}>{l}</button>
-                      ))}
-                    </div>
-                    <div style={{fontSize:9,color:"#475569",marginTop:3}}>Si la app está en segundo plano más de este tiempo, pedirá PIN al volver</div>
-                  </div>
-                  <div style={{display:"flex",gap:7,marginTop:9}}>
-                    <button style={{...S.cancB,flex:1,fontSize:10,marginTop:0}} onClick={()=>{setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');}}>
-                      Cambiar PIN
-                    </button>
-                    <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(248,113,113,0.15)",color:"#f87171",border:"1px solid #f8717144",fontSize:10}}
-                      onClick={()=>{setPinDesbloqueado(false);setPinInput('');setView("menu");}}>
-                      🔒 Bloquear ahora
-                    </button>
-                  </div>
-                </>)}
+              <div style={{borderTop:"1px solid #1e293b",paddingTop:11,display:"flex",flexDirection:"column",gap:7}}>
+                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>{setCatMode("eg");setView("catalogos");}}>✎ Editar etiquetas de prioridad</button>
+                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>{setCatMode("eg");setView("catalogos");}}>▦ Editar capas de proyección</button>
+                <button style={{...S.acBtn("#475569"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>setView("catalogos")}>🔗 Catálogos (Cuentas, Categorías)</button>
               </div>
             </div>
+
+            {/* ── 3. SEGURIDAD ── */}
+            <div style={S.sTit}>🔒 SEGURIDAD</div>
+            <div style={S.card()}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div>
+                  <div style={S.lbl}>PIN de acceso</div>
+                  <div style={{fontSize:9,color:"#475569",marginTop:2}}>{pinActivo?"Activo — la app pide PIN al abrir":"Desactivado"}</div>
+                </div>
+                <button style={{...S.prioB2(pinActivo,"#C9A84C"),padding:"6px 14px",fontSize:10}}
+                  onClick={()=>{
+                    if(pinActivo){
+                      if(window.confirm("¿Desactivar el PIN de acceso?")){{setPinActivo(false);setPinApp('');}}
+                    } else {
+                      setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');
+                    }
+                  }}>{pinActivo?"Desactivar":"Activar"}</button>
+              </div>
+              {pinActivo&&(<>
+                <div style={{marginTop:9}}>
+                  <div style={{...S.lbl,marginBottom:6}}>Bloquear después de</div>
+                  <div style={{display:"flex",gap:5}}>
+                    {[[1,"1 min"],[5,"5 min"],[15,"15 min"],[30,"30 min"]].map(([v,l])=>(
+                      <button key={v} style={{...S.prioB2(tiempoBloqueo===v,"#C9A84C"),flex:1,padding:"5px 0",fontSize:9}} onClick={()=>setTiempoBloqueo(v)}>{l}</button>
+                    ))}
+                  </div>
+                  <div style={{fontSize:9,color:"#475569",marginTop:3}}>Si la app está en segundo plano más de este tiempo, pedirá PIN al volver</div>
+                </div>
+                <div style={{display:"flex",gap:7,marginTop:9}}>
+                  <button style={{...S.cancB,flex:1,fontSize:10,marginTop:0}} onClick={()=>{setShowPinConfig(true);setPinConfigStep(1);setPinConfigTemp('');}}>
+                    Cambiar PIN
+                  </button>
+                  <button style={{...S.saveB,flex:1,marginTop:0,background:"rgba(248,113,113,0.15)",color:"#f87171",border:"1px solid #f8717144",fontSize:10}}
+                    onClick={()=>{setPinDesbloqueado(false);setPinInput('');setView("menu");}}>
+                    🔒 Bloquear ahora
+                  </button>
+                </div>
+              </>)}
+            </div>
+
+            {/* ── 4. EXPORTAR A EXCEL ── */}
+            <div style={S.sTit}>📥 EXPORTAR</div>
+            <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setShowExportModal(true)}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{...S.menuIco,background:"rgba(34,197,94,0.12)"}}><span>📥</span></div>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700}}>Exportar a Excel</div>
+                  <div style={{fontSize:10,color:"#475569"}}>Descarga tus movimientos, presupuestos y proyección en formato Excel para análisis avanzado</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 5. HERRAMIENTAS ESPECIALES ── */}
             <div style={{display:"flex",alignItems:"center",gap:8,margin:"18px 0 10px"}}>
               <div style={{flex:1,height:1,background:"#1e293b"}}/>
-              <div style={{fontSize:9,fontWeight:800,color:"#475569",letterSpacing:1.5,padding:"4px 10px",border:"1px solid #1e293b",borderRadius:20}}>⚙ HERRAMIENTAS ESPECIALES</div>
+              <div style={{fontSize:9,fontWeight:800,color:"#475569",letterSpacing:1.5,padding:"4px 10px",border:"1px solid #1e293b",borderRadius:20}}>⚡ HERRAMIENTAS ESPECIALES</div>
               <div style={{flex:1,height:1,background:"#1e293b"}}/>
+            </div>
+            <div style={{...S.card(),marginBottom:9}}>
+              <div style={{fontSize:10,color:"#94a3b8",fontWeight:700,marginBottom:9}}>Catálogos Nexus</div>
+              <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>setView("oportunidades")}>💡 Soluciones Nexus</button>
+                <button style={{...S.acBtn("#C9A84C"),fontSize:11,width:"100%",textAlign:"left"}} onClick={()=>setView("cartera")}>🤝 Aliados Estratégicos</button>
+              </div>
             </div>
             <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid #f8717122",borderRadius:13,padding:"11px 13px",marginBottom:9}}>
               <div style={{fontSize:10,color:"#f87171",fontWeight:700,marginBottom:9}}>⚠ Zona de operaciones críticas — úsalas con cuidado</div>
@@ -4475,33 +4562,7 @@ function App(){
                 </div>
               </div>
             </div>
-
-            <div style={S.sTit}>RESPALDO JSON</div>
-            <div style={{...S.infoBx("#22c55e"),marginBottom:9}}>
-              <span>✓</span>
-              <span>Guardado automático activo — tus datos se guardan en este dispositivo.</span>
-            </div>
-            <div style={{background:"rgba(251,191,36,0.08)",border:"1px solid #fbbf2444",borderRadius:11,padding:"11px 13px",marginBottom:9}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#fbbf24",marginBottom:4}}>⚠ Respaldo recomendado</div>
-              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.6}}>
-                Los datos viven en este navegador y dispositivo. Si cambias de navegador, limpias el caché o reinstalaas la app, se perderán. <strong style={{color:"#fbbf24"}}>Exporta el JSON regularmente</strong> y guárdalo en Google Drive.
-              </div>
-            </div>
-            <div style={{...S.card(),cursor:"pointer"}} onClick={exportJSON}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(201,168,76,0.12)"}}><span>💾</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#C9A84C"}}>Exportar datos (JSON)</div><div style={{fontSize:10,color:"#475569"}}>Descarga un respaldo de todos tus datos</div></div></div>
-            </div>
-            <div style={{...S.card()}} onClick={()=>{setShowJsonModal(true);setJsonImportError("");}}>
-              <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}}><div style={{...S.menuIco,background:"rgba(96,165,250,0.12)"}}><span>📂</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#60a5fa"}}>Importar datos (JSON)</div><div style={{fontSize:10,color:"#475569"}}>Restaura un respaldo previo</div></div></div>
-            </div>
-            {(()=>{const ab=loadLS('autobackup',null);const fb=loadLS('lastFileBackup',null);const fmt=(iso)=>{try{return new Date(iso).toLocaleString();}catch(e){return iso;}};return (
-            <div style={{...S.card(),marginTop:7}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#2dd4bf",marginBottom:5}}>Estado de respaldo</div>
-              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.7}}>Automático (este dispositivo): <strong style={{color:"#e2e8f0"}}>{ab?fmt(ab.fecha):"—"}</strong></div>
-              <div style={{fontSize:10,color:"#94a3b8",lineHeight:1.7}}>Último respaldo en archivo: <strong style={{color:fb?"#e2e8f0":"#f87171"}}>{fb?fmt(fb):"nunca"}</strong></div>
-              {!fb&&<div style={{fontSize:10,color:"#fbbf24",lineHeight:1.6,marginTop:4}}>⚠ Aún no guardas un archivo. El automático vive solo en este dispositivo y se pierde al limpiar el caché. Exporta el JSON y guárdalo aparte.</div>}
-              <div onClick={restoreAuto} style={{...S.card(),cursor:"pointer",marginTop:7,borderColor:"#a78bfa55"}}><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{...S.menuIco,background:"rgba(167,139,250,0.12)"}}><span>↺</span></div><div><div style={{fontSize:12,fontWeight:700,color:"#a78bfa"}}>Recuperar respaldo automático</div><div style={{fontSize:10,color:"#475569"}}>Restaura el último snapshot de este dispositivo</div></div></div></div>
-            </div>);})()}
-            <div style={{...S.infoBx("#475569"),marginTop:7}}><span>ℹ</span><span>El filtro de proyección (prioridades) se configura en la vista de Movimientos con el botón ⚙.</span></div>
+            <div style={{...S.infoBx("#475569"),marginTop:7}}><span>ℹ</span><span>Los respaldos se gestionan desde Nexus Flow (shell principal).</span></div>
           </div>
         )}
 
@@ -5198,7 +5259,7 @@ function App(){
             {id:"movimientos",icon:"💸",label:"Movim.",act:view==="movimientos"},
             {id:"oportunidades",icon:"🚀",label:"Oport.",act:view==="oportunidades"},
             {id:"cartera",icon:"🤝",label:"Cartera",act:view==="cartera"},
-            {id:"menu",sec:"analisis",icon:"📊",label:"Análisis",act:(view==="menu"&&menuSec==="analisis")||["estadisticas","presupuestos","proyeccion"].includes(view)},
+            {id:"menu",sec:"analisis",icon:"📈",label:"Análisis",act:(view==="menu"&&menuSec==="analisis")||["estadisticas","presupuestos","proyeccion"].includes(view)},
             {id:"menu",sec:"config",icon:"⚙",label:"Config",act:(view==="menu"&&menuSec==="config")||["cuentas","catalogos","configuracion"].includes(view)},
           ].map(n=>(
             <button key={n.label} style={S.navB(n.act)} onClick={()=>{setView(n.id);if(n.sec)setMenuSec(n.sec);}}>
