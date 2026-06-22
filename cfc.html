@@ -1299,13 +1299,8 @@ function Configuracion({data,onRestore,onExcel,go}){
 
       {/* ── 2. PERSONALIZACIÓN ── */}
       <div style={{...S.sTit,marginTop:6}}>🎨 PERSONALIZACIÓN</div>
-      <div style={{...S.cCard(GOLD),marginBottom:9}}>
-        <div style={{fontSize:11,color:"#64748b",marginBottom:9}}>Catálogos del sistema — edita listas, tipos y valores</div>
-        <div style={{display:"flex",alignItems:"center",gap:12,cursor:"pointer"}} onClick={()=>go("catalogos")}>
-          <span style={{fontSize:18}}>☰</span>
-          <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>Editar Catálogos</div><div style={{fontSize:10,color:"#64748b"}}>Listas y valores del sistema</div></div>
-          <span style={{color:"#64748b"}}>›</span>
-        </div>
+      <div style={{...S.cCard("#475569"),marginBottom:9}}>
+        <div style={{fontSize:10,color:"#64748b",lineHeight:1.5}}>Los catálogos y módulos del sistema se configuran en la sección <span style={{color:GOLD,fontWeight:700}}>Módulos Base</span> de arriba.</div>
       </div>
 
       {/* ── 3. SEGURIDAD ── */}
@@ -1552,8 +1547,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     return ordDir==="asc"?r:-r;
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);};
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);};
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
@@ -1588,6 +1583,20 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
           <div><div style={{...S.fl,marginTop:10}}>Hasta</div><input type="date" style={S.inp} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
         </div>
         {nFil>0&&<div style={{textAlign:"right",marginTop:10}}><button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar filtros</button></div>}
+        <div style={{borderTop:"1px solid #1e293b",marginTop:12,paddingTop:10}}>
+          <div style={{...S.fl,marginBottom:6}}>Selección múltiple</div>
+          {!selMode
+            ? <button style={{...S.pill(false,GOLD),padding:"7px 14px",fontWeight:700,width:"100%"}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Activar selección múltiple</button>
+            : <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
+                <button style={{...S.pill(false,"#60a5fa"),padding:"5px 9px"}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
+                <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>setSel([])}>Ninguna</button>
+                <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
+                <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
+              </div>}
+          <div style={{...S.fl,marginTop:10,marginBottom:6}}>Rezago</div>
+          <button style={{...S.pill(fRezago,"#ef4444"),padding:"7px 14px",width:"100%",fontWeight:700}} onClick={()=>setFRezago(v=>!v)}>⚠ Mostrar solo rezagados{fRezago?" ✓":""}</button>
+        </div>
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
@@ -1597,17 +1606,6 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
             <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
             <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
             <button style={{...S.pill(false,"#60a5fa"),padding:"5px 10px"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
-            <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 9px"}} onClick={()=>setFRezago(v=>!v)}>⚠ Rezago</button>
-          </div>
-          <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
-            {!selMode
-              ? <button style={{...S.pill(false,GOLD),padding:"6px 12px",fontWeight:700}} onClick={()=>{setSelMode(true);setSel([]);}}>Seleccionar</button>
-              : <><span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
-                  <button style={{...S.pill(false,"#60a5fa"),padding:"5px 9px"}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
-                  <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>setSel([])}>Ninguna</button>
-                  <div style={{flex:1}}/>
-                  <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
-                  <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button></>}
           </div>
       {modo==="lista"
         ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onTap={(a)=>openAct(a,a.contactoId)}/>

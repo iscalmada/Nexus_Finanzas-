@@ -1386,6 +1386,8 @@ function App(){
   const[carteraOrigen,setCarteraOrigen]=useState("Todos");
   const[carteraNivel,setCarteraNivel]=useState("Todos");
   const[carteraBusq,setCarteraBusq]=useState("");
+  const[carteraEstado,setCarteraEstado]=useState("Todos"); // Todos|Vigentes|Concretados
+  const[showCarteraFiltros,setShowCarteraFiltros]=useState(false);
   const[showCarteraForm,setShowCarteraForm]=useState(false);
   const[editCarteraId,setEditCarteraId]=useState(null);
   const[formCartera,setFormCartera]=useState({});
@@ -2413,7 +2415,7 @@ function App(){
                 <div style={{fontSize:10,color:"#f87171",opacity:.8}}>Primer rojo el <strong>{fmtDate(primerNegativo.fecha)}</strong> → {fmt(primerNegativo.saldoConsolidado)}</div>
               </div>
             )}
-            {/* ── Fondo de Estabilidad Financiera ── */}
+            {/* ── Fondo de Estabilidad Financiera (colapsable) ── */}
             {(()=>{
               // Ingresos: filtrados por probabilidad seleccionada (Alta+Media default)
               // Horizonte: hoy hasta horizonteFEF
@@ -2434,110 +2436,121 @@ function App(){
                 {label:"Extraordinarios",color:"#f87171",items:egNoEsenciales.filter(r=>(parseInt(r.prioridad)||3)===4)},
               ].filter(g=>g.items.length>0);
               return(
-                <div style={{...S.card("rgba(201,168,76,0.2)"),marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                    <div style={{fontSize:10,fontWeight:800,color:"#C9A84C"}}>🏦 Fondo de Estabilidad Financiera</div>
-                    {mesesFEF&&<div style={{fontSize:9,color:semFEF,fontWeight:700,background:semFEF+"18",padding:"2px 8px",borderRadius:8}}>{mesesFEF} meses</div>}
+                <div style={{...S.card("rgba(201,168,76,0.2)"),marginBottom:10,padding:0,overflow:"hidden"}}>
+                  {/* ── Encabezado colapsable ── */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",cursor:"pointer"}}
+                    onClick={()=>setFefMenuOpen(v=>!v)}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      <span style={{fontSize:14}}>🏦</span>
+                      <div style={{fontSize:10,fontWeight:800,color:"#C9A84C"}}>Fondo de Estabilidad Financiera</div>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",gap:7}}>
+                      {mesesFEF&&<div style={{fontSize:9,color:semFEF,fontWeight:700,background:semFEF+"18",padding:"2px 8px",borderRadius:8}}>{mesesFEF} meses</div>}
+                      <span style={{color:"#475569",fontSize:13}}>{fefMenuOpen?"▲":"▸"}</span>
+                    </div>
                   </div>
-                  <div style={{background:"#13131f",borderRadius:9,padding:"8px 11px",marginBottom:7}}>
-                    {[
-                      ["Saldo Real",stats.saldoReal,"#C9A84C"],
-                      ["+ Ing. Prog. ("+nivelIngLabel+")",ingProg,"#22c55e"],
-                    ].map(([l,v,c])=>(
-                      <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1e293b22"}}>
-                        <span style={{fontSize:9,color:"#64748b"}}>{l}</span>
-                        <span style={{fontSize:10,fontWeight:700,color:c}}>+{fmt(v)}</span>
-                      </div>
-                    ))}
-                    <div style={{borderBottom:"1px solid #1e293b22"}}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",cursor:"pointer"}}
-                        onClick={()=>setShowFEFDesglose(v=>!v)}>
-                        <div style={{display:"flex",alignItems:"center",gap:4}}>
-                          <span style={{fontSize:9,color:"#f87171"}}>− Eg. NO Esenciales</span>
-                          <span style={{fontSize:8,color:"#f87171",opacity:0.6}}>{showFEFDesglose?"▲":"▼"}</span>
-                        </div>
-                        <span style={{fontSize:10,fontWeight:700,color:"#f87171"}}>−{fmt(egNoEsencialesTotal)}</span>
-                      </div>
-                      {showFEFDesglose&&(
-                        <div style={{paddingBottom:6}}>
-                          {egPorNivel.length===0&&<div style={{fontSize:9,color:"#475569",padding:"4px 0"}}>Sin egresos no esenciales programados ✅</div>}
-                          {egPorNivel.map(g=>(
-                            <div key={g.label} style={{marginBottom:5}}>
-                              <div style={{display:"flex",justifyContent:"space-between",fontSize:8,color:g.color,fontWeight:700,marginBottom:2}}>
-                                <span>{g.label} ({g.items.length})</span>
-                                <span>{fmt(g.items.reduce((s,r)=>s+r.monto,0))}</span>
-                              </div>
-                              {g.items.slice(0,4).map(r=>(
-                                <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"1px 8px",fontSize:8,color:"#475569"}}>
-                                  <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.concepto}</span>
-                                  <span style={{marginLeft:6,flexShrink:0}}>{fmt(r.monto)}</span>
+                  {/* ── Contenido completo (idéntico al original) ── */}
+                  {fefMenuOpen&&(
+                    <div style={{borderTop:"1px solid #C9A84C22",padding:"10px 14px 14px"}}>
+                      <div style={{background:"#13131f",borderRadius:9,padding:"8px 11px",marginBottom:7}}>
+                        {[
+                          ["Saldo Real",stats.saldoReal,"#C9A84C"],
+                          ["+ Ing. Prog. ("+nivelIngLabel+")",ingProg,"#22c55e"],
+                        ].map(([l,v,c])=>(
+                          <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #1e293b22"}}>
+                            <span style={{fontSize:9,color:"#64748b"}}>{l}</span>
+                            <span style={{fontSize:10,fontWeight:700,color:c}}>+{fmt(v)}</span>
+                          </div>
+                        ))}
+                        <div style={{borderBottom:"1px solid #1e293b22"}}>
+                          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",cursor:"pointer"}}
+                            onClick={()=>setShowFEFDesglose(v=>!v)}>
+                            <div style={{display:"flex",alignItems:"center",gap:4}}>
+                              <span style={{fontSize:9,color:"#f87171"}}>− Eg. NO Esenciales</span>
+                              <span style={{fontSize:8,color:"#f87171",opacity:0.6}}>{showFEFDesglose?"▲":"▼"}</span>
+                            </div>
+                            <span style={{fontSize:10,fontWeight:700,color:"#f87171"}}>−{fmt(egNoEsencialesTotal)}</span>
+                          </div>
+                          {showFEFDesglose&&(
+                            <div style={{paddingBottom:6}}>
+                              {egPorNivel.length===0&&<div style={{fontSize:9,color:"#475569",padding:"4px 0"}}>Sin egresos no esenciales programados ✅</div>}
+                              {egPorNivel.map(g=>(
+                                <div key={g.label} style={{marginBottom:5}}>
+                                  <div style={{display:"flex",justifyContent:"space-between",fontSize:8,color:g.color,fontWeight:700,marginBottom:2}}>
+                                    <span>{g.label} ({g.items.length})</span>
+                                    <span>{fmt(g.items.reduce((s,r)=>s+r.monto,0))}</span>
+                                  </div>
+                                  {g.items.slice(0,4).map(r=>(
+                                    <div key={r.id} style={{display:"flex",justifyContent:"space-between",padding:"1px 8px",fontSize:8,color:"#475569"}}>
+                                      <span style={{flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.concepto}</span>
+                                      <span style={{marginLeft:6,flexShrink:0}}>{fmt(r.monto)}</span>
+                                    </div>
+                                  ))}
+                                  {g.items.length>4&&<div style={{fontSize:7,color:"#334155",paddingLeft:8}}>…y {g.items.length-4} más</div>}
                                 </div>
                               ))}
-                              {g.items.length>4&&<div style={{fontSize:7,color:"#334155",paddingLeft:8}}>…y {g.items.length-4} más</div>}
                             </div>
-                          ))}
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div style={{display:"flex",justifyContent:"space-between",paddingTop:5,marginTop:2}}>
-                      <span style={{fontSize:10,color:"#e2e8f0",fontWeight:700}}>= Fondo Disponible</span>
-                      <span style={{fontSize:14,fontWeight:800,color:fef>=0?semFEF:"#f87171"}}>{fmt(fef)}</span>
-                    </div>
-                  </div>
-                  {metaFEF>0&&(<>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:3}}>
-                      <span>Meta FEF: {fmt(metaFEF)} ({factorFEF}x GFE)</span>
-                      <span style={{color:semFEF,fontWeight:700}}>{Math.round(pctFEF)}%</span>
-                    </div>
-                    <div style={{height:pctFEF>=100?9:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:3,
-                      boxShadow:pctFEF>=100?"0 0 8px #22c55e88":"none",transition:"all 0.5s"}}>
-                      <div style={{height:"100%",borderRadius:4,background:pctFEF>=100?"linear-gradient(90deg,#22c55e,#86efac,#22c55e)":semFEF,
-                        width:Math.min(100,pctFEF)+"%",transition:"width 0.5s",
-                        backgroundSize:pctFEF>=100?"200% 100%":"auto"}}/>
-                    </div>
-                    {pctFEF>=100?(
-                      <div style={{textAlign:"center",marginBottom:6,padding:"5px 0"}}>
-                        <span style={{fontSize:11,color:"#22c55e",fontWeight:800}}>✅ Meta alcanzada</span>
-                      </div>
-                    ):(
-                      <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid #f8717122",borderRadius:8,padding:"8px 12px",marginBottom:6}}>
-                        <div style={{fontSize:8,color:"#64748b",marginBottom:3}}>Para alcanzar la meta:</div>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                          <span style={{fontSize:13,fontWeight:800,color:"#f87171"}}>{fmt(Math.max(0,metaFEF-fef))}</span>
-                          <span style={{fontSize:11,fontWeight:700,color:"#fbbf24"}}>{Math.max(0,(metaFEF-fef)/Math.max(1,gastoFamiliarEsencial)).toFixed(1)} meses</span>
+                        <div style={{display:"flex",justifyContent:"space-between",paddingTop:5,marginTop:2}}>
+                          <span style={{fontSize:10,color:"#e2e8f0",fontWeight:700}}>= Fondo Disponible</span>
+                          <span style={{fontSize:14,fontWeight:800,color:fef>=0?semFEF:"#f87171"}}>{fmt(fef)}</span>
                         </div>
                       </div>
-                    )}
-                  </>)}
-                  <div style={{background:"#0d0d1a",borderRadius:8,padding:"7px 10px"}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                      <span style={{fontSize:8,color:"#64748b"}}>Ingresos considerados</span>
-                      <div style={{display:"flex",gap:3}}>
-                        {[[1,"Alta","#22c55e"],[2,"Alta+Med","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=>(
-                          <button key={v} style={{...S.prioB2(prioFEF_ing===v,c),flex:"none",padding:"3px 6px",fontSize:8}} onClick={()=>setPrioFEF_ing(v)}>{l}</button>
-                        ))}
+                      {metaFEF>0&&(<>
+                        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:3}}>
+                          <span>Meta FEF: {fmt(metaFEF)} ({factorFEF}x GFE)</span>
+                          <span style={{color:semFEF,fontWeight:700}}>{Math.round(pctFEF)}%</span>
+                        </div>
+                        <div style={{height:pctFEF>=100?9:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:3,
+                          boxShadow:pctFEF>=100?"0 0 8px #22c55e88":"none",transition:"all 0.5s"}}>
+                          <div style={{height:"100%",borderRadius:4,background:pctFEF>=100?"linear-gradient(90deg,#22c55e,#86efac,#22c55e)":semFEF,
+                            width:Math.min(100,pctFEF)+"%",transition:"width 0.5s",
+                            backgroundSize:pctFEF>=100?"200% 100%":"auto"}}/>
+                        </div>
+                        {pctFEF>=100?(
+                          <div style={{textAlign:"center",marginBottom:6,padding:"5px 0"}}>
+                            <span style={{fontSize:11,color:"#22c55e",fontWeight:800}}>✅ Meta alcanzada</span>
+                          </div>
+                        ):(
+                          <div style={{background:"rgba(248,113,113,0.06)",border:"1px solid #f8717122",borderRadius:8,padding:"8px 12px",marginBottom:6}}>
+                            <div style={{fontSize:8,color:"#64748b",marginBottom:3}}>Para alcanzar la meta:</div>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                              <span style={{fontSize:13,fontWeight:800,color:"#f87171"}}>{fmt(Math.max(0,metaFEF-fef))}</span>
+                              <span style={{fontSize:11,fontWeight:700,color:"#fbbf24"}}>{Math.max(0,(metaFEF-fef)/Math.max(1,gastoFamiliarEsencial)).toFixed(1)} meses</span>
+                            </div>
+                          </div>
+                        )}
+                      </>)}
+                      <div style={{background:"#0d0d1a",borderRadius:8,padding:"7px 10px"}}>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                          <span style={{fontSize:8,color:"#64748b"}}>Ingresos considerados</span>
+                          <div style={{display:"flex",gap:3}}>
+                            {[[1,"Alta","#22c55e"],[2,"Alta+Med","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=>(
+                              <button key={v} style={{...S.prioB2(prioFEF_ing===v,c),flex:"none",padding:"3px 6px",fontSize:8}} onClick={()=>setPrioFEF_ing(v)}>{l}</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <div>
+                            <span style={{fontSize:8,color:"#64748b"}}>Horizonte</span>
+                            <span style={{fontSize:7,color:"#334155",marginLeft:5}}>({Math.round((new Date(horizonteFEF)-new Date(todayStr()))/(1000*60*60*24))} días)</span>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:5}}>
+                            <input type="date" style={{...S.inp,padding:"2px 6px",fontSize:8,width:"auto"}}
+                              value={horizonteFEF}
+                              onChange={e=>{if(e.target.value) setHorizonteFEF(e.target.value);}}/>
+                            <button style={{...S.smBtn("#475569"),fontSize:7,padding:"2px 5px"}}
+                              onClick={()=>{
+                                const d=new Date();
+                                d.setDate(d.getDate()+Math.round((factorFEF||2.5)*30.4));
+                                setHorizonteFEF(d.toISOString().slice(0,10));
+                              }}>↺</button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div>
-                        <span style={{fontSize:8,color:"#64748b"}}>Horizonte</span>
-                        <span style={{fontSize:7,color:"#334155",marginLeft:5}}>({Math.round((new Date(horizonteFEF)-new Date(todayStr()))/(1000*60*60*24))} días)</span>
-                      </div>
-                      <div style={{display:"flex",alignItems:"center",gap:5}}>
-                        <input type="date" style={{...S.inp,padding:"2px 6px",fontSize:8,width:"auto"}}
-                          value={horizonteFEF}
-                          onChange={e=>{
-                            if(e.target.value) setHorizonteFEF(e.target.value);
-                          }}/>
-                        <button style={{...S.smBtn("#475569"),fontSize:7,padding:"2px 5px"}}
-                          onClick={()=>{
-                            const d=new Date();
-                            d.setDate(d.getDate()+Math.round((factorFEF||2.5)*30.4));
-                            setHorizonteFEF(d.toISOString().slice(0,10));
-                          }}>↺</button>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               );
             })()}
@@ -3618,60 +3631,6 @@ function App(){
                 </div>
               ))}
             </div>)}
-            {/* ── Fondo de Estabilidad Financiera (presentación) ── */}
-            {(()=>{
-              const hoyStr=todayStr();
-              const ingProg=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Ingreso"&&(parseInt(r.prioridad)||1)<=prioFEF_ing&&r.fecha&&r.fecha>=hoyStr&&r.fecha<=horizonteFEF).reduce((s,r)=>s+r.monto,0);
-              const egNoEsencialesTotal=movs.filter(r=>["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.tipoOp==="Egreso"&&!r.usaTarjeta&&(parseInt(r.prioridad)||3)>1&&r.fecha&&r.fecha>=hoyStr&&r.fecha<=horizonteFEF).reduce((s,r)=>s+r.monto,0);
-              const fef=stats.saldoReal+ingProg-egNoEsencialesTotal;
-              const metaFEF=gastoFamiliarEsencial>0?gastoFamiliarEsencial*factorFEF:0;
-              const mesesFEF=gastoFamiliarEsencial>0?(fef/gastoFamiliarEsencial).toFixed(1):null;
-              const pctFEF=metaFEF>0?Math.min(120,(fef/metaFEF)*100):0;
-              const semFEF=pctFEF>=100?"#22c55e":pctFEF>=50?"#fbbf24":"#f87171";
-              return(
-                <div style={{...S.card("rgba(201,168,76,0.2)"),padding:0,overflow:"hidden",marginBottom:10}}>
-                  {/* Cabecera siempre visible — toca para colapsar/expandir */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",cursor:"pointer"}}
-                    onClick={()=>setFefMenuOpen(v=>!v)}>
-                    <div style={{display:"flex",alignItems:"center",gap:9}}>
-                      <span style={{fontSize:16}}>🏦</span>
-                      <div>
-                        <div style={{fontSize:11,fontWeight:800,color:"#C9A84C"}}>Fondo de Estabilidad Financiera</div>
-                        <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                          <span style={{fontSize:13,fontWeight:800,color:semFEF}}>{fmt(fef)}</span>
-                          {mesesFEF&&<span style={{fontSize:9,color:semFEF,fontWeight:700,background:semFEF+"18",padding:"1px 7px",borderRadius:7}}>{mesesFEF} meses</span>}
-                        </div>
-                      </div>
-                    </div>
-                    <span style={{color:"#475569",fontSize:14}}>{fefMenuOpen?"▲":"▸"}</span>
-                  </div>
-                  {/* Detalle colapsable */}
-                  {fefMenuOpen&&(
-                    <div style={{borderTop:"1px solid #C9A84C22",padding:"10px 14px"}}>
-                      {metaFEF>0&&(<>
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:4}}>
-                          <span>Meta: {fmt(metaFEF)} ({factorFEF}x GFE)</span>
-                          <span style={{color:semFEF,fontWeight:700}}>{Math.round(pctFEF)}%</span>
-                        </div>
-                        <div style={{height:7,borderRadius:4,background:"#1e293b",overflow:"hidden",marginBottom:9}}>
-                          <div style={{height:"100%",borderRadius:4,background:pctFEF>=100?"linear-gradient(90deg,#22c55e,#86efac,#22c55e)":semFEF,width:Math.min(100,pctFEF)+"%",transition:"width 0.5s"}}/>
-                        </div>
-                      </>)}
-                      <div style={{display:"flex",flexDirection:"column",gap:3,marginBottom:6}}>
-                        {[["Saldo Real",stats.saldoReal,"#C9A84C"],[`+ Ingresos Prog.`,ingProg,"#22c55e"],["− Eg. No Esenciales",egNoEsencialesTotal,"#f87171"]].map(([l,v,c])=>(
-                          <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:9}}>
-                            <span style={{color:"#64748b"}}>{l}</span>
-                            <span style={{fontWeight:700,color:c}}>{l.startsWith("−")?"−":"+ê"}{l.startsWith("−")?"":""}{fmt(v)}</span>
-                          </div>
-                        ))}
-                      </div>
-                      {!metaFEF&&<div style={{fontSize:9,color:"#475569",marginTop:4}}>Configura GFE y factor en Configuración → FEF para ver la meta.</div>}
-                      <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%",marginTop:4}} onClick={()=>setView("movimientos")}>Ver en Movimientos →</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
             <div style={{...S.card(),marginTop:4}}>
               <div style={S.sTit}>RESUMEN RÁPIDO</div>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:10}}><span style={{color:"#64748b"}}>Saldo Real</span><span style={{fontWeight:700,color:"#C9A84C"}}>{fmt(stats.saldoReal)}</span></div>
@@ -3695,16 +3654,54 @@ function App(){
               {[["acreedores","🔴 Acreedores"],["deudores","🟢 Deudores"],["ingresosExt","⭐ Ing. Ext."]].map(([k,l])=>(
                 <button key={k} style={{flex:1,padding:"8px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
                   color:carteraTab===k?"#C9A84C":"#334155",borderBottom:carteraTab===k?"2px solid #C9A84C":"2px solid transparent"}}
-                  onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");setCarteraBusq("");}}>{l}</button>
+                  onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");setCarteraBusq("");setCarteraEstado("Todos");setShowCarteraFiltros(false);}}>{l}</button>
               ))}
             </div>
-            {/* Búsqueda cartera */}
-            <input style={{...S.srch,marginBottom:9}} value={carteraBusq} onChange={e=>setCarteraBusq(e.target.value)} placeholder="🔍 Buscar nombre o concepto…"/>
+            {/* Búsqueda + Panel Filtros */}
+            {carteraTab!=="ingresosExt"&&(
+              <>
+                <div style={{display:"flex",gap:5,marginBottom:7,alignItems:"center"}}>
+                  <input style={{...S.srch,flex:1,marginBottom:0}} value={carteraBusq} onChange={e=>setCarteraBusq(e.target.value)} placeholder="🔍 Buscar nombre o concepto…"/>
+                  <button style={{...S.prioTag((carteraEstado!=="Todos"||carteraNivel!=="Todos"||carteraOrigen!=="Todos")||showCarteraFiltros),flexShrink:0,whiteSpace:"nowrap"}}
+                    onClick={()=>setShowCarteraFiltros(v=>!v)}>
+                    ⚙{(carteraEstado!=="Todos"||carteraNivel!=="Todos"||carteraOrigen!=="Todos")?" ✓":""} {showCarteraFiltros?"▲":"▾"}
+                  </button>
+                </div>
+                {showCarteraFiltros&&(
+                  <div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:11,padding:"10px 12px",marginBottom:9}}>
+                    <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>ESTADO</div>
+                    <div style={{display:"flex",gap:5,marginBottom:10}}>
+                      {["Todos","Vigentes","Concretados"].map(e=>(
+                        <button key={e} style={{...S.chip(carteraEstado===e,e==="Vigentes"?"#22c55e":e==="Concretados"?"#60a5fa":"#64748b"),flex:1}}
+                          onClick={()=>setCarteraEstado(e)}>{e}</button>
+                      ))}
+                    </div>
+                    <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>PRIORIDAD</div>
+                    <div style={{display:"flex",gap:5,marginBottom:10}}>
+                      {["Todos","Alta","Media","Baja"].map(n=>(
+                        <button key={n} style={{...S.chip(carteraNivel===n,n==="Todos"?"#64748b":n==="Alta"?"#f87171":n==="Media"?"#fbbf24":"#22c55e"),flex:1}}
+                          onClick={()=>setCarteraNivel(n)}>{n}</button>
+                      ))}
+                    </div>
+                    {(carteraEstado!=="Todos"||carteraNivel!=="Todos")&&(
+                      <button style={{...S.acBtn("#475569"),fontSize:10,width:"100%"}}
+                        onClick={()=>{setCarteraEstado("Todos");setCarteraNivel("Todos");}}>✕ Limpiar filtros</button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {carteraTab==="ingresosExt"&&(
+              <input style={{...S.srch,marginBottom:9}} value={carteraBusq} onChange={e=>setCarteraBusq(e.target.value)} placeholder="🔍 Buscar concepto…"/>
+            )}
 
             {/* ── ACREEDORES ── */}
             {carteraTab==="acreedores"&&(()=>{
               const origenes=["Todos",...ORIG_ACREEDOR];
-              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()));
+              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen))
+                .filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel)
+                .filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()))
+                .filter(x=>{if(carteraEstado==="Todos")return true;const s=saldoPendiente(x,movs);return carteraEstado==="Vigentes"?s>0:s<=0;});
               const total=acrFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector de origen */}
@@ -3784,7 +3781,10 @@ function App(){
             {/* ── DEUDORES ── */}
             {carteraTab==="deudores"&&(()=>{
               const origenes=["Todos",...ORIG_DEUDOR];
-              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()));
+              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen))
+                .filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel)
+                .filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()))
+                .filter(x=>{if(carteraEstado==="Todos")return true;const s=saldoPendiente(x,movs);return carteraEstado==="Vigentes"?s>0:s<=0;});
               const total=deuFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector de origen */}
