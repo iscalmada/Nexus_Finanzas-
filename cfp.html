@@ -1307,6 +1307,24 @@ function App(){
   const[prioLblEdit,setPrioLblEdit]=useState(()=>({...PRIO_EG_LBL}));
   const[showPrioLbl,setShowPrioLbl]=useState(false);
   const[showCapas,setShowCapas]=useState(false);
+  // ── Catálogos del Sistema ──
+  const[catOrigenAcr,setCatOrigenAcr]=useState(()=>loadLS('catOrigenAcr',["Sicresa","Familia","Terceros"]));
+  const[catOrigenDeu,setCatOrigenDeu]=useState(()=>loadLS('catOrigenDeu',["Sicresa","Terceros"]));
+  const[catOrigenIngExt,setCatOrigenIngExt]=useState(()=>loadLS('catOrigenIngExt',["Patrimonio","Sicresa"]));
+  const[catPrioPago,setCatPrioPago]=useState(()=>loadLS('catPrioPago',["Alta","Media","Baja"]));
+  const[catProbRecup,setCatProbRecup]=useState(()=>loadLS('catProbRecup',["Alta","Media","Baja"]));
+  const[prioIngLbl,setPrioIngLbl]=useState(()=>loadLS('prioIngLbl',{1:"Alta",2:"Media",3:"Baja"}));
+  const[catSisOpen,setCatSisOpen]=useState(null);   // qué sección está expandida en cat_sistema
+  const[catSisEditIdx,setCatSisEditIdx]=useState(null);
+  const[catSisEditVal,setCatSisEditVal]=useState("");
+  const[catSisNewVal,setCatSisNewVal]=useState("");
+  // persistencia catálogos del sistema
+  useEffect(()=>{ saveLS('catOrigenAcr',catOrigenAcr); },[catOrigenAcr]);
+  useEffect(()=>{ saveLS('catOrigenDeu',catOrigenDeu); },[catOrigenDeu]);
+  useEffect(()=>{ saveLS('catOrigenIngExt',catOrigenIngExt); },[catOrigenIngExt]);
+  useEffect(()=>{ saveLS('catPrioPago',catPrioPago); },[catPrioPago]);
+  useEffect(()=>{ saveLS('catProbRecup',catProbRecup); },[catProbRecup]);
+  useEffect(()=>{ saveLS('prioIngLbl',prioIngLbl); },[prioIngLbl]);
 
   // filtros movimientos
   const[filterTipo,setFilterTipo]=useState("TODOS");
@@ -2222,7 +2240,7 @@ function App(){
   },[acreedores,deudores,ingresosExt,movs]);
 
   useEffect(()=>{
-    const snap=()=>{try{const labels=(()=>{try{return JSON.parse(localStorage.getItem("nexus_prioEgLabels")||"null");}catch(e){return null;}})();const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,prioEgLabels:labels,tiempoBloqueo:loadLS('tiempoBloqueo',null)};saveLS('autobackup',{fecha:new Date().toISOString(),data});}catch(e){}};
+    const snap=()=>{try{const labels=(()=>{try{return JSON.parse(localStorage.getItem("nexus_prioEgLabels")||"null");}catch(e){return null;}})();const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,prioEgLabels:labels,tiempoBloqueo:loadLS('tiempoBloqueo',null),catOrigenAcr,catOrigenDeu,catOrigenIngExt,catPrioPago,catProbRecup,prioIngLbl};saveLS('autobackup',{fecha:new Date().toISOString(),data});}catch(e){}};
     const onHide=()=>{if(document.visibilityState==="hidden")snap();};
     document.addEventListener("visibilitychange",onHide);
     window.addEventListener("pagehide",snap);
@@ -2302,7 +2320,7 @@ function App(){
 
   const PrioILabel=prioI===3?"Todas":PRIO_LBL[prioI];
   const PrioELabel=prioE===3?"Todas":PRIO_LBL[prioE];
-  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","configuracion","cartera","oportunidades"];
+  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","cat_sistema","configuracion","cartera","oportunidades"];
 
   // Semáforo color
   const semColor=s=>s==="verde"?"#22c55e":s==="amarillo"?"#fbbf24":"#f87171";
@@ -3621,7 +3639,8 @@ function App(){
               <div style={S.sTit}>CONFIGURACIÓN</div>
               {[
                 {ico:"🏦",label:"Cuentas",sub:"Débito, efectivo y tarjetas",target:"cuentas",color:"#60a5fa"},
-                {ico:"📂",label:"Catálogos",sub:"Categorías de ingresos y egresos",target:"catalogos",color:"#C9A84C"},
+                {ico:"📂",label:"Categorías",sub:"Categorías de ingresos y egresos",target:"catalogos",color:"#C9A84C"},
+                {ico:"🗂",label:"Catálogos del Sistema",sub:"Orígenes, prioridades, capas y más",target:"cat_sistema",color:"#a78bfa"},
                 {ico:"⚙",label:"Configuración",sub:"Exportar y eliminar datos",target:"configuracion",color:"#f87171"},
               ].map(it=>(
                 <div key={it.target} style={S.menuRow} onClick={()=>setView(it.target)}>
@@ -3678,16 +3697,17 @@ function App(){
                     </div>
                     <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>ORIGEN</div>
                     <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>
-                      {(carteraTab==="acreedores"?["Todos",...ORIG_ACREEDOR]:["Todos",...ORIG_DEUDOR]).map(o=>{
-                        const cnt=o==="Todos"?(carteraTab==="acreedores"?acreedores:deudores).length:(carteraTab==="acreedores"?acreedores:deudores).filter(x=>x.origen===o).length;
+                      {(["Todos",...(carteraTab==="acreedores"?catOrigenAcr:catOrigenDeu)]).map(o=>{
+                        const lista=carteraTab==="acreedores"?acreedores:deudores;
+                        const cnt=o==="Todos"?lista.length:lista.filter(x=>x.origen===o).length;
                         return(<button key={o} style={{...S.chip(carteraOrigen===o,carteraTab==="acreedores"?"#f87171":"#22c55e"),flex:"none",padding:"5px 10px",fontSize:9}}
                           onClick={()=>setCarteraOrigen(o)}>{o}{cnt>0&&<span style={{opacity:0.7}}> ({cnt})</span>}</button>);
                       })}
                     </div>
                     <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:1,marginBottom:5}}>PRIORIDAD DE PAGO</div>
                     <div style={{display:"flex",gap:5,marginBottom:10}}>
-                      {["Todos","Alta","Media","Baja"].map(n=>(
-                        <button key={n} style={{...S.chip(carteraNivel===n,n==="Todos"?"#64748b":n==="Alta"?"#f87171":n==="Media"?"#fbbf24":"#22c55e"),flex:1}}
+                      {["Todos",...(carteraTab==="acreedores"?catPrioPago:catProbRecup)].map(n=>(
+                        <button key={n} style={{...S.chip(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]||"#64748b"),flex:1}}
                           onClick={()=>setCarteraNivel(n)}>{n}</button>
                       ))}
                     </div>
@@ -3705,7 +3725,7 @@ function App(){
 
             {/* ── ACREEDORES ── */}
             {carteraTab==="acreedores"&&(()=>{
-              const origenes=["Todos",...ORIG_ACREEDOR];
+              const origenes=["Todos",...catOrigenAcr];
               const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen))
                 .filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel)
                 .filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()))
@@ -3776,7 +3796,7 @@ function App(){
 
             {/* ── DEUDORES ── */}
             {carteraTab==="deudores"&&(()=>{
-              const origenes=["Todos",...ORIG_DEUDOR];
+              const origenes=["Todos",...catOrigenDeu];
               const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen))
                 .filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel)
                 .filter(x=>!carteraBusq||(x.nombre||"").toLowerCase().includes(carteraBusq.toLowerCase())||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()))
@@ -3848,7 +3868,7 @@ function App(){
 
             {/* ── INGRESOS EXTRAORDINARIOS ── */}
             {carteraTab==="ingresosExt"&&(()=>{
-              const origenes=["Todos",...ORIG_ING_EXT];
+              const origenes=["Todos",...catOrigenIngExt];
               const ingFiltrados=(carteraOrigen==="Todos"?ingresosExt:ingresosExt.filter(x=>x.origen===carteraOrigen)).filter(x=>!carteraBusq||(x.concepto||"").toLowerCase().includes(carteraBusq.toLowerCase()));
               const totalPend=ingFiltrados.filter(x=>x.estado!=="Recuperado").reduce((s,x)=>s+(x.monto||0),0);
               return(<>
@@ -4208,7 +4228,8 @@ function App(){
         {showCarteraForm&&(()=>{
           const isIngExt=carteraTab==="ingresosExt";
           const isAcr=carteraTab==="acreedores";
-          const origenes=isIngExt?ORIG_ING_EXT:isAcr?ORIG_ACREEDOR:ORIG_DEUDOR;
+          const origenes=isIngExt?catOrigenIngExt:isAcr?catOrigenAcr:catOrigenDeu;
+          const niveles=isAcr?catPrioPago:catProbRecup;
           const colorTipo=isIngExt?"#fbbf24":isAcr?"#f87171":"#22c55e";
           const set=(k,v)=>setFormCartera(f=>({...f,[k]:v}));
           return(
@@ -4275,7 +4296,7 @@ function App(){
                 )}
                 {!isIngExt&&<div style={S.fg}><label style={S.fl}>{isAcr?"Prioridad de pago":"Probabilidad de recuperación"}</label>
                   <div style={{display:"flex",gap:7,marginBottom:4}}>
-                    {["Alta","Media","Baja"].map(p=><button key={p} style={{...S.prioB2((formCartera.nivel||"Media")===p,NIV_COL[p]),flex:1,padding:"8px 0",fontSize:10}} onClick={()=>set("nivel",p)}>{p}</button>)}
+                    {niveles.map(p=><button key={p} style={{...S.prioB2((formCartera.nivel||niveles[1]||"Media")===p,NIV_COL[p]||"#64748b"),flex:1,padding:"8px 0",fontSize:10}} onClick={()=>set("nivel",p)}>{p}</button>)}
                   </div>
                 </div>}
                 <div style={S.fg}><label style={S.fl}>Condiciones actuales</label>
@@ -4351,36 +4372,12 @@ function App(){
         {/* ── CATÁLOGOS ── */}
         {view==="catalogos"&&(
           <div style={S.sec}>
-            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CATÁLOGOS</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CATEGORÍAS</span></div>
+            <div style={{fontSize:9,color:"#475569",marginBottom:9}}>Categorías de ingresos y egresos. Para Capas de Proyección y demás catálogos → <span style={{color:"#C9A84C",cursor:"pointer"}} onClick={()=>setView("cat_sistema")}>Catálogos del Sistema</span></div>
             <div style={{display:"flex",gap:7,marginBottom:13}}>
               <button style={{...S.prioB2(catMode==="eg","#f87171"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("eg")}>↓ Egresos</button>
               <button style={{...S.prioB2(catMode==="ing","#22c55e"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("ing")}>↑ Ingresos</button>
             </div>
-            {catMode==="eg"&&<div style={{marginBottom:11}}>
-              <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%"}} onClick={()=>setShowPrioLbl(v=>!v)}>{showPrioLbl?"▲ Ocultar etiquetas de prioridad":"✎ Editar etiquetas de prioridad"}</button>
-              {showPrioLbl&&<div style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:11,padding:12,marginTop:7}}>
-                <div style={{fontSize:9,color:"#64748b",marginBottom:9,lineHeight:1.4}}>Renombra las 4 prioridades sin afectar el funcionamiento del consolidado. Se aplica al guardar.</div>
-                {[1,2,3,4].map(n=>(
-                  <div key={n} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6}}>
-                    <span style={{width:11,height:11,borderRadius:3,background:PRIO_EG_COLOR[n],flexShrink:0}}/>
-                    <input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:12}} value={prioLblEdit[n]||""} onChange={e=>setPrioLblEdit(p=>({...p,[n]:e.target.value}))}/>
-                  </div>
-                ))}
-                <button style={{...S.saveB,marginTop:4}} onClick={()=>{const clean={1:(prioLblEdit[1]||"").trim()||"Prioridad 1",2:(prioLblEdit[2]||"").trim()||"Prioridad 2",3:(prioLblEdit[3]||"").trim()||"Prioridad 3",4:(prioLblEdit[4]||"").trim()||"Prioridad 4"};try{localStorage.setItem("nexus_prioEgLabels",JSON.stringify(clean));}catch(e){}if(window.confirm("Etiquetas guardadas. La app se recargará para aplicarlas en todos lados. ¿Continuar?"))location.reload();}}>Guardar etiquetas</button>
-              </div>}
-              <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%",marginTop:7}} onClick={()=>setShowCapas(v=>!v)}>{showCapas?"▲ Ocultar capas (proyección)":"▦ Editar capas (proyección)"}</button>
-              {showCapas&&<div style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:11,padding:12,marginTop:7}}>
-                <div style={{fontSize:9,color:"#64748b",marginBottom:9,lineHeight:1.4}}>Capas para la proyección de mediano plazo. Arrastra para reordenar (ese orden define la presentación de la proyección).</div>
-                {capas.map(cp=>(
-                  <div key={cp.id} draggable onDragStart={()=>capasDrag.start(cp.id)} onDragOver={e=>{e.preventDefault();capasDrag.enter(cp.id);}} onDrop={capasDrag.commit} style={{display:"flex",alignItems:"center",gap:7,marginBottom:6,background:capasDrag.aId===cp.id?"#1e2a1e":capasDrag.oViz===cp.id?"#1a2030":"transparent",borderRadius:8,padding:"3px 4px",cursor:"grab"}}>
-                    <span style={{color:"#475569",fontSize:12}}>☰</span>
-                    <input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:12}} value={cp.nombre} onChange={e=>setCapas(p=>p.map(x=>x.id===cp.id?{...x,nombre:e.target.value}:x))}/>
-                    <button style={S.smBtn("#f87171")} onClick={()=>{if(window.confirm("¿Eliminar la capa \""+cp.nombre+"\"? Las categorías/movimientos que la usen quedarán Sin capa."))setCapas(p=>p.filter(x=>x.id!==cp.id));}}>✕</button>
-                  </div>
-                ))}
-                <button style={{...S.acBtn("#C9A84C"),fontSize:10,width:"100%",marginTop:4}} onClick={()=>setCapas(p=>[...p,{id:"cap"+Date.now(),nombre:"Nueva capa"}])}>+ Agregar capa</button>
-              </div>}
-            </div>}
             <div style={{fontSize:9,color:"#475569",marginBottom:9}}>☰ arrastra para reordenar · toca el nombre para editar</div>
             {cats_.filter(c=>!c.nexus).map(cat=>(
               <div key={cat.id} draggable onDragStart={()=>catDrag.start(cat.id)} onDragOver={e=>{e.preventDefault();catDrag.enter(cat.id);}} onDrop={catDrag.commit}
@@ -4469,8 +4466,197 @@ function App(){
           </div>
         )}
 
-        {/* ── CONFIGURACIÓN ── */}
-        {view==="configuracion"&&(
+        {/* ── CATÁLOGOS DEL SISTEMA ── */}
+        {view==="cat_sistema"&&(()=>{
+          // Helper: editor 🟢 CRUD con protección de borrado
+          const CatCRUD=({title,color,items,setItems,countUsed,addDefault})=>{
+            const isOpen=catSisOpen===title;
+            const toggle=()=>{setCatSisOpen(isOpen?null:title);setCatSisEditIdx(null);setCatSisNewVal("");};
+            const activeN=items.length;
+            return(
+              <div style={{border:`1px solid ${color}33`,borderRadius:12,marginBottom:9,overflow:"hidden"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",cursor:"pointer",background:`${color}08`}} onClick={toggle}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color}}>{title}</div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:1}}>{activeN} valor{activeN!==1?"es":""}</div>
+                  </div>
+                  <span style={{color:"#475569",fontSize:13}}>{isOpen?"▲":"▸"}</span>
+                </div>
+                {isOpen&&(
+                  <div style={{padding:"10px 14px",borderTop:`1px solid ${color}22`}}>
+                    {items.map((val,idx)=>{
+                      const usados=countUsed(val);
+                      const isEditing=catSisEditIdx===`${title}-${idx}`;
+                      return(
+                        <div key={idx} style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
+                          {isEditing
+                            ?<><input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:12}} value={catSisEditVal}
+                                onChange={e=>setCatSisEditVal(e.target.value)}
+                                onKeyDown={e=>{if(e.key==="Enter"){const t=catSisEditVal.trim();if(t&&!items.includes(t)){setItems(p=>p.map((v,i)=>i===idx?t:v));}setCatSisEditIdx(null);}if(e.key==="Escape")setCatSisEditIdx(null);}} autoFocus/>
+                              <button style={S.smBtn("#22c55e")} onClick={()=>{const t=catSisEditVal.trim();if(t&&!items.includes(t)){setItems(p=>p.map((v,i)=>i===idx?t:v));}setCatSisEditIdx(null);}}>✓</button>
+                              <button style={S.smBtn("#475569")} onClick={()=>setCatSisEditIdx(null)}>✕</button>
+                            </>
+                            :<>
+                              <span style={{flex:1,fontSize:12,color:"#e2e8f0",fontWeight:500}}>{val}</span>
+                              {usados>0&&<span style={{fontSize:8,color:"#fbbf24",background:"rgba(251,191,36,0.12)",padding:"1px 7px",borderRadius:6,flexShrink:0}}>{usados} reg.</span>}
+                              <button style={S.smBtn("#C9A84C")} onClick={()=>{setCatSisEditIdx(`${title}-${idx}`);setCatSisEditVal(val);}}>✎</button>
+                              <button style={{...S.smBtn("#f87171"),opacity:usados>0?0.35:1,cursor:usados>0?"not-allowed":"pointer"}}
+                                onClick={()=>{if(usados>0){alert(`No se puede eliminar: ${usados} registro${usados!==1?"s":""} usa${usados!==1?"n":""} "${val}".`);}else{if(window.confirm(`¿Eliminar "${val}"?`))setItems(p=>p.filter((_,i)=>i!==idx));}}}>✕</button>
+                            </>
+                          }
+                        </div>
+                      );
+                    })}
+                    <div style={{display:"flex",gap:7,marginTop:9,borderTop:`1px solid ${color}22`,paddingTop:9}}>
+                      <input style={{...S.inp,flex:1,padding:"7px 10px",fontSize:11}} value={catSisNewVal}
+                        onChange={e=>setCatSisNewVal(e.target.value)} placeholder={addDefault||"Nuevo valor…"}
+                        onKeyDown={e=>{if(e.key==="Enter"){const t=catSisNewVal.trim();if(t&&!items.includes(t)){setItems(p=>[...p,t]);setCatSisNewVal("");}else if(items.includes(t))alert("Ese valor ya existe.");}}}/>
+                      <button style={{...S.saveB,width:"auto",padding:"7px 13px",marginTop:0,fontSize:11}}
+                        onClick={()=>{const t=catSisNewVal.trim();if(!t)return;if(items.includes(t)){alert("Ese valor ya existe.");return;}setItems(p=>[...p,t]);setCatSisNewVal("");}}>+ Agregar</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          };
+          // Helper: rename-only (cantidad fija)
+          const CatRename=({title,color,items,labels,setLabels,saveAction,note})=>{
+            const isOpen=catSisOpen===title;
+            const toggle=()=>{setCatSisOpen(isOpen?null:title);};
+            const [localLbls,setLocalLbls]=React.useState(labels);
+            React.useEffect(()=>setLocalLbls(labels),[labels]);
+            return(
+              <div style={{border:`1px solid ${color}33`,borderRadius:12,marginBottom:9,overflow:"hidden"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",cursor:"pointer",background:`${color}08`}} onClick={toggle}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color}}>{title}</div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:1}}>Rename — {items.length} valores fijos</div>
+                  </div>
+                  <span style={{color:"#475569",fontSize:13}}>{isOpen?"▲":"▸"}</span>
+                </div>
+                {isOpen&&(
+                  <div style={{padding:"10px 14px",borderTop:`1px solid ${color}22`}}>
+                    {note&&<div style={{fontSize:9,color:"#64748b",marginBottom:9,lineHeight:1.4}}>{note}</div>}
+                    {items.map(([key,col])=>(
+                      <div key={key} style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}>
+                        <span style={{width:10,height:10,borderRadius:2,background:col,flexShrink:0}}/>
+                        <input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:12}} value={localLbls[key]||""}
+                          onChange={e=>setLocalLbls(p=>({...p,[key]:e.target.value}))}/>
+                      </div>
+                    ))}
+                    <button style={{...S.saveB,marginTop:4}} onClick={()=>saveAction(localLbls)}>Guardar nombres</button>
+                  </div>
+                )}
+              </div>
+            );
+          };
+          // Helper: capas (add/rename/reorder/delete con protección)
+          const CatCapas=()=>{
+            const isOpen=catSisOpen==="Capas de Proyección";
+            const toggle=()=>{setCatSisOpen(isOpen?null:"Capas de Proyección");setCatSisNewVal("");};
+            return(
+              <div style={{border:"1px solid #C9A84C33",borderRadius:12,marginBottom:9,overflow:"hidden"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",cursor:"pointer",background:"rgba(201,168,76,0.06)"}} onClick={toggle}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#C9A84C"}}>Capas de Proyección</div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:1}}>{capas.length} capas · arrastra para reordenar</div>
+                  </div>
+                  <span style={{color:"#475569",fontSize:13}}>{isOpen?"▲":"▸"}</span>
+                </div>
+                {isOpen&&(
+                  <div style={{padding:"10px 14px",borderTop:"1px solid #C9A84C22"}}>
+                    <div style={{fontSize:9,color:"#64748b",marginBottom:9,lineHeight:1.4}}>El orden define la presentación en la vista Proyección. Una capa sin categorías asociadas se muestra vacía.</div>
+                    {capas.map(cp=>{
+                      const usados=[...catEg,...catEg.flatMap(c=>c.subs||[])].filter(c=>c.capa===cp.id).length;
+                      return(
+                        <div key={cp.id} draggable onDragStart={()=>capasDrag.start(cp.id)} onDragOver={e=>{e.preventDefault();capasDrag.enter(cp.id);}} onDrop={capasDrag.commit}
+                          style={{display:"flex",alignItems:"center",gap:7,marginBottom:7,background:capasDrag.aId===cp.id?"#1e2a1e":capasDrag.oViz===cp.id?"#1a2030":"transparent",borderRadius:8,padding:"3px 4px",cursor:"grab"}}>
+                          <span style={{color:"#475569",fontSize:12,flexShrink:0}}>☰</span>
+                          <input style={{...S.inp,flex:1,padding:"6px 9px",fontSize:12}} value={cp.nombre}
+                            onChange={e=>setCapas(p=>p.map(x=>x.id===cp.id?{...x,nombre:e.target.value}:x))}/>
+                          {usados>0&&<span style={{fontSize:8,color:"#fbbf24",background:"rgba(251,191,36,0.12)",padding:"1px 6px",borderRadius:6,flexShrink:0}}>{usados} cat.</span>}
+                          <button style={{...S.smBtn("#f87171"),opacity:usados>0?0.35:1,cursor:usados>0?"not-allowed":"pointer"}}
+                            onClick={()=>{if(usados>0){alert(`No se puede eliminar: ${usados} categoría${usados!==1?"s":""} usa${usados!==1?"n":""} la capa "${cp.nombre}".`);}else{if(window.confirm(`¿Eliminar capa "${cp.nombre}"?`))setCapas(p=>p.filter(x=>x.id!==cp.id));}}}>✕</button>
+                        </div>
+                      );
+                    })}
+                    <div style={{display:"flex",gap:7,marginTop:9,borderTop:"1px solid #C9A84C22",paddingTop:9}}>
+                      <input style={{...S.inp,flex:1,padding:"7px 10px",fontSize:11}} value={catSisNewVal}
+                        onChange={e=>setCatSisNewVal(e.target.value)} placeholder="Nueva capa…"
+                        onKeyDown={e=>{if(e.key==="Enter"){const t=catSisNewVal.trim();if(t){setCapas(p=>[...p,{id:"cap"+Date.now(),nombre:t}]);setCatSisNewVal("");}}}}/>
+                      <button style={{...S.saveB,width:"auto",padding:"7px 13px",marginTop:0,fontSize:11}}
+                        onClick={()=>{const t=catSisNewVal.trim();if(!t)return;setCapas(p=>[...p,{id:"cap"+Date.now(),nombre:t}]);setCatSisNewVal("");}}>+ Agregar</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          };
+          return(
+            <div style={S.sec}>
+              <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}>
+                <button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button>
+                <span style={{...S.sTit,margin:0}}>CATÁLOGOS DEL SISTEMA</span>
+              </div>
+
+              {/* ── MOVIMIENTOS ── */}
+              <div style={S.sTit}>📋 MOVIMIENTOS</div>
+              <CatRename
+                title="Prioridad de Egresos"
+                color="#f87171"
+                items={[[1,"#22c55e"],[2,"#60a5fa"],[3,"#fbbf24"],[4,"#f87171"]]}
+                labels={prioLblEdit}
+                setLabels={setPrioLblEdit}
+                note="4 niveles fijos. Solo se puede renombrar. Afecta el FEF y la proyección — guarda para recargar."
+                saveAction={(lbl)=>{const clean={1:(lbl[1]||"").trim()||"Prioridad 1",2:(lbl[2]||"").trim()||"Prioridad 2",3:(lbl[3]||"").trim()||"Prioridad 3",4:(lbl[4]||"").trim()||"Prioridad 4"};try{localStorage.setItem("nexus_prioEgLabels",JSON.stringify(clean));}catch(e){}if(window.confirm("Nombres guardados. La app se recargará para aplicarlos. ¿Continuar?"))location.reload();}}
+              />
+              <CatCapas/>
+              <CatRename
+                title="Probabilidad de Ingreso"
+                color="#22c55e"
+                items={[[1,"#22c55e"],[2,"#fbbf24"],[3,"#94a3b8"]]}
+                labels={prioIngLbl}
+                setLabels={()=>{}}
+                note="3 niveles fijos. Solo se puede renombrar. Cambios se aplican de inmediato."
+                saveAction={(lbl)=>{const clean={1:(lbl[1]||"").trim()||"Alta",2:(lbl[2]||"").trim()||"Media",3:(lbl[3]||"").trim()||"Baja"};setPrioIngLbl(clean);alert("Nombres actualizados.");}}
+              />
+              <div style={{border:"1px solid #47556933",borderRadius:12,marginBottom:9,overflow:"hidden"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",background:"rgba(71,85,105,0.08)"}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>🔒 Tipos de Movimiento</div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:1}}>Ingreso · Egreso · Traspaso · Pago Tarjeta — motor de cálculo</div>
+                  </div>
+                  <span style={{fontSize:10,color:"#334155",background:"#1e293b",padding:"2px 8px",borderRadius:6}}>No editable</span>
+                </div>
+              </div>
+              <div style={{border:"1px solid #47556933",borderRadius:12,marginBottom:9,overflow:"hidden"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"11px 14px",background:"rgba(71,85,105,0.08)"}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#64748b"}}>🔒 Estatus / Etapa</div>
+                    <div style={{fontSize:9,color:"#475569",marginTop:1}}>PROGRAMADO · PROYECTADO · INGRESADO · PENDIENTE · PAGADO — motor de cálculo</div>
+                  </div>
+                  <span style={{fontSize:10,color:"#334155",background:"#1e293b",padding:"2px 8px",borderRadius:6}}>No editable</span>
+                </div>
+              </div>
+
+              {/* ── CARTERA ── */}
+              <div style={S.sTit}>🤝 CARTERA</div>
+              <CatCRUD title="Origen — Acreedores" color="#f87171" items={catOrigenAcr} setItems={setCatOrigenAcr}
+                countUsed={v=>acreedores.filter(x=>x.origen===v).length} addDefault="Ej. Bancario"/>
+              <CatCRUD title="Origen — Deudores" color="#22c55e" items={catOrigenDeu} setItems={setCatOrigenDeu}
+                countUsed={v=>deudores.filter(x=>x.origen===v).length} addDefault="Ej. Empleados"/>
+              <CatCRUD title="Prioridad de Pago (Acreedores)" color="#f87171" items={catPrioPago} setItems={setCatPrioPago}
+                countUsed={v=>acreedores.filter(x=>x.nivel===v).length} addDefault="Ej. Urgente"/>
+              <CatCRUD title="Probabilidad de Recuperación (Deudores)" color="#22c55e" items={catProbRecup} setItems={setCatProbRecup}
+                countUsed={v=>deudores.filter(x=>x.nivel===v).length} addDefault="Ej. Muy Alta"/>
+
+              {/* ── INGRESOS EXTRAORDINARIOS ── */}
+              <div style={S.sTit}>⭐ INGRESOS EXTRAORDINARIOS</div>
+              <CatCRUD title="Tipo de Ingreso Extraordinario" color="#fbbf24" items={catOrigenIngExt} setItems={setCatOrigenIngExt}
+                countUsed={v=>ingresosExt.filter(x=>x.origen===v).length} addDefault="Ej. Inversión"/>
+            </div>
+          );
+        })()}
           <div style={S.sec}>
             <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:13}}><button style={{...S.acBtn("#475569"),fontSize:11}} onClick={()=>setView("menu")}>← Menú</button><span style={{...S.sTit,margin:0}}>CONFIGURACIÓN</span></div>
 
@@ -5302,7 +5488,7 @@ function App(){
             {id:"oportunidades",icon:"🚀",label:"Oport.",act:view==="oportunidades"},
             {id:"cartera",icon:"🤝",label:"Cartera",act:view==="cartera"},
             {id:"menu",sec:"analisis",icon:"📈",label:"Análisis",act:(view==="menu"&&menuSec==="analisis")||["estadisticas","presupuestos","proyeccion"].includes(view)},
-            {id:"menu",sec:"config",icon:"⚙",label:"Config",act:(view==="menu"&&menuSec==="config")||["cuentas","catalogos","configuracion"].includes(view)},
+            {id:"menu",sec:"config",icon:"⚙",label:"Config",act:(view==="menu"&&menuSec==="config")||["cuentas","catalogos","cat_sistema","configuracion"].includes(view)},
           ].map(n=>(
             <button key={n.label} style={S.navB(n.act)} onClick={()=>{setView(n.id);if(n.sec)setMenuSec(n.sec);}}>
               <span style={{fontSize:15}}>{n.icon}</span>{n.label}
