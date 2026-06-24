@@ -1391,17 +1391,62 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
 const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
 const hoyISO=()=>new Date().toISOString().slice(0,10);
 
+/* ── Helpers de modo interno ── */
+function ChecklistEditor({items,onChange}){
+  const addItem=()=>onChange([...items,{id:"ci"+Date.now(),texto:"",done:false}]);
+  const upd=(i,k,v)=>onChange(items.map((x,j)=>j===i?{...x,[k]:v}:x));
+  const del=(i)=>onChange(items.filter((_,j)=>j!==i));
+  return <div style={{marginTop:6}}>
+    <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Ítems del checklist</div>
+    {items.map((it,i)=>(
+      <div key={it.id} style={{display:"flex",gap:6,alignItems:"center",marginBottom:7}}>
+        <input type="checkbox" checked={!!it.done} onChange={e=>upd(i,"done",e.target.checked)} style={{width:17,height:17,flexShrink:0,accentColor:"#a78bfa"}}/>
+        <input style={{...S.inp,flex:1,textDecoration:it.done?"line-through":"none",color:it.done?"#475569":"#e2e8f0"}} value={it.texto} onChange={e=>upd(i,"texto",e.target.value)} placeholder={`Ítem ${i+1}…`}/>
+        <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0}} onClick={()=>del(i)}>✕</button>
+      </div>
+    ))}
+    <button style={{...S.pill(true,"#a78bfa"),padding:"7px 0",fontWeight:700,width:"100%",marginTop:4}} onClick={addItem}>+ Agregar ítem</button>
+  </div>;
+}
+function SubtareasEditor({subtareas,onChange}){
+  const addSub=()=>onChange([...subtareas,{id:"st"+Date.now(),titulo:"",fecha:"",estatus:"Programada"}]);
+  const upd=(i,k,v)=>onChange(subtareas.map((x,j)=>j===i?{...x,[k]:v}:x));
+  const del=(i)=>onChange(subtareas.filter((_,j)=>j!==i));
+  return <div style={{marginTop:6}}>
+    <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Subtareas del proyecto</div>
+    {subtareas.map((st,i)=>(
+      <div key={st.id} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,padding:"9px 10px",marginBottom:8}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:7}}>
+          <input style={{...S.inp,flex:1}} value={st.titulo} onChange={e=>upd(i,"titulo",e.target.value)} placeholder={`Subtarea ${i+1}…`}/>
+          <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0}} onClick={()=>del(i)}>✕</button>
+        </div>
+        <div style={{display:"flex",gap:6}}>
+          <input type="date" style={{...S.inp,flex:1}} value={st.fecha} onChange={e=>upd(i,"fecha",e.target.value)}/>
+          <select style={{...S.sel,flex:1}} value={st.estatus||"Programada"} onChange={e=>upd(i,"estatus",e.target.value)}>
+            {["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+    ))}
+    <button style={{...S.pill(true,"#a78bfa"),padding:"7px 0",fontWeight:700,width:"100%",marginTop:4}} onClick={addSub}>+ Agregar subtarea</button>
+  </div>;
+}
+const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||!(a.subtareas||[]).length)return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
+const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return "Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return "En Proceso";return "Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const done=(a.items||[]).filter(i=>i.done).length;if(done===(a.items||[]).length)return "Cerrada";if(done>0)return "En Proceso";return "Programada";}return a.estatus||"Programada";};
+const MODO_NEXT_EST={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Programada"};
+
 function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedContacto,onUpdateContacto,onUpdateOportunidad,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
   const[nuevoCto,setNuevoCto]=useState(null);
   const[esCopia,setEsCopia]=useState(false);
   const[showAvance,setShowAvance]=useState(false);
-  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",enfoque:"Comercial",...init}));
+  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",enfoque:"Comercial",modoTarea:"unica",...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const esInterno=f.enfoque==="Interno";
   const cid=!esInterno?(f.contactoId||fixedContacto):null;
   const cont=cid?contactos.find(c=>c.id===cid):null;
   const opsCont=!esInterno?(oportunidades||[]).filter(o=>o.contactoPrincipalId===cid||o.contactoOperativoId===cid||o.contactoId===cid):[];
   const save=()=>{
+    const modo=f.modoTarea||"unica";
     if(!esInterno){
       const cid=f.contactoId||fixedContacto;
       if(!cid){alert("Selecciona un contacto");return;}
@@ -1409,13 +1454,30 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
       if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
       onSave({...f,contactoId:cid,asunto:null});
     } else {
-      if(!f.fecha){alert("Indica la fecha");return;}
-      if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
-      onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null});
+      if(modo==="proyecto"){
+        if(!(f.subtareas||[]).length){alert("Agrega al menos una subtarea al proyecto");return;}
+        const pend=(f.subtareas||[]).filter(s=>s.estatus!=="Cerrada");
+        const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
+        const compFecha=ds[0]||(f.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";
+        const sts=(f.subtareas||[]).map(s=>s.estatus||"Programada");
+        const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
+        onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null,fecha:compFecha,estatus:compEst});
+      } else {
+        if(modo==="checklist"){
+          const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
+          const compEst=total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada";
+          if(!f.fecha){alert("Indica la fecha");return;}
+          onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null,estatus:compEst});
+        } else {
+          if(!f.fecha){alert("Indica la fecha");return;}
+          if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
+          onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null});
+        }
+      }
     }
     if(!esInterno&&f.estatus==="Cerrada"&&window.confirm("Actividad cerrada. ¿Agendar la siguiente acción para este contacto?")){
       const cid=f.contactoId||fixedContacto;
-      setF({contactoId:cid,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",hora:null,prioridad:f.prioridad||"Media",tipoAccion:"",servicioSolucion:null,intencion:"",resultado:"",enfoque:"Comercial"});
+      setF({contactoId:cid,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",hora:null,prioridad:f.prioridad||"Media",tipoAccion:"",servicioSolucion:null,intencion:"",resultado:"",enfoque:"Comercial",modoTarea:"unica"});
       return;
     }
     onClose();
@@ -1456,14 +1518,25 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
     </>)}
 
     {/* ── CAMPOS INTERNOS ── */}
-    {esInterno&&(
+    {esInterno&&(<>
+      <Field label="Tipo de tarea">
+        <div style={{display:"flex",gap:5}}>
+          {[["unica","1️⃣ Única"],["checklist","☑ Checklist"],["proyecto","📁 Proyecto"]].map(([v,l])=>(
+            <button key={v} style={{flex:1,padding:"7px 4px",fontSize:11,fontWeight:700,border:`1px solid ${(f.modoTarea||"unica")===v?"#a78bfa":"#a78bfa33"}`,borderRadius:8,cursor:"pointer",background:(f.modoTarea||"unica")===v?"#a78bfa22":"transparent",color:(f.modoTarea||"unica")===v?"#a78bfa":"#475569"}}
+              onClick={()=>set("modoTarea",v)}>{l}</button>
+          ))}
+        </div>
+      </Field>
       <Field label="Asunto / Tarea">
         <textarea style={{...S.ta,minHeight:72}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
       </Field>
-    )}
+      {(f.modoTarea||"unica")==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
+      {(f.modoTarea||"unica")==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}/>}
+    </>)}
 
     <div style={S.g2}>
-      <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
+      {(f.modoTarea||"unica")!=="proyecto"&&<Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>}
+      {(f.modoTarea||"unica")==="proyecto"&&<Field label="Fecha"><div style={{fontSize:10,color:"#64748b",padding:"9px 10px",background:"#0f172a",borderRadius:8,border:"1px solid #1e293b"}}>Calculada de subtareas</div></Field>}
       <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
     </div>
     <div style={S.g2}>
@@ -1525,17 +1598,75 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
   </div></div>;
 }
 
-function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta}){
-  const sorted=noSort?acts:acts.slice().sort((a,b)=>{const fa=(a.fecha||"")+(a.hora||""),fb=(b.fecha||"")+(b.hora||"");return asc?fa.localeCompare(fb):fb.localeCompare(fa);});
-  let hoyIdx=-1;if(hoy){for(let i=0;i<sorted.length;i++){const fx=sorted[i].fecha||"";if(asc?(fx>=hoy):(fx<=hoy)){hoyIdx=i;break;}}}
+function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct}){
+  const[expandidos,setExpandidos]=useState(new Set());
+  const toggleExp=(id)=>setExpandidos(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  const sorted=noSort?acts:acts.slice().sort((a,b)=>{const fa=(proyFecha(a)||a.fecha||"")+(a.hora||""),fb=(proyFecha(b)||b.fecha||"")+(b.hora||"");return asc?fa.localeCompare(fb):fb.localeCompare(fa);});
+  let hoyIdx=-1;if(hoy){for(let i=0;i<sorted.length;i++){const fx=proyFecha(sorted[i])||sorted[i].fecha||"";if(asc?(fx>=hoy):(fx<=hoy)){hoyIdx=i;break;}}}
   if(sorted.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades registradas.</div>;
-  return <div>{sorted.map((a,i)=>{const c=contactos.find(x=>x.id===a.contactoId);const col=EST_COLOR[a.estatus]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";const _hoy=hoyISO();const _pend=(a.estatus==="Programada"||a.estatus==="En Proceso");const _rez=(_pend&&a.fecha&&a.fecha<_hoy)?Math.max(0,Math.round((Date.parse(_hoy)-Date.parse(a.fecha))/86400000)):0;const _rezC=_rez>=7?"#ef4444":_rez>=3?"#fb923c":_rez>=1?"#fbbf24":null;const esInterno=a.enfoque==="Interno";const tituloCard=esInterno?(a.asunto||a.tipoAccion||"Actividad interna"):(showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad"));
-    return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${esInterno?"#a78bfa":col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,cursor:"pointer"}}>
-      <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-        <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>{selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}<div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tituloCard}</div></div>
-        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>{esInterno&&<span style={{...S.tag("#a78bfa"),fontSize:8}}>⚙ INT</span>}{_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}{a.prioridad&&<span style={S.tag(PRIOR_COLOR[a.prioridad]||"#64748b")}>{a.prioridad}</span>}<span style={S.tag(col)}>{a.estatus}</span></div>
+  return <div>{sorted.map((a,i)=>{const c=contactos.find(x=>x.id===a.contactoId);const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";const _hoy=hoyISO();const _pend=(efEst==="Programada"||efEst==="En Proceso");const efFech=proyFecha(a)||a.fecha||"";const _rez=(_pend&&efFech&&efFech<_hoy)?Math.max(0,Math.round((Date.parse(_hoy)-Date.parse(efFech))/86400000)):0;const _rezC=_rez>=7?"#ef4444":_rez>=3?"#fb923c":_rez>=1?"#fbbf24":null;const esInterno=a.enfoque==="Interno";const modo=a.modoTarea||"unica";const tituloCard=esInterno?(a.asunto||a.tipoAccion||"Actividad interna"):(showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad"));
+    const isExp=expandidos.has(a.id);
+    /* Progress para checklist y proyecto */
+    const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return {done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return {done:d,total:a.subtareas.length};}return null;})();
+    return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${esInterno?"#a78bfa":col}`,borderRadius:9,padding:"9px 11px",marginBottom:6}}>
+      <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(modo!=="unica"?toggleExp(a.id):(onTap&&onTap(a)))}>
+        <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+          {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+          {esInterno&&modo==="proyecto"&&<span style={{fontSize:12}}>📁</span>}
+          {esInterno&&modo==="checklist"&&<span style={{fontSize:12}}>☑</span>}
+          <div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tituloCard}</div>
+        </div>
+        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
+          {esInterno&&<span style={{...S.tag("#a78bfa"),fontSize:8}}>⚙ INT</span>}
+          {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+          {a.prioridad&&<span style={S.tag(PRIOR_COLOR[a.prioridad]||"#64748b")}>{a.prioridad}</span>}
+          <span style={S.tag(col)}>{efEst}</span>
+          {modo!=="unica"&&!selectable&&<span style={{fontSize:11,color:"#475569",marginLeft:2}}>{isExp?"▲":"▾"}</span>}
+        </div>
       </div>
-      <div style={{fontSize:10,color:"#64748b",marginTop:3}}>{a.fecha||"sin fecha"}{a.hora?" · "+a.hora:""}{esInterno&&a.tipoAccion?<span> · <span style={{color:"#a78bfa",fontWeight:600}}>{a.tipoAccion}</span></span>:(!esInterno&&showContacto&&a.tipoAccion?<span> · <span style={{color:"#cbd5e1",fontWeight:600}}>{a.tipoAccion}</span></span>:"")}{!esInterno&&showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}{!esInterno&&a.servicioSolucion?` · ${a.servicioSolucion}`:""}{!esInterno&&a.oportunidadId?" · 🎯":""}</div>
+      <div style={{fontSize:10,color:"#64748b",marginTop:3,cursor:"pointer"}} onClick={()=>modo==="unica"&&onTap&&onTap(a)}>
+        {efFech||"sin fecha"}{a.hora?" · "+a.hora:""}
+        {esInterno&&a.tipoAccion?<span> · <span style={{color:"#a78bfa",fontWeight:600}}>{a.tipoAccion}</span></span>:(!esInterno&&showContacto&&a.tipoAccion?<span> · <span style={{color:"#cbd5e1",fontWeight:600}}>{a.tipoAccion}</span></span>:"")}
+        {!esInterno&&showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}
+        {!esInterno&&a.servicioSolucion?` · ${a.servicioSolucion}`:""}
+        {!esInterno&&a.oportunidadId?" · 🎯":""}
+      </div>
+      {/* Progress bar */}
+      {prog&&<div style={{marginTop:6}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:3}}>
+          <span>{prog.done}/{prog.total} {modo==="checklist"?"ítems":"subtareas"}</span>
+          <span>{Math.round(prog.done/prog.total*100)}%</span>
+        </div>
+        <div style={{background:"#1e293b",borderRadius:4,height:5,overflow:"hidden"}}>
+          <div style={{background:prog.done===prog.total?"#22c55e":"#a78bfa",height:"100%",width:`${Math.round(prog.done/prog.total*100)}%`,borderRadius:4,transition:"width .3s"}}/>
+        </div>
+      </div>}
+      {/* Botón editar para no-única */}
+      {esInterno&&modo!=="unica"&&!selectable&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();onTap&&onTap(a);}}>✏ Editar proyecto</button>}
+      {/* Panel expandido checklist */}
+      {isExp&&modo==="checklist"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
+        {(a.items||[]).map((it,idx)=>(
+          <div key={it.id} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}}
+            onClick={()=>{if(!onPatchAct)return;const ni=(a.items||[]).map((x,j)=>j===idx?{...x,done:!x.done}:x);const done=ni.filter(x=>x.done).length;const compEst=ni.length>0&&done===ni.length?"Cerrada":done>0?"En Proceso":"Programada";onPatchAct(a.id,{items:ni,estatus:compEst});}}>
+            <span style={{fontSize:15,flexShrink:0}}>{it.done?"✅":"⬜"}</span>
+            <span style={{fontSize:12,color:it.done?"#475569":"#e2e8f0",textDecoration:it.done?"line-through":"none",flex:1}}>{it.texto||"Ítem sin nombre"}</span>
+          </div>
+        ))}
+      </div>}
+      {/* Panel expandido proyecto */}
+      {isExp&&modo==="proyecto"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
+        {(a.subtareas||[]).map((st,idx)=>(
+          <div key={st.id} style={{display:"flex",gap:8,alignItems:"center",padding:"6px 8px",marginBottom:4,background:"#0f172a",borderRadius:7,border:`1px solid ${EST_COLOR[st.estatus||"Programada"]||"#64748b"}33`,cursor:"pointer"}}
+            onClick={()=>{if(!onPatchAct)return;const nst=(a.subtareas||[]).map((x,j)=>j===idx?{...x,estatus:MODO_NEXT_EST[x.estatus||"Programada"]}:x);const sts=nst.map(s=>s.estatus||"Programada");const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=nst.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatchAct(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});}}>
+            <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]||"#64748b"),fontSize:8,flexShrink:0}}>{st.estatus||"Programada"}</span>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none"}}>{st.titulo||"Subtarea sin nombre"}</div>
+              {st.fecha&&<div style={{fontSize:9,color:"#64748b",marginTop:1}}>{st.fecha.split("-").reverse().join("/")}</div>}
+            </div>
+            <span style={{fontSize:9,color:"#475569"}}>tap →</span>
+          </div>
+        ))}
+      </div>}
       {!esInterno&&showContacto&&((c&&c.etapaEspecifica)||(op&&op.etapa))&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>{c&&c.etapaEspecifica&&<span style={{fontSize:8,fontWeight:700,color:"#a78bfa",background:"#a78bfa1a",border:"1px solid #a78bfa44",borderRadius:5,padding:"1px 6px"}}>{c.etapaEspecifica}</span>}{op&&op.etapa&&<span style={{fontSize:8,fontWeight:700,color:oc(op.etapa),background:oc(op.etapa)+"1a",border:`1px solid ${oc(op.etapa)}44`,borderRadius:5,padding:"1px 6px"}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}</div>}
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
       {a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
@@ -1545,7 +1676,8 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
 }
 
 function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
-  const[filtro,setFiltro]=useState("Programada");
+  const[filtros,setFiltros]=useState([]);
+  const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
   const[modo,setModo]=useState("lista");
   const[desde,setDesde]=useState("");
   const[hasta,setHasta]=useState("");
@@ -1572,9 +1704,10 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const toggleTipo=(t)=>setFTipos(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
   const ql=q.trim().toLowerCase();
   const base=actividades.filter(a=>{
-    if(filtro!=="Todas"&&a.estatus!==filtro)return false;
-    if(desde&&(a.fecha||"")<desde)return false;
-    if(hasta&&(a.fecha||"")>hasta)return false;
+    const efEst=proyEstatus(a); const efFech=proyFecha(a)||a.fecha||"";
+    if(filtros.length&&!filtros.includes(efEst))return false;
+    if(desde&&efFech<desde)return false;
+    if(hasta&&efFech>hasta)return false;
     if(fContacto&&a.contactoId!==fContacto)return false;
     if(fEmpresa){const c=ctById(a.contactoId);if(!c||!cEmpresas(c).some(x=>x.empresaId===fEmpresa))return false;}
     if(fPrioridad.length&&fPrioridad.indexOf(a.prioridad)<0)return false;
@@ -1587,15 +1720,16 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     return true;
   });
   const ordenadas=base.slice().sort((a,b)=>{
+    const fa=proyFecha(a)||a.fecha||"", fb=proyFecha(b)||b.fecha||"";
     let r;
-    if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=((a.fecha||"")+(a.hora||"")).localeCompare((b.fecha||"")+(b.hora||""));}
-    else if(ordCampo==="fecha"){r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
-    else {r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
+    if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=(fa+(a.hora||"")).localeCompare(fb+(b.hora||""));}
+    else if(ordCampo==="fecha"){r=fa.localeCompare(fb);if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
+    else {r=fa.localeCompare(fb);if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
     return ordDir==="asc"?r:-r;
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");};
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFiltros([]);};
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
@@ -1605,8 +1739,9 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("lista")}>Lista</button>
         <button style={{...S.pill(modo==="reporte",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("reporte")}>Reporte</button>
       </div>
-      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible",marginBottom:8}}>
-        {["Programada","En Proceso","Cerrada","Todas"].map(t=><span key={t} style={S.chip(filtro===t,EST_COLOR[t]||GOLD)} onClick={()=>setFiltro(t)}>{t}</span>)}
+      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible",marginBottom:8,gap:5}}>
+        {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={S.chip(filtros.includes(t),EST_COLOR[t]||GOLD)} onClick={()=>toggleFiltro(t)}>{t}</span>)}
+        {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),opacity:.8}} onClick={()=>setFiltros([])}>✕ Todas</span>}
       </div>
       <div style={{display:"flex",gap:6}}>
         <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar acción, contacto, nota…" value={q} onChange={e=>setQ(e.target.value)}/>
@@ -1664,7 +1799,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
             <button style={{...S.pill(false,"#60a5fa"),padding:"5px 10px"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
           </div>
       {modo==="lista"
-        ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onTap={(a)=>openAct(a,a.contactoId)}/>
+        ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)}/>
         : (ordenadas.length===0
             ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
             : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
