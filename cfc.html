@@ -224,7 +224,12 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
 
       <div style={S.sTit}>Generales</div>
-      <Field label="Tipo de contacto"><CatSelect cat={catalogos.tipoContacto} value={f.tipoContacto} onChange={v=>set("tipoContacto",v)}/></Field>
+      <Field label="Tipo de contacto">
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          {(catalogos.tipoContacto||[]).map(o=>{const on=(f.tiposContacto||[]).includes(o.nombre);
+            return <span key={o.id} style={S.chip(on,"#7dd3fc")} onClick={()=>set("tiposContacto",on?(f.tiposContacto||[]).filter(x=>x!==o.nombre):[...(f.tiposContacto||[]),o.nombre])}>{o.nombre}</span>;})}
+        </div>
+      </Field>
       <Field label="Actividad principal">
         <input style={S.inp} list="actlist" value={f.actividad||""} onChange={e=>set("actividad",e.target.value||null)} placeholder="Elige una existente o escribe nueva…"/>
         <datalist id="actlist">{(catalogos.actividadPrincipal||[]).map(o=><option key={o.id} value={o.nombre}/>)}</datalist>
@@ -285,6 +290,8 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       </>}
 
       <div style={S.sTit}>Avance Nexus</div>
+      {!(f.tiposContacto||[]).includes("Prospecto")&&<div style={{fontSize:10,color:"#475569",marginBottom:8,padding:"7px 10px",background:"#0f172a",borderRadius:8,border:"1px solid #1e293b"}}>Esta sección aplica cuando el tipo incluye <b style={{color:"#7dd3fc"}}>Prospecto</b>. Agrega ese tipo para habilitarla.</div>}
+      {(f.tiposContacto||[]).includes("Prospecto")&&<>
       <div style={S.g2}>
         <Field label="Etapa principal">
           <CatSelect cat={catalogos.etapaPrincipal} value={f.etapaPrincipal} onChange={v=>{set("etapaPrincipal",v);set("etapaEspecifica",null);}}/>
@@ -322,6 +329,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
           </select>
         </Field>
       </div>
+      </>}
 
       <div style={S.sTit}>Perfil estratégico</div>
       <Field label="Tipo de persona"><CatSelect cat={catalogos.tipoPersona} value={f.tipoPersona} onChange={v=>set("tipoPersona",v)}/></Field>
@@ -377,7 +385,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
       <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{c.nombreCompleto}</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
         {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}{c.etapaEspecifica?` · ${c.etapaEspecifica}`:""}</span>}
-        {c.tipoContacto&&<span style={S.tag("#7dd3fc")}>{c.tipoContacto}</span>}
+        {(c.tiposContacto||[c.tipoContacto].filter(Boolean)).map(t=><span key={t} style={S.tag("#7dd3fc")}>{t}</span>)}
         {c.potencial&&<span style={S.tag(POT_COLOR[c.potencial]||"#64748b")}>Potencial {c.potencial}</span>}
       </div>
     </div>
@@ -510,7 +518,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     if(fPot.length&&!fPot.includes(c.potencial))return false;
     if(fCer.length&&!fCer.includes(c.cercania))return false;
     if(fEco.length&&!fEco.includes(c.nivelEconomico))return false;
-    if(fTipo.length&&!fTipo.includes(c.tipoContacto))return false;
+    if(fTipo.length&&!fTipo.some(t=>(c.tiposContacto||[c.tipoContacto].filter(Boolean)).includes(t)))return false;
     if(fEsAliado&&(esAliado?"si":"no")!==fEsAliado)return false;
     if(fTipoAliado.length&&!(c.tiposAliado||[]).some(t=>fTipoAliado.includes(t)))return false;
     if(fEstatusAliado.length&&!fEstatusAliado.includes(c.estatusAliado))return false;
@@ -653,7 +661,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
             {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}</span>}
-            {c.tipoContacto&&c.tipoContacto!=="Prospecto"&&<span style={S.tag("#7dd3fc")}>{c.tipoContacto}</span>}
+            {(c.tiposContacto||[c.tipoContacto].filter(Boolean)).filter(t=>t!=="Prospecto").map(t=><span key={t} style={S.tag("#7dd3fc")}>{t}</span>)}
             {c.etapaEspecifica&&<span style={S.tag("#94a3b8")}>{c.etapaEspecifica}</span>}
             {c.circulo&&<span style={S.tag("#64748b")}>{c.circulo}</span>}
             {emp&&<span style={S.tag("#3b82f6")}>{emp.nombre}</span>}
@@ -1946,6 +1954,10 @@ function App(){
       cs=cs.map(c=>c.tipoContacto?c:{...c,tipoContacto:"Prospecto"});
       try{localStorage.setItem(PFX+"migTipo","1");}catch(e){}
     }
+    if(!localStorage.getItem(PFX+"migTiposContacto")){
+      cs=cs.map(c=>c.tiposContacto?c:{...c,tiposContacto:c.tipoContacto?[c.tipoContacto]:[]});
+      try{localStorage.setItem(PFX+"migTiposContacto","1");}catch(e){}
+    }
     if(!localStorage.getItem(PFX+"migCaps")){
       cs=cs.map(c=>({...c,nombre:titleCase(c.nombre),apellido:titleCase(c.apellido),nombreCompleto:titleCase(c.nombreCompleto)}));
       try{localStorage.setItem(PFX+"migCaps","1");}catch(e){}
@@ -1970,6 +1982,9 @@ function App(){
     }
     if(!base.etiquetas){ base.etiquetas=[]; }
     if(!localStorage.getItem(PFX+"migAnclaCat")){ const _A=["sol2","sol6","sol20","sol8","sol7","sol4","sol15","sol3"]; if(Array.isArray(base.solucion))base.solucion=base.solucion.map(s=>_A.indexOf(s.id)>=0?{...s,ancla:true}:s); try{localStorage.setItem(PFX+"migAnclaCat","1");}catch(e){} }
+    if(!base.accionesInt||base.accionesInt.length===0){
+      base.accionesInt=(SEED.catalogos.accionesInt)||[{id:"ai1",nombre:"Capacitación"},{id:"ai2",nombre:"Revisión de Portal"},{id:"ai3",nombre:"Elaboración de Material"},{id:"ai4",nombre:"Preparación de Propuesta"},{id:"ai5",nombre:"Investigación"},{id:"ai6",nombre:"Planificación Estratégica"},{id:"ai7",nombre:"Gestión Administrativa"}];
+    }
     if(!base.tipoContacto){
       base.tipoContacto=["Prospecto","Enlace operativo","Referidor","Otro"].map((n,i)=>({id:"tc"+i,nombre:n}));
     }
