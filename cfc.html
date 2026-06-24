@@ -1409,23 +1409,29 @@ function ChecklistEditor({items,onChange}){
   </div>;
 }
 function SubtareasEditor({subtareas,onChange}){
-  const addSub=()=>onChange([...subtareas,{id:"st"+Date.now(),titulo:"",fecha:"",estatus:"Programada"}]);
+  const addSub=()=>onChange([...subtareas,{id:"st"+Date.now(),titulo:"",fecha:"",estatus:"Programada",prioridad:"Media",descripcion:""}]);
   const upd=(i,k,v)=>onChange(subtareas.map((x,j)=>j===i?{...x,[k]:v}:x));
   const del=(i)=>onChange(subtareas.filter((_,j)=>j!==i));
   return <div style={{marginTop:6}}>
     <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Subtareas del proyecto</div>
     {subtareas.map((st,i)=>(
       <div key={st.id} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,padding:"9px 10px",marginBottom:8}}>
-        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:7}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
           <input style={{...S.inp,flex:1}} value={st.titulo} onChange={e=>upd(i,"titulo",e.target.value)} placeholder={`Subtarea ${i+1}…`}/>
           <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0}} onClick={()=>del(i)}>✕</button>
         </div>
-        <div style={{display:"flex",gap:6}}>
-          <input type="date" style={{...S.inp,flex:1}} value={st.fecha} onChange={e=>upd(i,"fecha",e.target.value)}/>
+        <div style={{display:"flex",gap:6,marginBottom:6}}>
+          <input type="date" style={{...S.inp,flex:1}} value={st.fecha||""} onChange={e=>upd(i,"fecha",e.target.value)}/>
           <select style={{...S.sel,flex:1}} value={st.estatus||"Programada"} onChange={e=>upd(i,"estatus",e.target.value)}>
             {["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+        <div style={{marginBottom:6}}>
+          <div style={{display:"flex",gap:5}}>
+            {PRIOR.map(p=><button key={p} style={{flex:1,padding:"4px 0",fontSize:9,fontWeight:700,border:`1px solid ${(st.prioridad||"Media")===p?PRIOR_COLOR[p]:PRIOR_COLOR[p]+"33"}`,borderRadius:6,cursor:"pointer",background:(st.prioridad||"Media")===p?PRIOR_COLOR[p]+"22":"transparent",color:(st.prioridad||"Media")===p?PRIOR_COLOR[p]:"#475569"}} onClick={()=>upd(i,"prioridad",p)}>{p}</button>)}
+          </div>
+        </div>
+        <textarea style={{...S.ta,minHeight:52,fontSize:11}} value={st.descripcion||""} onChange={e=>upd(i,"descripcion",e.target.value)} placeholder="Descripción de la subtarea (opcional)…"/>
       </div>
     ))}
     <button style={{...S.pill(true,"#a78bfa"),padding:"7px 0",fontWeight:700,width:"100%",marginTop:4}} onClick={addSub}>+ Agregar subtarea</button>
@@ -1433,6 +1439,7 @@ function SubtareasEditor({subtareas,onChange}){
 }
 const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||!(a.subtareas||[]).length)return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
 const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return "Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return "En Proceso";return "Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const done=(a.items||[]).filter(i=>i.done).length;if(done===(a.items||[]).length)return "Cerrada";if(done>0)return "En Proceso";return "Programada";}return a.estatus||"Programada";};
+const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};let best=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<best)best=r;});return Object.keys(rank).find(k=>rank[k]===best)||"Media";};
 const MODO_NEXT_EST={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Programada"};
 
 function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedContacto,onUpdateContacto,onUpdateOportunidad,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
@@ -1537,7 +1544,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
     <div style={S.g2}>
       {(f.modoTarea||"unica")!=="proyecto"&&<Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>}
       {(f.modoTarea||"unica")==="proyecto"&&<Field label="Fecha"><div style={{fontSize:10,color:"#64748b",padding:"9px 10px",background:"#0f172a",borderRadius:8,border:"1px solid #1e293b"}}>Calculada de subtareas</div></Field>}
-      <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
+      {(f.modoTarea||"unica")!=="proyecto"&&<Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>}
     </div>
     <div style={S.g2}>
       <Field label="Estatus">
@@ -1608,29 +1615,49 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
     const isExp=expandidos.has(a.id);
     /* Progress para checklist y proyecto */
     const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return {done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return {done:d,total:a.subtareas.length};}return null;})();
+    const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
     return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${esInterno?"#a78bfa":col}`,borderRadius:9,padding:"9px 11px",marginBottom:6}}>
-      <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(modo!=="unica"?toggleExp(a.id):(onTap&&onTap(a)))}>
-        <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
-          {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-          {esInterno&&modo==="proyecto"&&<span style={{fontSize:12}}>📁</span>}
-          {esInterno&&modo==="checklist"&&<span style={{fontSize:12}}>☑</span>}
-          <div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tituloCard}</div>
-        </div>
-        <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
-          {esInterno&&<span style={{...S.tag("#a78bfa"),fontSize:8}}>⚙ INT</span>}
-          {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-          {a.prioridad&&<span style={S.tag(PRIOR_COLOR[a.prioridad]||"#64748b")}>{a.prioridad}</span>}
-          <span style={S.tag(col)}>{efEst}</span>
-          {modo!=="unica"&&!selectable&&<span style={{fontSize:11,color:"#475569",marginLeft:2}}>{isExp?"▲":"▾"}</span>}
-        </div>
-      </div>
-      <div style={{fontSize:10,color:"#64748b",marginTop:3,cursor:"pointer"}} onClick={()=>modo==="unica"&&onTap&&onTap(a)}>
+      {/* CABECERA — comportamiento distinto para interno vs comercial */}
+      {esInterno
+        ? <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(modo!=="unica"?toggleExp(a.id):(onTap&&onTap(a)))}>
+            {/* Renglón 1: concepto completo */}
+            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+              {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+              {modo==="proyecto"&&<span style={{fontSize:11,flexShrink:0}}>📁</span>}
+              {modo==="checklist"&&<span style={{fontSize:11,flexShrink:0}}>☑</span>}
+              <div style={{fontSize:13,fontWeight:800,flex:1,wordBreak:"break-word",lineHeight:1.3}}>{tituloCard}</div>
+            </div>
+            {/* Renglón 2: etiquetas informativas */}
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+              <span style={{...S.tag("#a78bfa"),fontSize:8}}>⚙ INT</span>
+              {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+              {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
+              <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
+              {a.tipoAccion&&<span style={{fontSize:8,color:"#a78bfa",background:"#a78bfa1a",border:"1px solid #a78bfa33",borderRadius:5,padding:"1px 6px"}}>{a.tipoAccion}</span>}
+              <span style={{fontSize:9,color:"#475569"}}>{efFech||"sin fecha"}</span>
+              {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569",marginLeft:"auto"}}>{isExp?"▲":"▾"}</span>}
+            </div>
+          </div>
+        : <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))}>
+            <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
+              {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+              <div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tituloCard}</div>
+            </div>
+            <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
+              {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+              {a.prioridad&&<span style={S.tag(PRIOR_COLOR[a.prioridad]||"#64748b")}>{a.prioridad}</span>}
+              <span style={S.tag(col)}>{efEst}</span>
+            </div>
+          </div>
+      }
+      {/* Renglón de fecha/detalle para comerciales */}
+      {!esInterno&&<div style={{fontSize:10,color:"#64748b",marginTop:3}}>
         {efFech||"sin fecha"}{a.hora?" · "+a.hora:""}
-        {esInterno&&a.tipoAccion?<span> · <span style={{color:"#a78bfa",fontWeight:600}}>{a.tipoAccion}</span></span>:(!esInterno&&showContacto&&a.tipoAccion?<span> · <span style={{color:"#cbd5e1",fontWeight:600}}>{a.tipoAccion}</span></span>:"")}
-        {!esInterno&&showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}
-        {!esInterno&&a.servicioSolucion?` · ${a.servicioSolucion}`:""}
-        {!esInterno&&a.oportunidadId?" · 🎯":""}
-      </div>
+        {showContacto&&a.tipoAccion?<span> · <span style={{color:"#cbd5e1",fontWeight:600}}>{a.tipoAccion}</span></span>:""}
+        {showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}
+        {a.servicioSolucion?` · ${a.servicioSolucion}`:""}
+        {a.oportunidadId?" · 🎯":""}
+      </div>}
       {/* Progress bar */}
       {prog&&<div style={{marginTop:6}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:3}}>
@@ -1661,9 +1688,13 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
             <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]||"#64748b"),fontSize:8,flexShrink:0}}>{st.estatus||"Programada"}</span>
             <div style={{flex:1,minWidth:0}}>
               <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none"}}>{st.titulo||"Subtarea sin nombre"}</div>
-              {st.fecha&&<div style={{fontSize:9,color:"#64748b",marginTop:1}}>{st.fecha.split("-").reverse().join("/")}</div>}
+              <div style={{display:"flex",gap:5,marginTop:2,flexWrap:"wrap",alignItems:"center"}}>
+                {st.fecha&&<span style={{fontSize:9,color:"#64748b"}}>{st.fecha.split("-").reverse().join("/")}</span>}
+                {st.prioridad&&st.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[st.prioridad]||"#64748b"),fontSize:7}}>{st.prioridad}</span>}
+              </div>
+              {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:3,lineHeight:1.4}}>{st.descripcion}</div>}
             </div>
-            <span style={{fontSize:9,color:"#475569"}}>tap →</span>
+            <span style={{fontSize:9,color:"#475569",flexShrink:0}}>tap →</span>
           </div>
         ))}
       </div>}
@@ -1733,92 +1764,126 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
-    {/* ── BARRA STICKY: tabs + filtros ── */}
-    <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"10px 14px",marginBottom:2}}>
-      <div style={{display:"flex",gap:6,marginBottom:8}}>
-        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("lista")}>Lista</button>
-        <button style={{...S.pill(modo==="reporte",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("reporte")}>Reporte</button>
+    {/* ── BARRA STICKY COMPACTA ── */}
+    <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"8px 12px 8px"}}>
+      {/* Fila 1: tabs */}
+      <div style={{display:"flex",gap:5,marginBottom:7}}>
+        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:12}} onClick={()=>setModo("lista")}>Lista</button>
+        <button style={{...S.pill(modo==="rptCom",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:12}} onClick={()=>setModo("rptCom")}>🤝 Comercial</button>
+        <button style={{...S.pill(modo==="rptInt","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:12}} onClick={()=>setModo("rptInt")}>⚙ Interno</button>
       </div>
-      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible",marginBottom:8,gap:5}}>
-        {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={S.chip(filtros.includes(t),EST_COLOR[t]||GOLD)} onClick={()=>toggleFiltro(t)}>{t}</span>)}
-        {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),opacity:.8}} onClick={()=>setFiltros([])}>✕ Todas</span>}
+      {/* Fila 2: chips estatus */}
+      <div style={{display:"flex",gap:5,flexWrap:"nowrap",marginBottom:7}}>
+        {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]||GOLD),fontSize:10,padding:"3px 8px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
+        {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:10,padding:"3px 8px",opacity:.8}} onClick={()=>setFiltros([])}>✕</span>}
       </div>
-      <div style={{display:"flex",gap:6}}>
-        <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar acción, contacto, nota…" value={q} onChange={e=>setQ(e.target.value)}/>
-        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""} {showFil?"▲":"▾"}</button>
-        <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap",alignSelf:"center"}}>Act: {base.length}</span>
+      {/* Fila 3: búsqueda + filtros */}
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <input style={{...S.inp,flex:1,padding:"7px 10px",fontSize:12}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 12px",fontWeight:700,whiteSpace:"nowrap",fontSize:12}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` ${nFil}`:""} {showFil?"▲":"▾"}</button>
       </div>
     </div>
+    {/* ── PANEL DE FILTROS ── */}
     <div style={{...S.sec,paddingTop:4}}>
-      {showFil&&<div style={{...S.card(),marginTop:10}}>
-        <div style={S.fl}>Contacto</div>
-        <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
-        <div style={{...S.fl,marginTop:10}}>Empresa</div>
-        <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
-        <div style={{...S.fl,marginTop:10}}>Tipo de acción</div>
-        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={S.chip(fTipos.includes(t.nombre),GOLD)} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
-        <div style={{...S.fl,marginTop:10}}>Prioridad</div>
-        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{PRIOR.map(p=><span key={p} style={S.chip(fPrioridad.includes(p),PRIOR_COLOR[p])} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
-        <div style={S.g2}>
-          <div><div style={{...S.fl,marginTop:10}}>Etapa contacto</div><select style={S.sel} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
-          <div><div style={{...S.fl,marginTop:10}}>Etapa oportunidad</div><select style={S.sel} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+      {showFil&&<div style={{...S.card(),marginTop:6,padding:"10px 12px"}}>
+        {/* 1 Enfoque */}
+        <div style={{display:"flex",gap:5,marginBottom:8}}>
+          {[["","Todos","#64748b"],["Comercial","🤝 Com","#60a5fa"],["Interno","⚙ Int","#a78bfa"]].map(([v,l,c])=>(
+            <button key={v} style={{...S.pill(fEnfoque===v,c),flex:1,padding:"5px 0",fontWeight:700,fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
+          ))}
         </div>
-        <div style={S.g2}>
-          <div><div style={{...S.fl,marginTop:10}}>Desde</div><input type="date" style={S.inp} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
-          <div><div style={{...S.fl,marginTop:10}}>Hasta</div><input type="date" style={S.inp} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
-        </div>
-        {nFil>0&&<div style={{textAlign:"right",marginTop:10}}><button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar filtros</button></div>}
-        <div style={{borderTop:"1px solid #1e293b",marginTop:12,paddingTop:10}}>
-          <div style={{...S.fl,marginBottom:6}}>Selección múltiple</div>
+        {/* 2 Selección múltiple */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
           {!selMode
-            ? <button style={{...S.pill(false,GOLD),padding:"7px 14px",fontWeight:700,width:"100%"}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Activar selección múltiple</button>
-            : <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            ? <button style={{...S.pill(false,GOLD),padding:"5px 12px",fontWeight:700,width:"100%",fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
+            : <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                 <span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
-                <button style={{...S.pill(false,"#60a5fa"),padding:"5px 9px"}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
-                <button style={{...S.pill(false,"#64748b"),padding:"5px 9px"}} onClick={()=>setSel([])}>Ninguna</button>
-                <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
-                <button style={{...S.pill(false,"#f87171"),padding:"5px 10px"}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
+                <button style={{...S.pill(false,"#60a5fa"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
+                <button style={{...S.pill(false,"#64748b"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel([])}>Ninguna</button>
+                <button style={{...S.pill(false,GOLD),padding:"4px 8px",fontWeight:700,fontSize:11,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
+                <button style={{...S.pill(false,"#f87171"),padding:"4px 8px",fontSize:11}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
               </div>}
-          <div style={{...S.fl,marginTop:10,marginBottom:6}}>Rezago</div>
-          <button style={{...S.pill(fRezago,"#ef4444"),padding:"7px 14px",width:"100%",fontWeight:700}} onClick={()=>setFRezago(v=>!v)}>⚠ Mostrar solo rezagados{fRezago?" ✓":""}</button>
-          <div style={{...S.fl,marginTop:10,marginBottom:6}}>Enfoque</div>
-          <div style={{display:"flex",gap:6}}>
-            {[["","Todos","#64748b"],["Comercial","🤝 Comercial","#60a5fa"],["Interno","⚙ Interno","#a78bfa"]].map(([v,l,c])=>(
-              <button key={v} style={{...S.pill(fEnfoque===v,c),flex:1,padding:"7px 0",fontWeight:700,fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
-            ))}
+        </div>
+        {/* 3 Rezago */}
+        <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 12px",width:"100%",fontWeight:700,fontSize:11,marginBottom:8}} onClick={()=>setFRezago(v=>!v)}>⚠ Solo rezagados{fRezago?" ✓":""}</button>
+        {/* 4 Orden */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ORDEN</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
+            <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
+            <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
+            <button style={{...S.pill(false,"#60a5fa"),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
           </div>
         </div>
+        {/* 5 Prioridad */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>PRIORIDAD</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{PRIOR.map(p=><span key={p} style={{...S.chip(fPrioridad.includes(p),PRIOR_COLOR[p]),fontSize:10}} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
+        </div>
+        {/* 6 Contacto */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>CONTACTO</div>
+          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        </div>
+        {/* 7 Empresa */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>EMPRESA</div>
+          <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        </div>
+        {/* 8 Tipo de acción */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>TIPO DE ACCIÓN</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={{...S.chip(fTipos.includes(t.nombre),GOLD),fontSize:10}} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
+        </div>
+        {/* 9 Etapas */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={S.g2}>
+            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ETAPA CONTACTO</div><select style={{...S.sel,fontSize:11}} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ETAPA OPO.</div><select style={{...S.sel,fontSize:11}} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+          </div>
+        </div>
+        {/* 10 Fechas */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={S.g2}>
+            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>DESDE</div><input type="date" style={{...S.inp,fontSize:11}} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
+            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>HASTA</div><input type="date" style={{...S.inp,fontSize:11}} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+          </div>
+        </div>
+        {/* Limpiar */}
+        {nFil>0&&<button style={{...S.pill(false,"#f87171"),width:"100%",padding:"6px 0",fontWeight:700,fontSize:11}} onClick={limpiar}>✕ Limpiar filtros ({nFil})</button>}
       </div>}
     </div>
-    <div style={{...S.sec,paddingTop:4}}>
-      <div id="ag-top" style={{display:"flex",gap:6,marginBottom:8,alignItems:"center",flexWrap:"wrap",fontSize:11}}>
-            <span style={{color:"#64748b"}}>Orden:</span>
-            <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
-            <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
-            <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"5px 9px"}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
-            <button style={{...S.pill(false,"#60a5fa"),padding:"5px 10px"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
+    {/* ── CONTENIDO ── */}
+    <div id="ag-top" style={{...S.sec,paddingTop:4}}>
+      {modo==="lista"&&<ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)}/>}
+      {(modo==="rptCom"||modo==="rptInt")&&(()=>{
+        const esCom=modo==="rptCom";
+        const rptActs=ordenadas.filter(a=>(a.enfoque||"Comercial")===(esCom?"Comercial":"Interno"));
+        if(rptActs.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades {esCom?"comerciales":"internas"} en el rango y filtros elegidos.</div>;
+        return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
+          <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:0.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
+            <div style={{width:58,flexShrink:0}}>Fecha</div>
+            <div style={{flex:1,minWidth:0}}>{esCom?"Acción":"Actividad / Asunto"}</div>
+            <div style={{flex:1,minWidth:0}}>{esCom?"Contacto":"Descripción"}</div>
+            <div style={{width:60,flexShrink:0,textAlign:"right"}}>Estatus</div>
           </div>
-      {modo==="lista"
-        ? <ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)}/>
-        : (ordenadas.length===0
-            ? <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades en el rango y filtro elegidos.</div>
-            : <div style={{...S.card(),padding:0,overflow:"hidden"}}>
-                <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:0.5,textTransform:"uppercase",padding:"8px 10px",borderBottom:"1px solid #1e293b"}}>
-                  {selMode&&<div style={{width:22,flexShrink:0}}/>}
-                  <div style={{width:62,flexShrink:0}}>Fecha</div>
-                  <div style={{flex:1,minWidth:0}}>Acción</div>
-                  <div style={{flex:1,minWidth:0}}>Contacto</div>
-                  <div style={{width:64,flexShrink:0,textAlign:"right"}}>Estatus</div>
-                </div>
-                {ordenadas.map((a,i)=>{const col=EST_COLOR[a.estatus]||"#64748b";const isSel=selMode&&sel.indexOf(a.id)>-1;return (
-                  <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",fontSize:11,padding:"8px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"center",background:isSel?"#16213a":"transparent"}}>
-                    {selMode&&<span style={{width:15,height:15,flexShrink:0,marginRight:7,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:10,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-                    <div style={{width:62,flexShrink:0,color:"#94a3b8"}}>{fmtF(a.fecha)}{a.hora?<span style={{display:"block",fontSize:9,color:"#64748b"}}>{a.hora}</span>:""}</div>
-                    <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word"}}>{a.tipoAccion||"Actividad"}</div>
-                    <div style={{flex:1,minWidth:0,color:"#cbd5e1",paddingRight:4,wordBreak:"break-word"}}>{cn(a.contactoId)}</div>
-                    <div style={{width:64,flexShrink:0,textAlign:"right"}}>{a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{a.estatus}</span></div>
-                  </div>);})}
-              </div>)}
+          {rptActs.map((a,i)=>{
+            const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
+            const efFech=proyFecha(a)||a.fecha||"";
+            const isSel=selMode&&sel.indexOf(a.id)>-1;
+            const desc=esCom?cn(a.contactoId):(a.intencion||a.intencionResultado||a.asunto||"—");
+            const accion=esCom?(a.tipoAccion||"Actividad"):(a.asunto||a.tipoAccion||"Actividad interna");
+            return <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${esCom?col:"#a78bfa"}`}}>
+              {selMode&&<span style={{width:14,height:14,flexShrink:0,marginRight:6,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+              <div style={{width:58,flexShrink:0,color:"#94a3b8",fontSize:10}}>{efFech?efFech.split("-").reverse().join("/"):"—"}</div>
+              <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word",fontSize:11}}>{accion}</div>
+              <div style={{flex:1,minWidth:0,color:"#94a3b8",paddingRight:4,wordBreak:"break-word",fontSize:10,lineHeight:1.3}}>{desc}</div>
+              <div style={{width:60,flexShrink:0,textAlign:"right"}}>{a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
+            </div>;
+          })}
+        </div>;
+      })()}
     </div>
     {batch&&<div onClick={()=>setBatch(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:200}}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#0c0c16",border:"1px solid #1e293b",borderRadius:"16px 16px 0 0",padding:18,width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto"}}>
