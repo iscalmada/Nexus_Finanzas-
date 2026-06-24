@@ -759,7 +759,7 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
 const CAT_LABEL={etiquetas:"Etiquetas",circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cercanía",nivelEconomico:"Nivel económico",
   potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",etapaPrincipal:"Etapa principal de contacto",
   etapaEspecifica:"Etapa específica de contacto",areaEstrategica:"Área estratégica",solucion:"Solución de intervención",
-  tipoAccion:"Tipo de acción",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
+  tipoAccion:"Acciones Comerciales",accionesInt:"Acciones Internas",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
   pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal",tipoContacto:"Tipo de contacto",tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado"};
 function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,onBack}){
   const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");const[editEsp,setEditEsp]=useState(null);
@@ -1450,7 +1450,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
     {/* ── CAMPOS INTERNOS ── */}
     {esInterno&&(
       <Field label="Asunto / Tarea">
-        <input style={S.inp} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
+        <textarea style={{...S.ta,minHeight:72}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
       </Field>
     )}
 
@@ -1591,19 +1591,22 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
     <div style={S.line}/>
-    <div style={S.sec}>
-      <div style={{display:"flex",gap:6,marginBottom:10}}>
+    {/* ── BARRA STICKY: tabs + filtros ── */}
+    <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"10px 14px",marginBottom:2}}>
+      <div style={{display:"flex",gap:6,marginBottom:8}}>
         <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("lista")}>Lista</button>
         <button style={{...S.pill(modo==="reporte",GOLD),flex:1,padding:"8px 0",fontWeight:700}} onClick={()=>setModo("reporte")}>Reporte</button>
       </div>
-      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+      <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible",marginBottom:8}}>
         {["Programada","En Proceso","Cerrada","Todas"].map(t=><span key={t} style={S.chip(filtro===t,EST_COLOR[t]||GOLD)} onClick={()=>setFiltro(t)}>{t}</span>)}
       </div>
-      <div style={{display:"flex",gap:6,marginTop:10}}>
+      <div style={{display:"flex",gap:6}}>
         <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar acción, contacto, nota…" value={q} onChange={e=>setQ(e.target.value)}/>
         <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""} {showFil?"▲":"▾"}</button>
         <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap",alignSelf:"center"}}>Act: {base.length}</span>
       </div>
+    </div>
+    <div style={{...S.sec,paddingTop:4}}>
       {showFil&&<div style={{...S.card(),marginTop:10}}>
         <div style={S.fl}>Contacto</div>
         <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
@@ -1837,11 +1840,15 @@ function OpoCard({o,contactos,empresas,catalogos,onTap}){
   </div>;
 }
 
-function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
+function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,openOpo}){
   const[fEt,setFEt]=useState("");
   const[showFil,setShowFil]=useState(false);
   const[fSol,setFSol]=useState([]);
   const[fContacto,setFContacto]=useState("");
+  const[fEmpresa,setFEmpresa]=useState("");
+  const[fAliado,setFAliado]=useState("");
+  const[fProb,setFProb]=useState([]);
+  const[fRecur,setFRecur]=useState([]);
   const[cDesde,setCDesde]=useState("");
   const[cHasta,setCHasta]=useState("");
   const[q,setQ]=useState("");
@@ -1849,21 +1856,28 @@ function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
   const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"";
   const en=(id)=>(empresas.find(e=>e.id===id)||{}).nombre||"";
   const toggleSol=(id)=>setFSol(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  const toggleProb=(v)=>setFProb(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
+  const toggleRecur=(v)=>setFRecur(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
   const ql=q.trim().toLowerCase();
   const list=oportunidades.filter(o=>{
     if(fEt&&o.etapa!==fEt)return false;
     if(fSol.length&&!fSol.includes(o.solucionId))return false;
     if(fContacto&&(o.contactoPrincipalId||o.contactoId)!==fContacto&&o.contactoOperativoId!==fContacto)return false;
+    if(fEmpresa&&o.empresaId!==fEmpresa)return false;
+    if(fAliado&&o.aliadoEstrategicoId!==fAliado&&o.aliadoComercialId!==fAliado)return false;
+    if(fProb.length&&!fProb.includes(o.probabilidad))return false;
+    if(fRecur.length&&!fRecur.includes(o.recurrencia||"Única"))return false;
     if(cDesde&&(o.fechaEstimadaCierre||"")<cDesde)return false;
     if(cHasta&&(o.fechaEstimadaCierre||"")>cHasta)return false;
     if(ql){const hay=[o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
   }).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
-  const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+((cDesde||cHasta)?1:0);
-  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setCDesde("");setCHasta("");setQ("");};
+  const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0);
+  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");};
   const abiertas=oportunidades.filter(ABIERTA);
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
   const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
+  const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div><div style={S.sub}>{oportunidades.length} en total · {abiertas.length} abiertas</div></div></div>
     <div style={S.line}/>
@@ -1883,10 +1897,22 @@ function Oportunidades({oportunidades,contactos,empresas,catalogos,openOpo}){
           <span style={S.chip(!fEt)} onClick={()=>setFEt("")}>Todas</span>
           {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEt===o.nombre,oc(o.nombre))} onClick={()=>setFEt(fEt===o.nombre?"":o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
         </div>
+        <div style={{...S.fl,marginTop:10}}>Probabilidad</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          {PROB.map(p=><span key={p} style={S.chip(fProb.includes(p),PROB_COLOR[p])} onClick={()=>toggleProb(p)}>{p}</span>)}
+        </div>
+        <div style={{...S.fl,marginTop:10}}>Recurrencia</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+          {RECUR.map(r=><span key={r} style={S.chip(fRecur.includes(r),"#a78bfa")} onClick={()=>toggleRecur(r)}>{r}</span>)}
+        </div>
         <div style={{...S.fl,marginTop:10}}>Solución</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.solucion||[]).map(s=><span key={s.id} style={S.chip(fSol.includes(s.id),GOLD)} onClick={()=>toggleSol(s.id)}>{s.nombre.length>22?s.nombre.slice(0,22)+"…":s.nombre}</span>)}</div>
         <div style={{...S.fl,marginTop:10}}>Contacto</div>
         <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        <div style={{...S.fl,marginTop:10}}>Empresa</div>
+        <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        <div style={{...S.fl,marginTop:10}}>Aliado</div>
+        <BuscaSelect opciones={aliadoOpts} value={fAliado} onChange={v=>setFAliado(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={S.g2}>
           <div><div style={{...S.fl,marginTop:10}}>Cierre estimado desde</div><input type="date" style={S.inp} value={cDesde} onChange={e=>{setCDesde(e.target.value);if(e.target.value&&!cHasta)setCHasta(e.target.value);}}/></div>
           <div><div style={{...S.fl,marginTop:10}}>Cierre estimado hasta</div><input type="date" style={S.inp} value={cHasta} onChange={e=>setCHasta(e.target.value)}/></div>
@@ -2034,7 +2060,7 @@ function App(){
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
-    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} catalogos={catalogos} openOpo={openOpo}/>}
+    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} openOpo={openOpo}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}

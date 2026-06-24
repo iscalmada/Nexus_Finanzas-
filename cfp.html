@@ -2062,7 +2062,7 @@ function App(){
       } else {
         // App vuelve a primer plano — verificar tiempo transcurrido
         const elapsed=(Date.now()-pinLastActiveRef.current)/1000/60; // en minutos
-        if(elapsed>=tiempoBloqueo){
+        if(elapsed>=tiempoBloqueo && tiempoBloqueo>0){
           setPinDesbloqueado(false);
           setPinInput('');
           setPinError(false);
@@ -4717,7 +4717,11 @@ function App(){
 
             {/* ── 3. SEGURIDAD ── */}
             <div style={S.sTit}>🔒 SEGURIDAD</div>
-            <div style={S.card()}>
+            {window.self!==window.top
+              ? <div style={{...S.card(),background:"#0f172a",border:"1px solid #1e293b"}}>
+                  <div style={{fontSize:11,color:"#64748b",lineHeight:1.5}}>🔒 Seguridad gestionada por <span style={{color:GOLD,fontWeight:700}}>Nexus Flow</span>. El PIN y el control de bloqueo se configuran desde el shell principal.</div>
+                </div>
+              : <div style={S.card()}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div>
                   <div style={S.lbl}>PIN de acceso</div>
@@ -4735,9 +4739,9 @@ function App(){
               {pinActivo&&(<>
                 <div style={{marginTop:9}}>
                   <div style={{...S.lbl,marginBottom:6}}>Bloquear después de</div>
-                  <div style={{display:"flex",gap:5}}>
-                    {[[1,"1 min"],[5,"5 min"],[15,"15 min"],[30,"30 min"]].map(([v,l])=>(
-                      <button key={v} style={{...S.prioB2(tiempoBloqueo===v,"#C9A84C"),flex:1,padding:"5px 0",fontSize:9}} onClick={()=>setTiempoBloqueo(v)}>{l}</button>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                    {[[1,"1 min"],[5,"5 min"],[15,"15 min"],[30,"30 min"],[0,"Nunca"]].map(([v,l])=>(
+                      <button key={v} style={{...S.prioB2(tiempoBloqueo===v,"#C9A84C"),flex:1,padding:"5px 0",fontSize:9,minWidth:50}} onClick={()=>setTiempoBloqueo(v)}>{l}</button>
                     ))}
                   </div>
                   <div style={{fontSize:9,color:"#475569",marginTop:3}}>Si la app está en segundo plano más de este tiempo, pedirá PIN al volver</div>
@@ -4752,7 +4756,7 @@ function App(){
                   </button>
                 </div>
               </>)}
-            </div>
+            </div>}
 
             {/* ── 4. EXPORTAR A EXCEL ── */}
             <div style={S.sTit}>📥 EXPORTAR</div>
