@@ -2567,126 +2567,11 @@ function App(){
         {/* ── MOVIMIENTOS ── */}
         {view==="movimientos"&&(
           <div style={S.sec} onTouchMove={drag.tm} onTouchEnd={drag.commit} id="mov-list-container">
-            {/* Período */}
-            <div style={S.perBar} onClick={()=>setShowPeriod(v=>!v)}>
-              {!showPeriod&&<button style={S.perBtn} onClick={e=>{e.stopPropagation();period.prev();}}>‹</button>}
-              <span style={S.perLbl}>📅 {period.label()}</span>
-              {!showPeriod&&<button style={S.perBtn} onClick={e=>{e.stopPropagation();period.next();}}>›</button>}
-              <span style={{padding:"7px 10px",color:"#475569",fontSize:10}}>{showPeriod?"▲":"▼"}</span>
-            </div>
-            {showPeriod&&(
-              <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:13,padding:14,marginBottom:7}}>
-                <div style={S.perModes}>{[["mes","Mensual"],["anio","Anual"],["custom","Personalizado"]].map(([m,l])=><button key={m} style={S.perMode(period.mode===m)} onClick={()=>period.setMode(m)}>{l}</button>)}</div>
-                {period.mode==="mes"&&<div style={S.perBar}><button style={S.perBtn} onClick={period.prev}>‹</button><span style={S.perLbl}>{MESES_FULL[period.sm]} {period.sy}</span><button style={S.perBtn} onClick={period.next}>›</button></div>}
-                {period.mode==="anio"&&<div style={S.perBar}><button style={S.perBtn} onClick={period.prev}>‹</button><span style={S.perLbl}>{period.sy}</span><button style={S.perBtn} onClick={period.next}>›</button></div>}
-                {period.mode==="custom"&&<div style={{...S.r2,gap:9}}><div><label style={S.fl}>Desde</label><input style={S.inp} type="date" value={period.fr} onChange={e=>period.setFr(e.target.value)}/></div><div><label style={S.fl}>Hasta</label><input style={S.inp} type="date" value={period.to} onChange={e=>period.setTo(e.target.value)}/></div></div>}
-                <button style={S.cancB} onClick={()=>setShowPeriod(false)}>Cerrar</button>
-              </div>
-            )}
-            {/* Filtros */}
-            <div style={{display:"flex",gap:5,marginBottom:7,flexWrap:"wrap"}}>
-              {/* Filtro visualización Ingresos por probabilidad */}
-              <div style={{position:"relative",display:"inline-block"}}>
-                <button style={S.prioTag(filterProbIng.size>0)}
-                  onClick={()=>{setShowFilterProbIng(v=>!v);setShowFilterPrioEg(false);}}>
-                  ↑ Prob.{filterProbIng.size>0?" ("+filterProbIng.size+")":""}
-                </button>
-                {showFilterProbIng&&(
-                  <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 12px",minWidth:165,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
-                    <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:7}}>PROBABILIDAD — INGRESOS</div>
-                    {[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=>{
-                      const sel=filterProbIng.has(v);
-                      return(
-                        <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
-                          onClick={()=>setFilterProbIng(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
-                          <div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}
-                          </div>
-                          <span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
-                        </div>
-                      );
-                    })}
-                    <div style={{display:"flex",gap:5,marginTop:8}}>
-                      <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
-                        onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>✕ Limpiar</button>
-                      <button style={{...S.smBtn("#22c55e"),flex:1,fontSize:8}}
-                        onClick={()=>setShowFilterProbIng(false)}>✓ Aplicar</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Filtro visualización Egresos por prioridad */}
-              <div style={{position:"relative",display:"inline-block"}}>
-                <button style={S.prioTag(filterPrioEg.size>0)}
-                  onClick={()=>{setShowFilterPrioEg(v=>!v);setShowFilterProbIng(false);}}>
-                  ↓ Prior.{filterPrioEg.size>0?" ("+filterPrioEg.size+")":""}
-                </button>
-                {showFilterPrioEg&&(
-                  <div style={{position:"absolute",top:"100%",left:0,zIndex:200,background:"#0d0d1a",border:"1px solid #f8717144",borderRadius:10,padding:"10px 12px",minWidth:185,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
-                    <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:7}}>PRIORIDAD — EGRESOS</div>
-                    {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>{
-                      const sel=filterPrioEg.has(v);
-                      return(
-                        <div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}}
-                          onClick={()=>setFilterPrioEg(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}>
-                          <div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                            {sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}
-                          </div>
-                          <span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span>
-                        </div>
-                      );
-                    })}
-                    <div style={{display:"flex",gap:5,marginTop:8}}>
-                      <button style={{...S.smBtn("#475569"),flex:1,fontSize:8}}
-                        onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>✕ Limpiar</button>
-                      <button style={{...S.smBtn("#f87171"),flex:1,fontSize:8}}
-                        onClick={()=>setShowFilterPrioEg(false)}>✓ Aplicar</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Botones del saldo consolidado (panel ⚙) */}
-              <button style={S.prioTag(prioI<3)} onClick={()=>setShowPrioPanel(v=>v==="ing"?false:"ing")}>
-                ⚙↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}
-              </button>
-              <button style={S.prioTag(prioE<5)} onClick={()=>setShowPrioPanel(v=>v==="eg"?false:"eg")}>
-                ⚙↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}
-              </button>
-              <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>
-                {retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados
-              </button>
-              <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>
-                📂 Categoría{hasCatFilterActive?" ✓":""}
-              </button>
-              <button style={S.prioTag(filterCuentas.size>0||filterTarjetasFiltro.size>0)}
-                onClick={()=>{setTempFilterCuentas(new Set(filterCuentas));setTempFilterTarjetas(new Set(filterTarjetasFiltro));setShowCuentaFilter(true);}}>
-                🏦 Cuentas{(filterCuentas.size+filterTarjetasFiltro.size)>0?" ("+(filterCuentas.size+filterTarjetasFiltro.size)+")":""}
-              </button>
-              <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
-              <button style={{...S.prioTag(simMode),color:simMode?"#fbbf24":"#64748b",borderColor:simMode?"#fbbf24":"#334155",background:simMode?"rgba(251,191,36,0.15)":"none"}}
-                onClick={()=>{if(simMode)salirSim();else setSimMode(true);}}>⚗ Simular{simMode?" ●":""}</button>
-            </div>
-            {showPrioPanel&&(
-              <div style={S.prioPanel}>
-                {(showPrioPanel==="ing"||showPrioPanel===true)&&(<>
-                <div style={{fontSize:9,color:"#22c55e",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↑ Probabilidad Ingresos</div>
-                <div style={S.prioRow}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioI===v,c)} onClick={()=>setPrioI(v)}>{l}</button>)}</div>
-                </>)}
-                {(showPrioPanel==="eg"||showPrioPanel===true)&&(<>
-                <div style={{fontSize:9,color:"#f87171",letterSpacing:1.5,textTransform:"uppercase",marginBottom:7,fontWeight:700}}>↓ Prioridad Egresos (proyección)</div>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:9}}>
-                  {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"],[5,"Todos","#64748b"]].map(([v,l,c])=>(
-                    <button key={v} style={{...S.prioB(prioE===v,c),flex:1,minWidth:50,fontSize:8,padding:"6px 2px"}} onClick={()=>setPrioE(v)}>{l}</button>
-                  ))}
-                </div>
-                </>)}
 
-                <button style={S.cancB} onClick={()=>setShowPrioPanel(false)}>Cerrar</button>
-              </div>
-            )}
-            {/* ── STICKY: periodo + búsqueda + chips + totales ── */}
-            <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"6px 0",marginLeft:-14,marginRight:-14,paddingLeft:14,paddingRight:14,marginBottom:4}}>
-              {/* Fila 1: Periodo compacto */}
+            {/* ══ STICKY ═══════════════════════════════════════════════ */}
+            <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",marginLeft:-14,marginRight:-14,paddingLeft:14,paddingRight:14,paddingTop:6,paddingBottom:6}}>
+
+              {/* F1 — Período */}
               <div style={S.perBar} onClick={()=>setShowPeriod(v=>!v)}>
                 {!showPeriod&&<button style={S.perBtn} onClick={e=>{e.stopPropagation();period.prev();}}>‹</button>}
                 <span style={S.perLbl}>📅 {period.label()}</span>
@@ -2694,7 +2579,7 @@ function App(){
                 <span style={{padding:"7px 10px",color:"#475569",fontSize:10}}>{showPeriod?"▲":"▼"}</span>
               </div>
               {showPeriod&&(
-                <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:13,padding:14,marginBottom:7}}>
+                <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:13,padding:14,marginBottom:5}}>
                   <div style={S.perModes}>{[["mes","Mensual"],["anio","Anual"],["custom","Personalizado"]].map(([m,l])=><button key={m} style={S.perMode(period.mode===m)} onClick={()=>period.setMode(m)}>{l}</button>)}</div>
                   {period.mode==="mes"&&<div style={S.perBar}><button style={S.perBtn} onClick={period.prev}>‹</button><span style={S.perLbl}>{MESES_FULL[period.sm]} {period.sy}</span><button style={S.perBtn} onClick={period.next}>›</button></div>}
                   {period.mode==="anio"&&<div style={S.perBar}><button style={S.perBtn} onClick={period.prev}>‹</button><span style={S.perLbl}>{period.sy}</span><button style={S.perBtn} onClick={period.next}>›</button></div>}
@@ -2702,58 +2587,63 @@ function App(){
                   <button style={S.cancB} onClick={()=>setShowPeriod(false)}>Cerrar</button>
                 </div>
               )}
-              {/* Fila 2: Búsqueda + botón filtros + limpiar */}
-              <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:5,marginTop:4}}>
+
+              {/* F2 — Búsqueda + ⚙ + ✕ */}
+              <div style={{display:"flex",gap:5,alignItems:"center",marginTop:5,marginBottom:5}}>
                 <input style={{...S.srch,margin:0,flex:1}} value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Buscar…"/>
-                <button style={{...S.prioTag(showPrioPanel||filterRetrasados||filterProbIng.size>0||filterPrioEg.size>0||hasCatFilterActive||(filterCuentas.size+filterTarjetasFiltro.size)>0||multiMode||simMode),padding:"6px 10px",fontSize:10,flexShrink:0}} onClick={()=>setShowPrioPanel(v=>v?"":true)}>⚙{(filterRetrasados||filterProbIng.size>0||filterPrioEg.size>0||hasCatFilterActive||(filterCuentas.size+filterTarjetasFiltro.size)>0)?" ●":""}</button>
+                <button style={{...S.prioTag(!!showPrioPanel||(filterRetrasados||filterProbIng.size>0||filterPrioEg.size>0||hasCatFilterActive||(filterCuentas.size+filterTarjetasFiltro.size)>0||multiMode||simMode)),padding:"6px 11px",fontSize:11,flexShrink:0}} onClick={()=>setShowPrioPanel(v=>v?"":true)}>⚙{(filterRetrasados||filterProbIng.size>0||filterPrioEg.size>0||hasCatFilterActive||(filterCuentas.size+filterTarjetasFiltro.size)>0)?" ●":""}</button>
                 {(filterTipo!=="TODOS"||filterEst!=="TODOS"||filterRetrasados||filterProbIng.size>0||filterPrioEg.size>0||hasCatFilterActive||filterCuentas.size>0||filterTarjetasFiltro.size>0||search)&&(
-                  <button style={{flexShrink:0,background:"#f8717111",border:"1px solid #f87171",color:"#f87171",borderRadius:8,padding:"5px 8px",fontSize:10,cursor:"pointer",fontWeight:700}} onClick={()=>{setFilterTipo("TODOS");setFilterEst("TODOS");setFilterRetrasados(false);setFilterProbIng(new Set());setFilterPrioEg(new Set());setFilterCuentas(new Set());setTempFilterCuentas(new Set());setTempFilterTarjetas(new Set());setFilterTarjetasFiltro(new Set());setSearch("");}}>✕</button>
+                  <button style={{flexShrink:0,background:"#f8717111",border:"1px solid #f87171",color:"#f87171",borderRadius:8,padding:"5px 9px",fontSize:11,cursor:"pointer",fontWeight:700}} onClick={()=>{setFilterTipo("TODOS");setFilterEst("TODOS");setFilterRetrasados(false);setFilterProbIng(new Set());setFilterPrioEg(new Set());setFilterCuentas(new Set());setTempFilterCuentas(new Set());setTempFilterTarjetas(new Set());setFilterTarjetasFiltro(new Set());setSearch("");}}>✕</button>
                 )}
               </div>
-              {/* Panel filtros avanzados — desplegable */}
-              {showPrioPanel&&<div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:10,padding:"10px 12px",marginBottom:6}}>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:6}}>
-                  {/* Filtros inline */}
-                  <div style={{position:"relative",display:"inline-block"}}>
-                    <button style={S.prioTag(filterProbIng.size>0)} onClick={()=>{setShowFilterProbIng(v=>!v);setShowFilterPrioEg(false);}}>↑ Prob.{filterProbIng.size>0?" ("+filterProbIng.size+")":""}</button>
-                    {showFilterProbIng&&(<div style={{position:"absolute",top:"100%",left:0,zIndex:300,background:"#0d0d1a",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 12px",minWidth:165,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
-                      <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:7}}>PROBABILIDAD — INGRESOS</div>
-                      {[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=>{const sel=filterProbIng.has(v);return(<div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setFilterProbIng(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}><div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}</div><span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span></div>);})}
-                      <div style={{display:"flex",gap:5,marginTop:8}}><button style={{...S.smBtn("#475569"),flex:1,fontSize:8}} onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>✕ Limpiar</button><button style={{...S.smBtn("#22c55e"),flex:1,fontSize:8}} onClick={()=>setShowFilterProbIng(false)}>✓ Aplicar</button></div>
-                    </div>)}
+
+              {/* F3 — Panel filtros avanzados (oculto por defecto) */}
+              {showPrioPanel&&(
+                <div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:10,padding:"9px 11px",marginBottom:5}}>
+                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:(showPrioPanel==="ing"||showPrioPanel==="eg")?8:0}}>
+                    <div style={{position:"relative",display:"inline-block"}}>
+                      <button style={S.prioTag(filterProbIng.size>0)} onClick={()=>{setShowFilterProbIng(v=>!v);setShowFilterPrioEg(false);}}>↑ Prob.{filterProbIng.size>0?" ("+filterProbIng.size+")":""}</button>
+                      {showFilterProbIng&&(<div style={{position:"fixed",top:"auto",left:16,zIndex:400,background:"#0d0d1a",border:"1px solid #22c55e44",borderRadius:10,padding:"10px 12px",minWidth:165,boxShadow:"0 4px 20px rgba(0,0,0,0.85)"}}>
+                        <div style={{fontSize:8,color:"#22c55e",fontWeight:700,marginBottom:7}}>PROBABILIDAD — INGRESOS</div>
+                        {[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Baja","#94a3b8"]].map(([v,l,c])=>{const sel=filterProbIng.has(v);return(<div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setFilterProbIng(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}><div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}</div><span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span></div>);})}
+                        <div style={{display:"flex",gap:5,marginTop:8}}><button style={{...S.smBtn("#475569"),flex:1,fontSize:8}} onClick={()=>{setFilterProbIng(new Set());setShowFilterProbIng(false);}}>✕ Limpiar</button><button style={{...S.smBtn("#22c55e"),flex:1,fontSize:8}} onClick={()=>setShowFilterProbIng(false)}>✓ Aplicar</button></div>
+                      </div>)}
+                    </div>
+                    <div style={{position:"relative",display:"inline-block"}}>
+                      <button style={S.prioTag(filterPrioEg.size>0)} onClick={()=>{setShowFilterPrioEg(v=>!v);setShowFilterProbIng(false);}}>↓ Prior.{filterPrioEg.size>0?" ("+filterPrioEg.size+")":""}</button>
+                      {showFilterPrioEg&&(<div style={{position:"fixed",top:"auto",left:16,zIndex:400,background:"#0d0d1a",border:"1px solid #f8717144",borderRadius:10,padding:"10px 12px",minWidth:185,boxShadow:"0 4px 20px rgba(0,0,0,0.85)"}}>
+                        <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:7}}>PRIORIDAD — EGRESOS</div>
+                        {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>{const sel=filterPrioEg.has(v);return(<div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setFilterPrioEg(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}><div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}</div><span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span></div>);})}
+                        <div style={{display:"flex",gap:5,marginTop:8}}><button style={{...S.smBtn("#475569"),flex:1,fontSize:8}} onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>✕ Limpiar</button><button style={{...S.smBtn("#f87171"),flex:1,fontSize:8}} onClick={()=>setShowFilterPrioEg(false)}>✓ Aplicar</button></div>
+                      </div>)}
+                    </div>
+                    <button style={S.prioTag(prioI<3)} onClick={()=>setShowPrioPanel(v=>v==="ing"?true:"ing")}>⚙↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}</button>
+                    <button style={S.prioTag(prioE<5)} onClick={()=>setShowPrioPanel(v=>v==="eg"?true:"eg")}>⚙↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}</button>
+                    <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>{retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados</button>
+                    <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>📂 Categoría{hasCatFilterActive?" ✓":""}</button>
+                    <button style={S.prioTag(filterCuentas.size>0||filterTarjetasFiltro.size>0)} onClick={()=>{setTempFilterCuentas(new Set(filterCuentas));setTempFilterTarjetas(new Set(filterTarjetasFiltro));setShowCuentaFilter(true);}}>🏦 Cuentas{(filterCuentas.size+filterTarjetasFiltro.size)>0?" ("+(filterCuentas.size+filterTarjetasFiltro.size)+")":""}</button>
+                    <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
+                    <button style={{...S.prioTag(simMode),color:simMode?"#fbbf24":"#64748b",borderColor:simMode?"#fbbf24":"#334155",background:simMode?"rgba(251,191,36,0.15)":"none"}} onClick={()=>{if(simMode)salirSim();else setSimMode(true);}}>⚗ Simular{simMode?" ●":""}</button>
                   </div>
-                  <div style={{position:"relative",display:"inline-block"}}>
-                    <button style={S.prioTag(filterPrioEg.size>0)} onClick={()=>{setShowFilterPrioEg(v=>!v);setShowFilterProbIng(false);}}>↓ Prior.{filterPrioEg.size>0?" ("+filterPrioEg.size+")":""}</button>
-                    {showFilterPrioEg&&(<div style={{position:"absolute",top:"100%",left:0,zIndex:300,background:"#0d0d1a",border:"1px solid #f8717144",borderRadius:10,padding:"10px 12px",minWidth:185,boxShadow:"0 4px 20px rgba(0,0,0,0.7)"}}>
-                      <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:7}}>PRIORIDAD — EGRESOS</div>
-                      {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>{const sel=filterPrioEg.has(v);return(<div key={v} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",cursor:"pointer",borderBottom:"1px solid #1e293b22"}} onClick={()=>setFilterPrioEg(prev=>{const n=new Set(prev);n.has(v)?n.delete(v):n.add(v);return n;})}><div style={{width:14,height:14,borderRadius:3,border:"2px solid "+(sel?c:"#334155"),background:sel?c:"transparent",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{sel&&<span style={{color:"#080810",fontSize:9,fontWeight:900}}>✓</span>}</div><span style={{fontSize:11,color:sel?"#e2e8f0":"#64748b",fontWeight:sel?700:400}}>{l}</span></div>);})}
-                      <div style={{display:"flex",gap:5,marginTop:8}}><button style={{...S.smBtn("#475569"),flex:1,fontSize:8}} onClick={()=>{setFilterPrioEg(new Set());setShowFilterPrioEg(false);}}>✕ Limpiar</button><button style={{...S.smBtn("#f87171"),flex:1,fontSize:8}} onClick={()=>setShowFilterPrioEg(false)}>✓ Aplicar</button></div>
-                    </div>)}
-                  </div>
-                  <button style={S.prioTag(prioI<3)} onClick={()=>setShowPrioPanel(v=>v==="ing"?"":("ing"))}>⚙↑ {prioI===1?"Alta":prioI===2?"Alta+Med":"Todas"}</button>
-                  <button style={S.prioTag(prioE<5)} onClick={()=>setShowPrioPanel(v=>v==="eg"?"":("eg"))}>⚙↓ {prioE===1?"Esencial":prioE===2?"Esen+Imp":prioE===3?"Esen+Imp+Disc":prioE===4?"Esen-Extr":"Todos"}</button>
-                  <button style={S.prioTag(filterRetrasados)} onClick={()=>setFilterRetrasados(v=>!v)}>{retrasados.length>0&&<span style={{background:"#f87171",color:"#fff",borderRadius:7,padding:"0 4px",fontSize:8,marginRight:2}}>{retrasados.length}</span>}⚠ Retrasados</button>
-                  <button style={S.prioTag(hasCatFilterActive)} onClick={()=>setShowCatFilter(true)}>📂 Categoría{hasCatFilterActive?" ✓":""}</button>
-                  <button style={S.prioTag(filterCuentas.size>0||filterTarjetasFiltro.size>0)} onClick={()=>{setTempFilterCuentas(new Set(filterCuentas));setTempFilterTarjetas(new Set(filterTarjetasFiltro));setShowCuentaFilter(true);}}>🏦 Cuentas{(filterCuentas.size+filterTarjetasFiltro.size)>0?" ("+(filterCuentas.size+filterTarjetasFiltro.size)+")":""}</button>
-                  <button style={S.prioTag(multiMode)} onClick={()=>{setMultiMode(v=>!v);setSelected(new Set());}}>☑ Múltiple</button>
-                  <button style={{...S.prioTag(simMode),color:simMode?"#fbbf24":"#64748b",borderColor:simMode?"#fbbf24":"#334155",background:simMode?"rgba(251,191,36,0.15)":"none"}} onClick={()=>{if(simMode)salirSim();else setSimMode(true);}}>⚗ Simular{simMode?" ●":""}</button>
+                  {showPrioPanel==="ing"&&<div style={{borderTop:"1px solid #1e293b",paddingTop:7}}><div style={{fontSize:8,color:"#22c55e",letterSpacing:1,textTransform:"uppercase",marginBottom:5,fontWeight:700}}>↑ Probabilidad Ingresos</div><div style={S.prioRow}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioI===v,c)} onClick={()=>setPrioI(v)}>{l}</button>)}</div></div>}
+                  {showPrioPanel==="eg"&&<div style={{borderTop:"1px solid #1e293b",paddingTop:7}}><div style={{fontSize:8,color:"#f87171",letterSpacing:1,textTransform:"uppercase",marginBottom:5,fontWeight:700}}>↓ Prioridad Egresos</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"],[5,"Todos","#64748b"]].map(([v,l,c])=><button key={v} style={{...S.prioB(prioE===v,c),flex:1,minWidth:46,fontSize:8,padding:"5px 2px"}} onClick={()=>setPrioE(v)}>{l}</button>)}</div></div>}
                 </div>
-                {(showPrioPanel==="ing"||showPrioPanel===true)&&<div style={{marginBottom:6}}><div style={{fontSize:8,color:"#22c55e",letterSpacing:1,textTransform:"uppercase",marginBottom:5,fontWeight:700}}>↑ Probabilidad Ingresos</div><div style={S.prioRow}>{[[1,"Alta","#22c55e"],[2,"Media","#fbbf24"],[3,"Todas","#64748b"]].map(([v,l,c])=><button key={v} style={S.prioB(prioI===v,c)} onClick={()=>setPrioI(v)}>{l}</button>)}</div></div>}
-                {(showPrioPanel==="eg"||showPrioPanel===true)&&<div><div style={{fontSize:8,color:"#f87171",letterSpacing:1,textTransform:"uppercase",marginBottom:5,fontWeight:700}}>↓ Prioridad Egresos</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"],[5,"Todos","#64748b"]].map(([v,l,c])=><button key={v} style={{...S.prioB(prioE===v,c),flex:1,minWidth:46,fontSize:8,padding:"5px 2px"}} onClick={()=>setPrioE(v)}>{l}</button>)}</div></div>}
-              </div>}
-              {/* Fila 3: Chips tipo + estatus */}
+              )}
+
+              {/* F4 — Chips tipo */}
               <div style={S.chips}>{["TODOS",...TIPO_OP].map(t=><button key={t} style={S.chip(filterTipo===t)} onClick={()=>setFilterTipo(t)}>{t}</button>)}</div>
-              <div style={{...S.chips,marginBottom:5}}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
-              {/* Fila 4: Totales + pendientes */}
-              <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <div style={{flex:1,background:"#10101e",borderRadius:8,padding:"5px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div><div style={{fontSize:7,color:"#475569"}}>↑ ING</div><div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(filteredTotals.ingReal)}{filteredTotals.ingProy>0&&<span style={{fontSize:8,color:"#22c55e88"}}> +{fmt(filteredTotals.ingProy)}</span>}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontSize:7,color:"#475569"}}>↓ EG</div><div style={{fontSize:12,fontWeight:800,color:"#f87171"}}>{fmt(filteredTotals.egReal)}{filteredTotals.egProy>0&&<span style={{fontSize:8,color:"#f8717188"}}> +{fmt(filteredTotals.egProy)}</span>}</div></div>
-                  {movs.filter(r=>r.estatus==="PENDIENTE").length>0&&filterEst!=="PENDIENTE"&&<button style={{fontSize:8,padding:"3px 7px",borderRadius:6,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",flexShrink:0}} onClick={()=>{setFilterEst("PENDIENTE");setFilterRetrasados(false);setFilterTipo("TODOS");setSearch("");}}>📋 {movs.filter(r=>r.estatus==="PENDIENTE").length} pend.</button>}
-                </div>
+              {/* F5 — Chips estatus */}
+              <div style={{...S.chips,marginBottom:4}}>{["TODOS",...ESTATUS_LIST].map(e=><button key={e} style={S.chip(filterEst===e)} onClick={()=>setFilterEst(e)}>{e}</button>)}</div>
+              {/* F6 — Totales + pendientes */}
+              <div style={{background:"#10101e",borderRadius:8,padding:"5px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:7,color:"#475569"}}>↑ ING</div><div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(filteredTotals.ingReal)}{filteredTotals.ingProy>0&&<span style={{fontSize:8,color:"#22c55e88"}}> +{fmt(filteredTotals.ingProy)}</span>}</div></div>
+                <div style={{textAlign:"right"}}><div style={{fontSize:7,color:"#475569"}}>↓ EG</div><div style={{fontSize:12,fontWeight:800,color:"#f87171"}}>{fmt(filteredTotals.egReal)}{filteredTotals.egProy>0&&<span style={{fontSize:8,color:"#f8717188"}}> +{fmt(filteredTotals.egProy)}</span>}</div></div>
+                {movs.filter(r=>r.estatus==="PENDIENTE").length>0&&filterEst!=="PENDIENTE"&&<button style={{fontSize:8,padding:"3px 7px",borderRadius:6,border:"1px solid #fbbf2444",background:"#fbbf2411",color:"#fbbf24",cursor:"pointer",flexShrink:0}} onClick={()=>{setFilterEst("PENDIENTE");setFilterRetrasados(false);setFilterTipo("TODOS");setSearch("");}}>📋 {movs.filter(r=>r.estatus==="PENDIENTE").length} pend.</button>}
               </div>
             </div>
-            {hasGlobalResults&&search.length>=2&&(
+            {/* ══ FIN STICKY ══════════════════════════════════════════════ */}
+
+                        {hasGlobalResults&&search.length>=2&&(
               <div style={{background:"#0d0d1a",border:"1px solid #C9A84C33",borderRadius:11,padding:"10px 13px",marginBottom:9}}>
                 <div style={{fontSize:9,color:"#C9A84C",fontWeight:700,letterSpacing:1.5,marginBottom:8}}>TAMBIÉN EN CARTERA</div>
                 {globalSearchResults.acreedores.map(x=>(
