@@ -1236,6 +1236,8 @@ function App(){
   const[factorFEF,setFactorFEF]=useState(()=>loadLS('factorFEF',2.5));
   const[prioFEF_ing,setPrioFEF_ing]=useState(2);
   const[showFEFDesglose,setShowFEFDesglose]=useState(false);
+  const[showFEF,setShowFEF]=useState(()=>loadLS('showFEF',true));
+  const toggleFEF=()=>{const v=!showFEF;setShowFEF(v);try{localStorage.setItem('ncfp_showFEF',JSON.stringify(v));}catch(e){}};
   const[horizonteFEF,setHorizonteFEF]=useState(()=>{
     // Default: hoy + factorFEF meses (en días)
     const d=new Date();
@@ -2390,11 +2392,18 @@ function App(){
                 {label:"Extraordinarios",color:"#f87171",items:egNoEsenciales.filter(r=>(parseInt(r.prioridad)||3)===4)},
               ].filter(g=>g.items.length>0);
               return(
-                <div style={{...S.card("rgba(201,168,76,0.2)"),marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <div style={{...S.card("rgba(201,168,76,0.2)"),marginBottom:10,padding:0,overflow:"hidden"}}>
+                  {/* ── Cabecera toggle ── */}
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",cursor:"pointer",borderBottom:showFEF?"1px solid rgba(201,168,76,0.15)":"none"}}
+                    onClick={toggleFEF}>
                     <div style={{fontSize:10,fontWeight:800,color:"#C9A84C"}}>🏦 Fondo de Estabilidad Financiera</div>
-                    {mesesFEF&&<div style={{fontSize:9,color:semFEF,fontWeight:700,background:semFEF+"18",padding:"2px 8px",borderRadius:8}}>{mesesFEF} meses</div>}
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      {mesesFEF&&<div style={{fontSize:9,color:semFEF,fontWeight:700,background:semFEF+"18",padding:"2px 8px",borderRadius:8}}>{mesesFEF} meses</div>}
+                      <span style={{fontSize:11,color:"#475569"}}>{showFEF?"▲":"▾"}</span>
+                    </div>
                   </div>
+                  {/* ── Contenido colapsable ── */}
+                  {showFEF&&<div style={{padding:"10px 14px"}}>
                   <div style={{background:"#13131f",borderRadius:9,padding:"8px 11px",marginBottom:7}}>
                     {[
                       ["Saldo Real",stats.saldoReal,"#C9A84C"],
@@ -2482,18 +2491,13 @@ function App(){
                       <div style={{display:"flex",alignItems:"center",gap:5}}>
                         <input type="date" style={{...S.inp,padding:"2px 6px",fontSize:8,width:"auto"}}
                           value={horizonteFEF}
-                          onChange={e=>{
-                            if(e.target.value) setHorizonteFEF(e.target.value);
-                          }}/>
+                          onChange={e=>{if(e.target.value) setHorizonteFEF(e.target.value);}}/>
                         <button style={{...S.smBtn("#475569"),fontSize:7,padding:"2px 5px"}}
-                          onClick={()=>{
-                            const d=new Date();
-                            d.setDate(d.getDate()+Math.round((factorFEF||2.5)*30.4));
-                            setHorizonteFEF(d.toISOString().slice(0,10));
-                          }}>↺</button>
+                          onClick={()=>{const d=new Date();d.setDate(d.getDate()+Math.round((factorFEF||2.5)*30.4));setHorizonteFEF(d.toISOString().slice(0,10));}}>↺</button>
                       </div>
                     </div>
                   </div>
+                  </div>}
                 </div>
               );
             })()}
