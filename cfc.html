@@ -1403,11 +1403,11 @@ function ChecklistEditor({items,onChange}){
     <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Ítems del checklist</div>
     {items.map((it,i)=>(
       <div key={it.id} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,padding:"9px 10px",marginBottom:8}}>
-        {/* Fila 1: checkbox + tarea + borrar */}
-        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
-          <input type="checkbox" checked={!!it.done} onChange={e=>upd(i,"done",e.target.checked)} style={{width:16,height:16,flexShrink:0,accentColor:"#a78bfa"}}/>
-          <input style={{...S.inp,flex:1,textDecoration:it.done?"line-through":"none",color:it.done?"#475569":"#e2e8f0"}} value={it.texto} onChange={e=>upd(i,"texto",e.target.value)} placeholder="Acción o tarea…"/>
-          <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0}} onClick={()=>del(i)}>✕</button>
+        {/* Fila 1: checkbox + tarea multilinea + borrar */}
+        <div style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:6}}>
+          <input type="checkbox" checked={!!it.done} onChange={e=>upd(i,"done",e.target.checked)} style={{width:16,height:16,flexShrink:0,accentColor:"#a78bfa",marginTop:6}}/>
+          <textarea style={{...S.ta,flex:1,minHeight:44,textDecoration:it.done?"line-through":"none",color:it.done?"#475569":"#e2e8f0",fontSize:13}} value={it.texto} onChange={e=>upd(i,"texto",e.target.value)} placeholder="Acción o tarea…"/>
+          <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0,marginTop:2}} onClick={()=>del(i)}>✕</button>
         </div>
         {/* Fila 2: prioridad chips */}
         <div style={{display:"flex",gap:4,marginBottom:6}}>
@@ -1715,6 +1715,8 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
           {selSubCount(a.id)>0&&<button style={{...S.pill(true,"#a78bfa"),padding:"2px 10px",fontSize:10,fontWeight:700}} onClick={()=>setBatchSub({actId:a.id,fecha:"",estatus:"",prioridad:""})}>✏ Editar {selSubCount(a.id)}</button>}
         </div>
         {[...(a.subtareas||[])].sort((x,y)=>{
+          const xCerr=x.estatus==="Cerrada",yCerr=y.estatus==="Cerrada";
+          if(xCerr!==yCerr)return xCerr?1:-1;
           const fd=(x.fecha||"9999").localeCompare(y.fecha||"9999");
           if(fd!==0)return fd;
           return (PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);

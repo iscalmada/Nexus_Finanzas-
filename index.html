@@ -396,6 +396,21 @@ function App(){
   const[cargado,setCargado]=useState({cfp:false,cfc:false});
   useEffect(()=>{const el=document.getElementById('loading');if(el){el.classList.add('fade-out');setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},380);}},[]);
   useEffect(()=>{let hid=null;const onHide=()=>{hid=Date.now();};const onShow=()=>{if(hid==null)return;const mins=Number(lsCFP('pinTimeout',5));const pa=lsCFP('pinActivo',false),pk=String(lsCFP('pinApp',''));if(pa&&pk&&mins>=0&&(Date.now()-hid)/60000>=mins)setAbierto(false);hid=null;};const vis=()=>{document.hidden?onHide():onShow();};document.addEventListener('visibilitychange',vis);window.addEventListener('focus',onShow);window.addEventListener('blur',onHide);return()=>{document.removeEventListener('visibilitychange',vis);window.removeEventListener('focus',onShow);window.removeEventListener('blur',onHide);};},[]);
+  useEffect(()=>{
+    // Aviso al presionar botón Atrás de Android
+    window.history.pushState(null,'',window.location.href);
+    const onPop=()=>{
+      window.history.pushState(null,'',window.location.href);
+      if(window.confirm('¿Salir de Nexus Flow?\n\nVerifica haber guardado cualquier registro en proceso antes de salir.')){
+        window.history.back();window.history.back();
+      }
+    };
+    window.addEventListener('popstate',onPop);
+    // beforeunload para cierres directos (desktop / recarga)
+    const onBefore=(e)=>{e.preventDefault();e.returnValue='';};
+    window.addEventListener('beforeunload',onBefore);
+    return()=>{window.removeEventListener('popstate',onPop);window.removeEventListener('beforeunload',onBefore);};
+  },[]);
   const ir=(v)=>{ setVista(v); if(v==="cfp"||v==="cfc"){ setCargado(c=>({...c,[v]:true})); try{localStorage.setItem('nexus_flow_ultima',v);}catch(e){} } };
   if(!abierto) return <Lock onOk={()=>setAbierto(true)}/>;
   const barBtn=(v,lab)=>{const on=vista===v;return <button onClick={()=>ir(v)} style={{flex:1,padding:"9px 0",fontSize:12,fontWeight:on?800:500,background:on?GOLD:"transparent",color:on?"#08080f":"#94a3b8",border:"none",borderRadius:9,cursor:"pointer"}}>{lab}</button>;};

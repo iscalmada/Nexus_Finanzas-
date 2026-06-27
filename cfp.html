@@ -3297,6 +3297,7 @@ function App(){
                   <input style={{...S.srch,margin:0,flex:1}} value={opoQ} onChange={e=>setOpoQ(e.target.value)} placeholder="🔍 Buscar oportunidad…"/>
                   {(opoQ||opoFiltroEtapa)&&<button style={{flexShrink:0,background:"#f8717111",border:"1px solid #f87171",color:"#f87171",borderRadius:8,padding:"5px 9px",fontSize:11,cursor:"pointer",fontWeight:700}} onClick={()=>{setOpoQ("");setOpoFiltroEtapa(null);}}>✕</button>}
                 </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
                   {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
                 </div>
