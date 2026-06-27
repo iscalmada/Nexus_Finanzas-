@@ -1396,16 +1396,25 @@ const hoyISO=()=>new Date().toISOString().slice(0,10);
 
 /* ── Helpers de modo interno ── */
 function ChecklistEditor({items,onChange}){
-  const addItem=()=>onChange([...items,{id:"ci"+Date.now(),texto:"",done:false}]);
+  const addItem=()=>onChange([...items,{id:"ci"+Date.now(),texto:"",descripcion:"",prioridad:"Media",done:false}]);
   const upd=(i,k,v)=>onChange(items.map((x,j)=>j===i?{...x,[k]:v}:x));
   const del=(i)=>onChange(items.filter((_,j)=>j!==i));
   return <div style={{marginTop:6}}>
     <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Ítems del checklist</div>
     {items.map((it,i)=>(
-      <div key={it.id} style={{display:"flex",gap:6,alignItems:"center",marginBottom:7}}>
-        <input type="checkbox" checked={!!it.done} onChange={e=>upd(i,"done",e.target.checked)} style={{width:17,height:17,flexShrink:0,accentColor:"#a78bfa"}}/>
-        <input style={{...S.inp,flex:1,textDecoration:it.done?"line-through":"none",color:it.done?"#475569":"#e2e8f0"}} value={it.texto} onChange={e=>upd(i,"texto",e.target.value)} placeholder={`Ítem ${i+1}…`}/>
-        <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0}} onClick={()=>del(i)}>✕</button>
+      <div key={it.id} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,padding:"9px 10px",marginBottom:8}}>
+        {/* Fila 1: checkbox + tarea + borrar */}
+        <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+          <input type="checkbox" checked={!!it.done} onChange={e=>upd(i,"done",e.target.checked)} style={{width:16,height:16,flexShrink:0,accentColor:"#a78bfa"}}/>
+          <input style={{...S.inp,flex:1,textDecoration:it.done?"line-through":"none",color:it.done?"#475569":"#e2e8f0"}} value={it.texto} onChange={e=>upd(i,"texto",e.target.value)} placeholder="Acción o tarea…"/>
+          <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0}} onClick={()=>del(i)}>✕</button>
+        </div>
+        {/* Fila 2: prioridad chips */}
+        <div style={{display:"flex",gap:4,marginBottom:6}}>
+          {PRIOR.map(p=><button key={p} style={{flex:1,padding:"3px 0",fontSize:9,fontWeight:700,border:`1px solid ${(it.prioridad||"Media")===p?PRIOR_COLOR[p]:PRIOR_COLOR[p]+"33"}`,borderRadius:6,cursor:"pointer",background:(it.prioridad||"Media")===p?PRIOR_COLOR[p]+"22":"transparent",color:(it.prioridad||"Media")===p?PRIOR_COLOR[p]:"#475569"}} onClick={()=>upd(i,"prioridad",p)}>{p}</button>)}
+        </div>
+        {/* Fila 3: descripción multilinea */}
+        <textarea style={{...S.ta,minHeight:48,fontSize:11}} value={it.descripcion||""} onChange={e=>upd(i,"descripcion",e.target.value)} placeholder="Descripción (opcional)…"/>
       </div>
     ))}
     <button style={{...S.pill(true,"#a78bfa"),padding:"7px 0",fontWeight:700,width:"100%",marginTop:4}} onClick={addItem}>+ Agregar ítem</button>
@@ -1676,16 +1685,26 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
         </div>
       </div>}
       {/* Botón editar para no-única */}
-      {esInterno&&modo!=="unica"&&!selectable&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();onTap&&onTap(a);}}>✏ Editar proyecto</button>}
+      {esInterno&&modo!=="unica"&&!selectable&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();onTap&&onTap(a);}}>✏ Editar {modo==="proyecto"?"proyecto":"Checklist"}</button>}
       {/* Panel expandido checklist */}
       {isExp&&modo==="checklist"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
-        {(a.items||[]).map((it,idx)=>(
-          <div key={it.id} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}}
-            onClick={()=>{if(!onPatchAct)return;const ni=(a.items||[]).map((x,j)=>j===idx?{...x,done:!x.done}:x);const done=ni.filter(x=>x.done).length;const compEst=ni.length>0&&done===ni.length?"Cerrada":done>0?"En Proceso":"Programada";onPatchAct(a.id,{items:ni,estatus:compEst});}}>
-            <span style={{fontSize:15,flexShrink:0}}>{it.done?"✅":"⬜"}</span>
-            <span style={{fontSize:12,color:it.done?"#475569":"#e2e8f0",textDecoration:it.done?"line-through":"none",flex:1}}>{it.texto||"Ítem sin nombre"}</span>
-          </div>
-        ))}
+        {[...(a.items||[])].sort((x,y)=>{
+          if(x.done!==y.done)return x.done?1:-1;
+          return (PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);
+        }).map((it,idx)=>{
+          const origIdx=(a.items||[]).findIndex(x=>x.id===it.id);
+          return <div key={it.id} style={{padding:"6px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}}
+            onClick={()=>{if(!onPatchAct)return;const ni=(a.items||[]).map((x,j)=>j===origIdx?{...x,done:!x.done}:x);const done=ni.filter(x=>x.done).length;const compEst=ni.length>0&&done===ni.length?"Cerrada":done>0?"En Proceso":"Programada";onPatchAct(a.id,{items:ni,estatus:compEst});}}>
+            {/* Renglón 1: icono + tarea + prioridad */}
+            <div style={{display:"flex",gap:8,alignItems:"center"}}>
+              <span style={{fontSize:14,flexShrink:0}}>{it.done?"✅":"⬜"}</span>
+              <span style={{fontSize:12,fontWeight:700,color:it.done?"#475569":"#e2e8f0",textDecoration:it.done?"line-through":"none",flex:1,lineHeight:1.3}}>{it.texto||"Ítem sin nombre"}</span>
+              {it.prioridad&&it.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[it.prioridad]||"#64748b"),fontSize:7,flexShrink:0}}>{it.prioridad}</span>}
+            </div>
+            {/* Renglón 2: descripción */}
+            {it.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:3,lineHeight:1.4,paddingLeft:22}}>{it.descripcion}</div>}
+          </div>;
+        })}
       </div>}
       {/* Panel expandido proyecto */}
       {isExp&&modo==="proyecto"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
@@ -1695,11 +1714,16 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
           <button style={{...S.pill(false,"#64748b"),padding:"2px 8px",fontSize:10}} onClick={()=>setSelSub(p=>({...p,[a.id]:new Set()}))}>Ninguna</button>
           {selSubCount(a.id)>0&&<button style={{...S.pill(true,"#a78bfa"),padding:"2px 10px",fontSize:10,fontWeight:700}} onClick={()=>setBatchSub({actId:a.id,fecha:"",estatus:"",prioridad:""})}>✏ Editar {selSubCount(a.id)}</button>}
         </div>
-        {(a.subtareas||[]).map((st,idx)=>{
+        {[...(a.subtareas||[])].sort((x,y)=>{
+          const fd=(x.fecha||"9999").localeCompare(y.fecha||"9999");
+          if(fd!==0)return fd;
+          return (PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);
+        }).map((st,idx)=>{
+          const origIdx=(a.subtareas||[]).findIndex(s=>s.id===st.id);
           const isSel=(selSub[a.id]||new Set()).has(st.id);
           return <div key={st.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 8px",marginBottom:4,background:isSel?"#1e1b4b":"#0f172a",borderRadius:7,border:`1px solid ${isSel?"#a78bfa":(EST_COLOR[st.estatus||"Programada"]||"#64748b")}33`}}>
             <input type="checkbox" checked={isSel} onChange={()=>toggleSubSel(a.id,st.id)} style={{width:15,height:15,flexShrink:0,accentColor:"#a78bfa",marginTop:2,cursor:"pointer"}}/>
-            <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{if(!onPatchAct)return;const nst=(a.subtareas||[]).map((x,j)=>j===idx?{...x,estatus:MODO_NEXT_EST[x.estatus||"Programada"]}:x);const sts=nst.map(s=>s.estatus||"Programada");const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=nst.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatchAct(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});}}>
+            <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{if(!onPatchAct)return;const nst=(a.subtareas||[]).map((x,j)=>j===origIdx?{...x,estatus:MODO_NEXT_EST[x.estatus||"Programada"]}:x);const sts=nst.map(s=>s.estatus||"Programada");const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=nst.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatchAct(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});}}>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:2}}>
                 <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]||"#64748b"),fontSize:8}}>{st.estatus||"Programada"}</span>
                 {st.prioridad&&st.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[st.prioridad]||"#64748b"),fontSize:7}}>{st.prioridad}</span>}

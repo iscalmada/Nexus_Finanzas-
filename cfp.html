@@ -1393,6 +1393,7 @@ function App(){
   const[opoTab,setOpoTab]=useState("activas"); // "activas"|"concretadas"|"rechazadas"
   const[opoOrden,setOpoOrden]=useState("fechaCierre"); // "fechaCierre"|"pctAvance"
   const[opoFiltroEtapa,setOpoFiltroEtapa]=useState(null); // null=todas o id de etapa
+  const[opoQ,setOpoQ]=useState("");
   const[opoFiltroAliEst,setOpoFiltroAliEst]=useState(new Set()); // Set vacío = todas
   const[opoFiltroAliCom,setOpoFiltroAliCom]=useState(new Set());
   const[opoFiltroSol,setOpoFiltroSol]=useState(new Set());
@@ -3276,7 +3277,12 @@ function App(){
           const comAb=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
           const prodAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
           const comCon=concret.reduce((s,o)=>s+(Number(o.comisionEstimada)||Number(o.montoEstimado)||0),0);
-          const lista=opos.filter(o=>!opoFiltroEtapa||o.etapa===opoFiltroEtapa).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+          const ql=opoQ.trim().toLowerCase();
+          const lista=opos.filter(o=>{
+            if(opoFiltroEtapa&&o.etapa!==opoFiltroEtapa)return false;
+            if(ql){const hay=[o.concepto,solName(o.solucionId),contName(o.contactoPrincipalId||o.contactoId),empName(o.empresaId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
+            return true;
+          }).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
           const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
           const cardS={background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8};
           return (
@@ -3287,7 +3293,10 @@ function App(){
                   <div style={{flex:1,background:"#10101e",border:"1px solid #22c55e33",borderRadius:9,padding:"7px 11px"}}><div style={{fontSize:8,color:"#475569"}}>Producción Proyectada</div><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>{fmt(prodAb)}</div></div>
                   <div style={{flex:1,background:"#10101e",border:"1px solid #C9A84C33",borderRadius:9,padding:"7px 11px"}}><div style={{fontSize:8,color:"#475569"}}>Participación Proyectada</div><div style={{fontSize:15,fontWeight:800,color:"#C9A84C"}}>{fmt(comAb)}</div></div>
                 </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:8,marginTop:6}}>
+                  <input style={{...S.srch,margin:0,flex:1}} value={opoQ} onChange={e=>setOpoQ(e.target.value)} placeholder="🔍 Buscar oportunidad…"/>
+                  {(opoQ||opoFiltroEtapa)&&<button style={{flexShrink:0,background:"#f8717111",border:"1px solid #f87171",color:"#f87171",borderRadius:8,padding:"5px 9px",fontSize:11,cursor:"pointer",fontWeight:700}} onClick={()=>{setOpoQ("");setOpoFiltroEtapa(null);}}>✕</button>}
+                </div>
                   <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
                   {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
                 </div>
