@@ -1423,7 +1423,7 @@ function ChecklistEditor({items,onChange}){
     <button style={{...S.pill(true,"#a78bfa"),padding:"7px 0",fontWeight:700,width:"100%",marginTop:4}} onClick={addItem}>+ Agregar ítem</button>
   </div>;
 }
-function SubtareasEditor({subtareas,onChange}){
+function SubtareasEditor({subtareas,onChange,onIndependizar}){
   const addSub=()=>onChange([...subtareas,{id:"st"+Date.now(),titulo:"",fecha:"",estatus:"Programada",prioridad:"Media",descripcion:""}]);
   const upd=(i,k,v)=>onChange(subtareas.map((x,j)=>j===i?{...x,[k]:v}:x));
   const del=(i)=>onChange(subtareas.filter((_,j)=>j!==i));
@@ -1433,7 +1433,10 @@ function SubtareasEditor({subtareas,onChange}){
       <div key={st.id} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,padding:"9px 10px",marginBottom:8}}>
         <div style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:6}}>
           <textarea style={{...S.ta,flex:1,minHeight:48,fontSize:12}} value={st.titulo} onChange={e=>upd(i,"titulo",e.target.value)} placeholder={`Subtarea ${i+1}…`}/>
-          <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0,marginTop:2}} onClick={()=>del(i)}>✕</button>
+          <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+            <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12}} onClick={()=>del(i)}>✕</button>
+            {onIndependizar&&<button style={{...S.pill(false,"#60a5fa"),padding:"3px 6px",fontSize:10}} title="Independizar como actividad única" onClick={()=>onIndependizar(i)}>↗</button>}
+          </div>
         </div>
         <div style={{display:"flex",gap:6,marginBottom:6}}>
           <input type="date" style={{...S.inp,flex:1}} value={st.fecha||""} onChange={e=>upd(i,"fecha",e.target.value)}/>
@@ -1457,10 +1460,11 @@ const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){c
 const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};let best=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<best)best=r;});return Object.keys(rank).find(k=>rank[k]===best)||"Media";};
 const MODO_NEXT_EST={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Programada"};
 
-function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedContacto,onUpdateContacto,onUpdateOportunidad,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
+function ActividadModal({init,contactos,empresas,catalogos,oportunidades,actividades,fixedContacto,onUpdateContacto,onUpdateOportunidad,onSave,onSaveExtra,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
   const[nuevoCto,setNuevoCto]=useState(null);
   const[esCopia,setEsCopia]=useState(false);
   const[showAvance,setShowAvance]=useState(false);
+  const[moveToProjectId,setMoveToProjectId]=useState("");
   const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",enfoque:"Comercial",modoTarea:"unica",...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const esInterno=f.enfoque==="Interno";
@@ -1472,6 +1476,23 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
   ):[];
   const save=()=>{
     const modo=f.modoTarea||"unica";
+    // ── Mover a proyecto ──
+    if(esInterno&&modo==="unica"&&moveToProjectId&&onSaveExtra&&actividades){
+      const proj=actividades.find(a=>a.id===moveToProjectId);
+      if(proj){
+        if(!f.asunto){alert("Indica el asunto antes de mover");return;}
+        const ns={id:"st"+Date.now(),titulo:f.asunto,fecha:f.fecha||"",estatus:f.estatus||"Programada",prioridad:f.prioridad||"Media",descripcion:f.intencion||""};
+        const allSubs=[...(proj.subtareas||[]),ns];
+        const sts=allSubs.map(s=>s.estatus||"Programada");
+        const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
+        const pend=allSubs.filter(s=>s.estatus!=="Cerrada");
+        const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
+        const compFecha=ds[0]||allSubs.map(s=>s.fecha).filter(Boolean).sort()[0]||"";
+        onSaveExtra({...proj,subtareas:allSubs,estatus:compEst,fecha:compFecha});
+        if(f.id)onDelete(f.id);
+        onClose();return;
+      }
+    }
     if(!esInterno){
       const cid=f.contactoId||fixedContacto;
       if(!cid){alert("Selecciona un contacto");return;}
@@ -1556,7 +1577,15 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
         <textarea style={{...S.ta,minHeight:72}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
       </Field>
       {(f.modoTarea||"unica")==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
-      {(f.modoTarea||"unica")==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}/>}
+      {(f.modoTarea||"unica")==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}
+        onIndependizar={onSaveExtra?(idx)=>{
+          const st=(f.subtareas||[])[idx];
+          if(!st)return;
+          if(!window.confirm(`¿Independizar "${st.titulo||"esta subtarea"}" como actividad única?`))return;
+          onSaveExtra({enfoque:"Interno",modoTarea:"unica",asunto:st.titulo,fecha:st.fecha||"",estatus:st.estatus||"Programada",prioridad:st.prioridad||"Media",intencion:st.descripcion||""});
+          set("subtareas",(f.subtareas||[]).filter((_,j)=>j!==idx));
+        }:undefined}
+      />}
     </>)}
 
     <div style={S.g2}>
@@ -1629,6 +1658,19 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
         </div>)}
       </div>}
     </div>}
+    {/* ── MOVER A PROYECTO (solo actividades únicas internas) ── */}
+    {esInterno&&(f.modoTarea||"unica")==="unica"&&onSaveExtra&&(()=>{
+      const proyectos=(actividades||[]).filter(a=>a.enfoque==="Interno"&&a.modoTarea==="proyecto"&&a.id!==f.id);
+      if(!proyectos.length)return null;
+      return <div style={{...S.card(),marginBottom:10,border:"1px solid #60a5fa33"}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#60a5fa",marginBottom:8}}>↙ Mover a proyecto</div>
+        <select style={S.sel} value={moveToProjectId} onChange={e=>setMoveToProjectId(e.target.value)}>
+          <option value="">— Mantener como actividad única —</option>
+          {proyectos.map(p=><option key={p.id} value={p.id}>📁 {p.asunto||"Proyecto sin nombre"}</option>)}
+        </select>
+        {moveToProjectId&&<div style={{fontSize:9,color:"#60a5fa",marginTop:5}}>Al guardar se convertirá en subtarea del proyecto seleccionado.</div>}
+      </div>;
+    })()}
     <button style={S.saveB} onClick={save}>Guardar</button>
     {!esInterno&&init&&init.id&&!esCopia&&(f.estatus==="Programada"||f.estatus==="En Proceso")&&<button style={{...S.cancB,color:"#fb923c",borderColor:"#fb923c55"}} onClick={cerrarSinRespuesta}>Cerrar sin respuesta</button>}
     {init&&init.id&&!esCopia&&<button style={S.cancB} onClick={()=>{setF(p=>{const{id,...r}=p;return r;});setEsCopia(true);}}>Copiar como nueva</button>}
@@ -2419,7 +2461,7 @@ function App(){
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"||view==="bienes"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
-    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} oportunidades={oportunidades} onUpdateContacto={(id,patch)=>setContactos(prev=>prev.map(c=>c.id===id?{...c,...patch}:c))} onUpdateOportunidad={(id,patch)=>setOportunidades(prev=>prev.map(o=>o.id===id?{...o,...patch}:o))} onSave={saveAct} onDelete={delAct} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setActModal(null)}/>}
+    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} oportunidades={oportunidades} actividades={actividades} onUpdateContacto={(id,patch)=>setContactos(prev=>prev.map(c=>c.id===id?{...c,...patch}:c))} onUpdateOportunidad={(id,patch)=>setOportunidades(prev=>prev.map(o=>o.id===id?{...o,...patch}:o))} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setActModal(null)}/>}
     {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setOpoModal(null)}/>}
   </div>;
 }
