@@ -2100,15 +2100,18 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,catalogos,onTap}){
+function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
   const op=contactos.find(x=>x.id===o.contactoOperativoId);
   const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
   const monto=o.comisionEstimada||o.montoEstimado;
-  return <div onClick={()=>onTap&&onTap(o)} style={S.cCard(col)}>
+  return <div onClick={()=>onTap&&onTap(o)} style={{...S.cCard(col),borderLeft:sinAct?`3px solid #ef4444`:`3px solid ${col}44`}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
       <div style={{fontSize:14,fontWeight:700}}>{o.concepto}</div>
-      {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
+        {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
+        {sinAct&&<span style={{fontSize:9,fontWeight:700,color:"#ef4444",background:"#ef444411",border:"1px solid #ef444433",borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap"}}>⚠ Sin seguimiento</span>}
+      </div>
     </div>
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
       <span style={S.tag(col)}>{(o.etapa||"").replace("Oportunidad ","")}</span>
@@ -2123,7 +2126,7 @@ function OpoCard({o,contactos,empresas,catalogos,onTap}){
   </div>;
 }
 
-function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,openOpo}){
+function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,openOpo}){
   const[fEt,setFEt]=useState("");
   const[showFil,setShowFil]=useState(false);
   const[fSol,setFSol]=useState([]);
@@ -2135,14 +2138,25 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,openO
   const[cDesde,setCDesde]=useState("");
   const[cHasta,setCHasta]=useState("");
   const[q,setQ]=useState("");
+  const[fSinAct,setFSinAct]=useState(false);
   const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
   const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"";
   const en=(id)=>(empresas.find(e=>e.id===id)||{}).nombre||"";
   const toggleSol=(id)=>setFSol(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
   const toggleProb=(v)=>setFProb(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
   const toggleRecur=(v)=>setFRecur(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
+  // ── Cómputo de oportunidades sin seguimiento activo ──
+  const actActivas=(actividades||[]).filter(a=>a.estatus==="Programada"||a.estatus==="En Proceso");
+  const tieneSeg=(o)=>actActivas.some(a=>
+    a.oportunidadId===o.id ||
+    (a.contactoId&&(a.contactoId===(o.contactoPrincipalId||o.contactoId)||a.contactoId===o.contactoOperativoId))
+  );
+  const abiertas=oportunidades.filter(ABIERTA);
+  const sinSeguimiento=abiertas.filter(o=>!tieneSeg(o));
   const ql=q.trim().toLowerCase();
   const list=oportunidades.filter(o=>{
+    if(fSinAct&&tieneSeg(o))return false;
+    if(fSinAct&&!ABIERTA(o))return false;
     if(fEt&&o.etapa!==fEt)return false;
     if(fSol.length&&!fSol.includes(o.solucionId))return false;
     if(fContacto&&(o.contactoPrincipalId||o.contactoId)!==fContacto&&o.contactoOperativoId!==fContacto)return false;
@@ -2155,9 +2169,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,openO
     if(ql){const hay=[o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
   }).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
-  const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0);
-  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");};
-  const abiertas=oportunidades.filter(ABIERTA);
+  const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0);
+  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);};
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
   const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
@@ -2169,7 +2182,15 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,openO
         <div style={S.card()}><div style={S.lbl}>Monto abierto</div><div style={S.big()}>{money(totalAb)}</div></div>
         <div style={S.card()}><div style={S.lbl}>Comisión abierta</div><div style={S.big("#22c55e")}>{money(totalCom)}</div></div>
       </div>
-      <div style={{display:"flex",gap:6,marginTop:4,alignItems:"center"}}>
+      {/* Chip sin seguimiento */}
+      {sinSeguimiento.length>0&&<button
+        style={{...S.pill(fSinAct,"#ef4444"),width:"100%",padding:"8px 0",fontWeight:700,fontSize:12,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
+        onClick={()=>setFSinAct(v=>!v)}>
+        <span>⚠</span>
+        <span>{sinSeguimiento.length} oportunidad{sinSeguimiento.length!==1?"es":""} sin actividad de seguimiento</span>
+        {fSinAct&&<span style={{fontSize:10,opacity:.8}}>· Toca para ver todas</span>}
+      </button>}
+      <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
         <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar concepto, contacto, empresa…" value={q} onChange={e=>setQ(e.target.value)}/>
         <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""} {showFil?"▲":"▾"}</button>
         <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap"}}>Act: {list.length}</span>
@@ -2204,7 +2225,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,openO
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
@@ -2350,7 +2371,7 @@ function App(){
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
-    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} openOpo={openOpo}/>}
+    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} openOpo={openOpo}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
