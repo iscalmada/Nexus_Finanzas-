@@ -1184,15 +1184,15 @@ function CatCRUD({title,items,setItems,usage,usageField,usageLabel,color}){
   const add=()=>{if(!nuevo.trim()||items.includes(nuevo.trim()))return;setItems([...items,nuevo.trim()]);setNuevo("");};
   const rename=(i,v)=>{const n=[...items];n[i]=v;setItems(n);};
   const remove=(i)=>{const val=items[i];const cnt=(usage||[]).filter(x=>x[usageField]===val).length;if(cnt>0){alert(`No se puede eliminar: ${cnt} ${usageLabel||"registro"}${cnt!==1?"s":""} usa${cnt!==1?"n":""} "${val}"`);return;}setItems(items.filter((_,j)=>j!==i));};
-  return <div style={{background:"#10101e",border:`1px solid ${color||GOLD}33`,borderRadius:11,padding:"11px 13px",marginBottom:10}}>
-    <div style={{fontSize:12,fontWeight:800,color:color||GOLD,marginBottom:8}}>{title}</div>
+  return <div style={{background:"#10101e",border:`1px solid ${color||"#C9A84C"}33`,borderRadius:11,padding:"11px 13px",marginBottom:10}}>
+    <div style={{fontSize:12,fontWeight:800,color:color||"#C9A84C",marginBottom:8}}>{title}</div>
     {items.map((v,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
       <input style={{...S.inp,flex:1,fontSize:12}} value={v} onChange={e=>rename(i,e.target.value)}/>
       <button style={{flexShrink:0,background:"#f8717111",border:"1px solid #f87171",color:"#f87171",borderRadius:8,padding:"4px 9px",fontSize:11,cursor:"pointer"}} onClick={()=>remove(i)}>✕</button>
     </div>)}
     <div style={{display:"flex",gap:6,marginTop:6}}>
       <input style={{...S.inp,flex:1,fontSize:12}} placeholder="Nuevo valor…" value={nuevo} onChange={e=>setNuevo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}/>
-      <button style={{flexShrink:0,background:GOLD,border:"none",borderRadius:9,color:"#08080f",fontWeight:800,fontSize:12,padding:"6px 12px",cursor:"pointer"}} onClick={add}>+ Agregar</button>
+      <button style={{flexShrink:0,background:"#C9A84C",border:"none",borderRadius:9,color:"#08080f",fontWeight:800,fontSize:12,padding:"6px 12px",cursor:"pointer"}} onClick={add}>+ Agregar</button>
     </div>
   </div>;
 }
@@ -4169,7 +4169,7 @@ function App(){
               <button style={{...S.prioB2(catMode==="ing","#22c55e"),flex:1,padding:"9px 0",fontSize:11}} onClick={()=>setCatMode("ing")}>↑ Ingresos</button>
             </div>
             {catMode==="eg"&&<div style={{marginBottom:8}}>
-              <div style={{fontSize:9,color:"#64748b",padding:"6px 10px",background:"#0f172a",borderRadius:8,border:"1px solid #1e293b",marginBottom:8}}>Las etiquetas de prioridad y las capas de proyección se editan en <b style={{color:GOLD}}>Catálogos del Sistema</b>.</div>
+              <div style={{fontSize:9,color:"#64748b",padding:"6px 10px",background:"#0f172a",borderRadius:8,border:"1px solid #1e293b",marginBottom:8}}>Las etiquetas de prioridad y las capas de proyección se editan en <b style={{color:"#C9A84C"}}>Catálogos del Sistema</b>.</div>
             </div>}
             <div style={{fontSize:9,color:"#475569",marginBottom:9}}>☰ arrastra para reordenar · toca el nombre para editar</div>
             {cats_.filter(c=>!c.nexus).map(cat=>(
