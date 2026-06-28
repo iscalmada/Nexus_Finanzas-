@@ -1392,8 +1392,19 @@ function App(){
 
   const[opoTab,setOpoTab]=useState("activas"); // "activas"|"concretadas"|"rechazadas"
   const[opoOrden,setOpoOrden]=useState("fechaCierre"); // "fechaCierre"|"pctAvance"
-  const[opoFiltroEtapa,setOpoFiltroEtapa]=useState(null); // null=todas o id de etapa
+  const[opoFiltroEtapa,setOpoFiltroEtapa]=useState(null);
   const[opoQ,setOpoQ]=useState("");
+  // ── Catálogos del Sistema ──
+  const[catOrigenAcr,setCatOrigenAcrRaw]=useState(()=>loadLS('ncfp_catOrigenAcr',["Sicresa","Familia","Terceros"]));
+  const[catOrigenDeu,setCatOrigenDeuRaw]=useState(()=>loadLS('ncfp_catOrigenDeu',["Sicresa","Terceros"]));
+  const[catPrioPago,setCatPrioPagoRaw]=useState(()=>loadLS('ncfp_catPrioPago',["Alta","Media","Baja"]));
+  const[catProbRecup,setCatProbRecupRaw]=useState(()=>loadLS('ncfp_catProbRecup',["Alta","Media","Baja"]));
+  const[catTipoIngExt,setCatTipoIngExtRaw]=useState(()=>loadLS('ncfp_catTipoIngExt',["Patrimonio","Sicresa"]));
+  const setCatOrigenAcr=(v)=>{setCatOrigenAcrRaw(v);try{localStorage.setItem('ncfp_catOrigenAcr',JSON.stringify(v));}catch(e){}};
+  const setCatOrigenDeu=(v)=>{setCatOrigenDeuRaw(v);try{localStorage.setItem('ncfp_catOrigenDeu',JSON.stringify(v));}catch(e){}};
+  const setCatPrioPago=(v)=>{setCatPrioPagoRaw(v);try{localStorage.setItem('ncfp_catPrioPago',JSON.stringify(v));}catch(e){}};
+  const setCatProbRecup=(v)=>{setCatProbRecupRaw(v);try{localStorage.setItem('ncfp_catProbRecup',JSON.stringify(v));}catch(e){}};
+  const setCatTipoIngExt=(v)=>{setCatTipoIngExtRaw(v);try{localStorage.setItem('ncfp_catTipoIngExt',JSON.stringify(v));}catch(e){}};
   const[opoFiltroAliEst,setOpoFiltroAliEst]=useState(new Set()); // Set vacío = todas
   const[opoFiltroAliCom,setOpoFiltroAliCom]=useState(new Set());
   const[opoFiltroSol,setOpoFiltroSol]=useState(new Set());
@@ -2191,7 +2202,7 @@ function App(){
   },[acreedores,deudores,ingresosExt,movs]);
 
   const exportJSON=useCallback(()=>{
-    const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,exportedAt:new Date().toISOString(),version:"v8"};
+    const data={movs,cuentas,tarjetas,catIng,catEg,capas,presupuestos,acreedores,deudores,ingresosExt,oportunidades,etapasAvance,solucionesNexus,aliadosEst,aliadosCom,metaFondo,gastoFamiliarEsencial,factorFEF,nombreUsuario,catOrigenAcr,catOrigenDeu,catPrioPago,catProbRecup,catTipoIngExt,exportedAt:new Date().toISOString(),version:"v9"};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
@@ -2221,6 +2232,11 @@ function App(){
         if(data.metaFondo!==undefined){setMetaFondo(data.metaFondo);saveLS('metaFondo',data.metaFondo);}
         if(data.gastoFamiliarEsencial!==undefined){setGastoFamiliarEsencial(data.gastoFamiliarEsencial);saveLS('gastoFamiliarEsencial',data.gastoFamiliarEsencial);}
         if(data.factorFEF!==undefined){setFactorFEF(data.factorFEF);saveLS('factorFEF',data.factorFEF);}
+        if(data.catOrigenAcr)setCatOrigenAcr(data.catOrigenAcr);
+        if(data.catOrigenDeu)setCatOrigenDeu(data.catOrigenDeu);
+        if(data.catPrioPago)setCatPrioPago(data.catPrioPago);
+        if(data.catProbRecup)setCatProbRecup(data.catProbRecup);
+        if(data.catTipoIngExt)setCatTipoIngExt(data.catTipoIngExt);
         if(data.etapasAvance){setEtapasAvance(data.etapasAvance);saveLS('etapasAvance',data.etapasAvance);}
         if(data.solucionesNexus){setSolucionesNexus(data.solucionesNexus);saveLS('solucionesNexus',data.solucionesNexus);}
         if(data.aliadosEst){setAliadosEst(data.aliadosEst);saveLS('aliadosEst',data.aliadosEst);}
@@ -2251,7 +2267,7 @@ function App(){
 
   const PrioILabel=prioI===3?"Todas":PRIO_LBL[prioI];
   const PrioELabel=prioE===3?"Todas":PRIO_LBL[prioE];
-  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","configuracion","cartera","oportunidades"];
+  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","catalogosSistema","configuracion","cartera","oportunidades"];
 
   // Semáforo color
   const semColor=s=>s==="verde"?"#22c55e":s==="amarillo"?"#fbbf24":"#f87171";
@@ -2334,7 +2350,7 @@ function App(){
                   <div style={S.sub}>CONTROL FINANCIERO PERSONAL</div>
                 </>
               : <>
-                  <div style={S.logo}>{view==="menu"?(menuSec==="analisis"?"Análisis":"Configuración"):({movimientos:"Movimientos",cartera:"Cartera",oportunidades:"Oportunidades",estadisticas:"Estadísticas",presupuestos:"Presupuestos",proyeccion:"Proyección",cuentas:"Cuentas",catalogos:"Catálogos",configuracion:"Configuración"}[view]||"Nexus CFP")}</div>
+                  <div style={S.logo}>{view==="menu"?(menuSec==="analisis"?"Análisis":"Configuración"):({movimientos:"Movimientos",cartera:"Cartera",oportunidades:"Oportunidades",estadisticas:"Estadísticas",presupuestos:"Presupuestos",proyeccion:"Proyección",cuentas:"Cuentas",catalogos:"Categorías",catalogosSistema:"Catálogos del Sistema",configuracion:"Configuración"}[view]||"Nexus CFP")}</div>
                   <div style={S.sub}>Nexus CFP</div>
                 </>
             }
@@ -3310,6 +3326,8 @@ function App(){
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
                     <span style={tag(etColor(o.etapa))}>{(o.etapa||"").replace("Oportunidad ","")}</span>
+                    {o.probabilidad&&<span style={tag(o.probabilidad==="Alta"?"#22c55e":o.probabilidad==="Media"?"#fbbf24":"#f87171")}>◎ {o.probabilidad}</span>}
+                    {o.recurrencia&&<span style={tag("#a78bfa")}>↺ {o.recurrencia}</span>}
                     {o.solucionId&&<span style={tag("#C9A84C")}>◈ {solName(o.solucionId)}</span>}
                     {(o.contactoPrincipalId||o.contactoId)&&<span style={tag("#94a3b8")}>{contName(o.contactoPrincipalId||o.contactoId)}</span>}
                     {o.empresaId&&<span style={tag("#3b82f6")}>{empName(o.empresaId)}</span>}
@@ -3396,7 +3414,8 @@ function App(){
             {menuSec==="config"&&(<div style={{marginBottom:16}}>
               {[
                 {ico:"🏦",label:"Cuentas",sub:"Débito, efectivo y tarjetas",target:"cuentas",color:"#60a5fa"},
-                {ico:"📂",label:"Catálogos",sub:"Categorías de ingresos y egresos",target:"catalogos",color:"#C9A84C"},
+                {ico:"📂",label:"Categorías",sub:"Categorías de ingresos y egresos",target:"catalogos",color:"#C9A84C"},
+                {ico:"🗂",label:"Catálogos del Sistema",sub:"Orígenes, prioridades y tipos",target:"catalogosSistema",color:"#a78bfa"},
                 {ico:"⚙",label:"Configuración",sub:"Exportar y eliminar datos",target:"configuracion",color:"#f87171"},
               ].map(it=>(
                 <div key={it.target} style={S.menuRow} onClick={()=>setView(it.target)}>
@@ -3416,6 +3435,70 @@ function App(){
         )}
 
 
+        {/* ── CATÁLOGOS DEL SISTEMA ── */}
+        {view==="catalogosSistema"&&(()=>{
+          const CatCRUD=({title,items,setItems,usage,usageField,usageLabel})=>{
+            const[nuevo,setNuevo]=useState("");
+            const add=()=>{if(!nuevo.trim()||items.includes(nuevo.trim()))return;setItems([...items,nuevo.trim()]);setNuevo("");};
+            const rename=(i,v)=>{const n=[...items];n[i]=v;setItems(n);};
+            const remove=(i)=>{const val=items[i];const cnt=(usage||[]).filter(x=>x[usageField]===val).length;if(cnt>0){alert(`No se puede eliminar: ${cnt} ${usageLabel||"registro"}${cnt!==1?"s":""} usa${cnt!==1?"n":""} "${val}"`);return;}setItems(items.filter((_,j)=>j!==i));};
+            return <div style={{...S.card(),marginBottom:10}}>
+              <div style={{fontSize:12,fontWeight:800,color:"#C9A84C",marginBottom:8}}>{title}</div>
+              {items.map((v,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+                <input style={{...S.inp,flex:1,fontSize:12}} value={v} onChange={e=>rename(i,e.target.value)}/>
+                <button style={{...S.pill(false,"#f87171"),padding:"4px 9px",fontSize:11}} onClick={()=>remove(i)}>✕</button>
+              </div>)}
+              <div style={{display:"flex",gap:6,marginTop:4}}>
+                <input style={{...S.inp,flex:1,fontSize:12}} placeholder="Nuevo valor…" value={nuevo} onChange={e=>setNuevo(e.target.value)}/>
+                <button style={{...S.pill(true,GOLD),padding:"5px 12px",fontWeight:700,fontSize:12}} onClick={add}>+ Agregar</button>
+              </div>
+            </div>;
+          };
+          const CatRename=({title,items,labels,setLabels,color})=>(
+            <div style={{...S.card(),marginBottom:10}}>
+              <div style={{fontSize:12,fontWeight:800,color:color||"#C9A84C",marginBottom:4}}>{title}</div>
+              <div style={{fontSize:9,color:"#475569",marginBottom:8}}>Solo renombrar — cantidad fija</div>
+              {items.map((k,i)=><div key={k} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                <span style={{fontSize:10,color:"#475569",width:18,textAlign:"right",flexShrink:0}}>{i+1}</span>
+                <input style={{...S.inp,flex:1,fontSize:12}} value={labels[k]||""} onChange={e=>{const n={...labels,[k]:e.target.value};setLabels(n);try{localStorage.setItem('nexus_prioEgLabels',JSON.stringify(n));}catch(ex){}}}/>
+              </div>)}
+            </div>
+          );
+          const[prioLbl,setPrioLbl]=useState(()=>({...PRIO_EG_LBL}));
+          return <div style={{padding:"0 14px 90px"}}>
+            <button style={S.back} onClick={()=>setView("menu")}>← Config</button>
+            <div style={{fontSize:9,color:"#475569",marginBottom:12}}>Los cambios se guardan al instante.</div>
+            <div style={{fontSize:11,fontWeight:800,color:"#64748b",letterSpacing:1,textTransform:"uppercase",marginBottom:10}}>📊 Movimientos</div>
+            <CatRename title="Prioridad de Egresos" items={[1,2,3,4]} labels={prioLbl} setLabels={setPrioLbl} color="#f87171"/>
+            <div style={{...S.card(),marginBottom:10}}>
+              <div style={{fontSize:12,fontWeight:800,color:"#60a5fa",marginBottom:4}}>Probabilidad de Ingreso</div>
+              <div style={{fontSize:9,color:"#475569",marginBottom:8}}>Solo renombrar — 3 niveles fijos</div>
+              {[[1,"Alta"],[2,"Media"],[3,"Baja"]].map(([k,def])=>{
+                const[lbl,setLbl]=useState(()=>loadLS('ncfp_probLbl'+k,def));
+                return <div key={k} style={{display:"flex",gap:8,alignItems:"center",marginBottom:6}}>
+                  <span style={{fontSize:10,color:"#475569",width:18,textAlign:"right",flexShrink:0}}>{k}</span>
+                  <input style={{...S.inp,flex:1,fontSize:12}} value={lbl} onChange={e=>{setLbl(e.target.value);try{localStorage.setItem('ncfp_probLbl'+k,e.target.value);}catch(ex){}}}/>
+                </div>;
+              })}
+            </div>
+            <div style={{...S.card(),marginBottom:10,opacity:.7}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#64748b"}}>Tipos y Etapas de Movimiento</div>
+                <span style={{fontSize:14}}>🔒</span>
+              </div>
+              <div style={{fontSize:9,color:"#475569",marginBottom:8}}>Solo lectura — son el motor del sistema</div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{TIPO_OP.map(t=><span key={t} style={{fontSize:9,padding:"2px 8px",border:"1px solid #1e293b",borderRadius:6,color:"#475569"}}>{t}</span>)}</div>
+            </div>
+            <div style={{fontSize:11,fontWeight:800,color:"#64748b",letterSpacing:1,textTransform:"uppercase",marginBottom:10,marginTop:16}}>💼 Cartera</div>
+            <CatCRUD title="Origen — Acreedores" items={catOrigenAcr} setItems={setCatOrigenAcr} usage={acreedores} usageField="origen" usageLabel="acreedor"/>
+            <CatCRUD title="Origen — Deudores" items={catOrigenDeu} setItems={setCatOrigenDeu} usage={deudores} usageField="origen" usageLabel="deudor"/>
+            <CatCRUD title="Prioridad de Pago (Acreedores)" items={catPrioPago} setItems={setCatPrioPago} usage={acreedores} usageField="nivel" usageLabel="acreedor"/>
+            <CatCRUD title="Prob. de Recuperación (Deudores)" items={catProbRecup} setItems={setCatProbRecup} usage={deudores} usageField="nivel" usageLabel="deudor"/>
+            <div style={{fontSize:11,fontWeight:800,color:"#64748b",letterSpacing:1,textTransform:"uppercase",marginBottom:10,marginTop:16}}>⭐ Ingresos Extraordinarios</div>
+            <CatCRUD title="Tipo de Ingreso" items={catTipoIngExt} setItems={setCatTipoIngExt} usage={ingresosExt} usageField="origen" usageLabel="ingreso"/>
+          </div>;
+        })()}
+
         {/* ── CARTERA ── */}
         {view==="cartera"&&(
           <div style={S.sec}>
@@ -3430,7 +3513,7 @@ function App(){
               </div>
               {/* Origen por tab */}
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:carteraTab==="acreedores"?6:0}}>
-                {(carteraTab==="acreedores"?["Todos",...ORIG_ACREEDOR]:carteraTab==="deudores"?["Todos",...ORIG_DEUDOR]:["Todos",...ORIG_ING_EXT]).map(o=>{
+                {(carteraTab==="acreedores"?["Todos",...catOrigenAcr]:carteraTab==="deudores"?["Todos",...catOrigenDeu]:["Todos",...catTipoIngExt]).map(o=>{
                   const arr=carteraTab==="acreedores"?acreedores:carteraTab==="deudores"?deudores:ingresosExt;
                   const cnt=o==="Todos"?arr.length:arr.filter(x=>x.origen===o).length;
                   return <button key={o} style={{...S.prioB2(carteraOrigen===o,carteraTab==="acreedores"?"#f87171":carteraTab==="deudores"?"#22c55e":"#fbbf24"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraOrigen(o)}>{o}{cnt>0&&<span style={{opacity:0.7}}> ({cnt})</span>}</button>;
@@ -3439,7 +3522,7 @@ function App(){
               {/* Prioridad de pago — solo Acreedores */}
               {carteraTab==="acreedores"&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                 <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Pago</span>
-                {["Todos","Alta","Media","Baja"].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
+                {["Todos",...catPrioPago].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]||"#64748b"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
               </div>}
             </div>
 
@@ -3937,7 +4020,7 @@ function App(){
         {showCarteraForm&&(()=>{
           const isIngExt=carteraTab==="ingresosExt";
           const isAcr=carteraTab==="acreedores";
-          const origenes=isIngExt?ORIG_ING_EXT:isAcr?ORIG_ACREEDOR:ORIG_DEUDOR;
+          const origenes=isIngExt?catTipoIngExt:isAcr?catOrigenAcr:catOrigenDeu;
           const colorTipo=isIngExt?"#fbbf24":isAcr?"#f87171":"#22c55e";
           const set=(k,v)=>setFormCartera(f=>({...f,[k]:v}));
           return(
@@ -4004,7 +4087,7 @@ function App(){
                 )}
                 {!isIngExt&&<div style={S.fg}><label style={S.fl}>{isAcr?"Prioridad de pago":"Probabilidad de recuperación"}</label>
                   <div style={{display:"flex",gap:7,marginBottom:4}}>
-                    {["Alta","Media","Baja"].map(p=><button key={p} style={{...S.prioB2((formCartera.nivel||"Media")===p,NIV_COL[p]),flex:1,padding:"8px 0",fontSize:10}} onClick={()=>set("nivel",p)}>{p}</button>)}
+                    {(isAcr?catPrioPago:catProbRecup).map(p=><button key={p} style={{...S.prioB2((formCartera.nivel||catPrioPago[1]||"Media")===p,NIV_COL[p]||"#64748b"),flex:1,padding:"8px 0",fontSize:10}} onClick={()=>set("nivel",p)}>{p}</button>)}
                   </div>
                 </div>}
                 <div style={S.fg}><label style={S.fl}>Condiciones actuales</label>
