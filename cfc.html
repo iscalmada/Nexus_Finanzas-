@@ -467,7 +467,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
           <button style={S.pill(true,"#fbbf24")} onClick={()=>onAddOpo(c.id)}>+ Detonar</button>
         </div>
         {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>onEditOpo(x)}/>)}
-        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
+        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoId===c.id||(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(c.id)).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
       </div>
 
       <div style={S.card()}>
@@ -1466,7 +1466,10 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
   const esInterno=f.enfoque==="Interno";
   const cid=!esInterno?(f.contactoId||fixedContacto):null;
   const cont=cid?contactos.find(c=>c.id===cid):null;
-  const opsCont=!esInterno?(oportunidades||[]).filter(o=>o.contactoPrincipalId===cid||o.contactoOperativoId===cid||o.contactoId===cid):[];
+  const opsCont=!esInterno?(oportunidades||[]).filter(o=>
+    o.contactoPrincipalId===cid||o.contactoId===cid||
+    (o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(cid)
+  ):[];
   const save=()=>{
     const modo=f.modoTarea||"unica";
     if(!esInterno){
@@ -1578,15 +1581,29 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,fixedCo
       <CatSelect cat={esInterno?(catalogos.accionesInt||[]):(catalogos.tipoAccion||[])} value={f.tipoAccion} onChange={v=>set("tipoAccion",v)}/>
     </Field>
 
-    {!esInterno&&(<>
-      <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
-      {opsCont.length>0&&<Field label="Oportunidad ligada (opcional)">
-        <select style={S.sel} value={f.oportunidadId||""} onChange={e=>set("oportunidadId",e.target.value||null)}>
-          <option value="">— Seguimiento de contacto —</option>
-          {opsCont.map(o=><option key={o.id} value={o.id}>{o.concepto}</option>)}
-        </select>
-      </Field>}
-    </>)}
+      {!esInterno&&(<>
+        <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
+        {opsCont.length>0&&<Field label="Oportunidad ligada (opcional)">
+          {/* Aviso si hay oportunidades abiertas sin vincular */}
+          {!f.oportunidadId&&opsCont.filter(ABIERTA).length>0&&(
+            <div style={{display:"flex",alignItems:"center",gap:7,background:"#fbbf2411",border:"1px solid #fbbf2444",borderRadius:8,padding:"7px 10px",marginBottom:7,cursor:"pointer"}} onClick={()=>{if(opsCont.filter(ABIERTA).length===1)set("oportunidadId",opsCont.filter(ABIERTA)[0].id);}}>
+              <span style={{fontSize:14}}>💡</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:10,fontWeight:700,color:"#fbbf24"}}>
+                  {opsCont.filter(ABIERTA).length===1
+                    ? `Este contacto tiene "${opsCont.filter(ABIERTA)[0].concepto}" abierta`
+                    : `Este contacto tiene ${opsCont.filter(ABIERTA).length} oportunidades abiertas`}
+                </div>
+                <div style={{fontSize:9,color:"#92400e"}}>{opsCont.filter(ABIERTA).length===1?"Toca para vincular automáticamente":"Selecciona abajo para vincular"}</div>
+              </div>
+            </div>
+          )}
+          <select style={{...S.sel,borderColor:!f.oportunidadId&&opsCont.filter(ABIERTA).length>0?"#fbbf2466":undefined}} value={f.oportunidadId||""} onChange={e=>set("oportunidadId",e.target.value||null)}>
+            <option value="">— Seguimiento de contacto —</option>
+            {opsCont.map(o=><option key={o.id} value={o.id}>{ABIERTA(o)?"🎯 ":"✓ "}{o.concepto}</option>)}
+          </select>
+        </Field>}
+      </>)}
 
     <Field label={esInterno?"Descripción / objetivo":"Intención (al programar)"}><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder={esInterno?"Qué se va a hacer o revisar…":"Qué se busca lograr…"}/></Field>
     {(f.estatus==="En Proceso"||f.estatus==="Cerrada"||f.accionProceso)&&<Field label="Acción ejecutada (en proceso)"><textarea style={S.ta} value={f.accionProceso||""} onChange={e=>set("accionProceso",e.target.value||null)} placeholder="Qué se hizo…"/></Field>}
@@ -2032,8 +2049,14 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
     <Field label="Contacto principal">
       <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={(nombre)=>{setNuevoCto({field:"contactoPrincipalId",nombre:nombre||null});}}/>
     </Field>
-    <Field label="Contacto operativo (opcional)">
-      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoOperativoId} onChange={v=>set("contactoOperativoId",v)} placeholder="— Ninguno —" vacioLabel="— Ninguno —" onAdd={(nombre)=>{setNuevoCto({field:"contactoOperativoId",nombre:nombre||null});}}/>
+    <Field label="Contactos operativos (opcionales)">
+      <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
+        {(f.contactosOperativosIds||[]).map(id=>{const ct=contactos.find(x=>x.id===id);return ct?<span key={id} style={{...S.tag("#64748b"),display:"flex",alignItems:"center",gap:4,fontSize:10}}>
+          {ct.nombreCompleto}
+          <button style={{background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:11,padding:0,lineHeight:1}} onClick={()=>set("contactosOperativosIds",(f.contactosOperativosIds||[]).filter(x=>x!==id))}>✕</button>
+        </span>:null;})}
+      </div>
+      <BuscaSelect opciones={csort.filter(c=>!(f.contactosOperativosIds||[]).includes(c.id)).map(c=>({id:c.id,label:c.nombreCompleto}))} value="" onChange={v=>{if(v)set("contactosOperativosIds",[...(f.contactosOperativosIds||[]),v]);}} placeholder="+ Agregar operativo" vacioLabel="+ Agregar operativo"/>
     </Field>
     <Field label="Empresa (opcional)">
       <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —" onAdd={(nombre)=>{setNuevaEmp({nombre:nombre||null});}} addLabel="empresa"/>
@@ -2118,7 +2141,11 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
       {o.recurrencia&&<span style={S.tag("#a78bfa")}>{o.recurrencia}</span>}
       {o.probabilidad&&<span style={S.tag(PROB_COLOR[o.probabilidad])}>{o.probabilidad}</span>}
       {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
-      {op&&<span style={S.tag("#64748b")}>op: {op.nombreCompleto}</span>}
+      {(()=>{const ops=(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).map(id=>contactos.find(x=>x.id===id)).filter(Boolean);
+        if(ops.length===0)return null;
+        if(ops.length===1)return <span style={S.tag("#64748b")}>op: {ops[0].nombreCompleto}</span>;
+        return <span style={S.tag("#64748b")}>{ops.length} operativos</span>;
+      })()}
       {e&&<span style={S.tag("#3b82f6")}>{e.nombre}</span>}
       {(()=>{const nm=(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===o.solucionId)||{}).nombre||o.solucionNexus;return nm?<span style={S.tag(GOLD)}>{nm.length>22?nm.slice(0,22)+"…":nm}</span>:null;})()}
       {o.aliadoEstrategicoId&&(()=>{const ae=contactos.find(x=>x.id===o.aliadoEstrategicoId);return ae?<span style={S.tag("#2dd4bf")}>🤝 {ae.nombreCompleto}</span>:null;})()}
@@ -2147,10 +2174,16 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const toggleRecur=(v)=>setFRecur(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
   // ── Cómputo de oportunidades sin seguimiento activo ──
   const actActivas=(actividades||[]).filter(a=>a.estatus==="Programada"||a.estatus==="En Proceso");
-  const tieneSeg=(o)=>actActivas.some(a=>
-    a.oportunidadId===o.id ||
-    (a.contactoId&&(a.contactoId===(o.contactoPrincipalId||o.contactoId)||a.contactoId===o.contactoOperativoId))
-  );
+  const tieneSeg=(o)=>{
+    const opIds=o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean);
+    return actActivas.some(a=>
+      a.oportunidadId===o.id ||
+      (a.contactoId&&(
+        a.contactoId===(o.contactoPrincipalId||o.contactoId)||
+        opIds.includes(a.contactoId)
+      ))
+    );
+  };
   const abiertas=oportunidades.filter(ABIERTA);
   const sinSeguimiento=abiertas.filter(o=>!tieneSeg(o));
   const ql=q.trim().toLowerCase();
@@ -2304,6 +2337,10 @@ function App(){
         return o;
       });
       try{localStorage.setItem(PFX+"migSolId","1");}catch(e){}
+    }
+    if(!localStorage.getItem(PFX+"migOpOper")){
+      ops=ops.map(o=>o.contactosOperativosIds?o:{...o,contactosOperativosIds:o.contactoOperativoId?[o.contactoOperativoId]:[]});
+      try{localStorage.setItem(PFX+"migOpOper","1");}catch(e){}
     }
     return ops;
   });
