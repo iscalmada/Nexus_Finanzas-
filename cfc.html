@@ -664,7 +664,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
             {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}</span>}
-            {(c.tiposContacto||[c.tipoContacto].filter(Boolean)).filter(t=>t!=="Prospecto").map(t=><span key={t} style={S.tag("#7dd3fc")}>{t}</span>)}
+            {(c.tiposContacto||[c.tipoContacto].filter(Boolean)).map(t=><span key={t} style={S.tag("#7dd3fc")}>{t}</span>)}
             {c.etapaEspecifica&&<span style={S.tag("#94a3b8")}>{c.etapaEspecifica}</span>}
             {c.circulo&&<span style={S.tag("#64748b")}>{c.circulo}</span>}
             {emp&&<span style={S.tag("#3b82f6")}>{emp.nombre}</span>}
@@ -767,11 +767,14 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
 }
 
 /* ════════ CATÁLOGOS ════════ */
-const CAT_LABEL={etiquetas:"Etiquetas",circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cercanía",nivelEconomico:"Nivel económico",
-  potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",etapaPrincipal:"Etapa principal de contacto",
-  etapaEspecifica:"Etapa específica de contacto",areaEstrategica:"Área estratégica",solucion:"Solución de intervención",
-  tipoAccion:"Acciones Comerciales",accionesInt:"Acciones Internas",estatusAccion:"Estatus de acción",etapaOportunidad:"Etapa de oportunidad",
-  pixan:"Etapa Pixán (histórico)",tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa",capacidadRef:"Capacidad referidor",actividadPrincipal:"Actividad principal",tipoContacto:"Tipo de contacto",tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado"};
+const CAT_LABEL={
+  tipoContacto:"Tipo de contacto",circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cercanía",nivelEconomico:"Nivel económico",
+  potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",actividadPrincipal:"Actividad principal",capacidadRef:"Capacidad referidor",etiquetas:"Etiquetas",
+  etapaPrincipal:"Etapa principal de contacto",etapaEspecifica:"Etapa específica de contacto",pixan:"Etapa Pixán (histórico)",
+  solucion:"Solución de intervención",etapaOportunidad:"Etapa de oportunidad",areaEstrategica:"Área estratégica",
+  tipoAccion:"Acciones Comerciales",accionesInt:"Acciones Internas",estatusAccion:"Estatus de acción",
+  tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado",
+  tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa"};
 function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,onBack}){
   const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");const[editEsp,setEditEsp]=useState(null);
   if(open){
@@ -848,7 +851,7 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,on
             <button style={{...S.pill(false,"#64748b"),padding:"0 7px",fontSize:11,opacity:idx===0?0.3:1}} disabled={idx===0} onClick={()=>move(idx,-1)}>↑</button>
             <button style={{...S.pill(false,"#64748b"),padding:"0 7px",fontSize:11,opacity:idx===items.length-1?0.3:1}} disabled={idx===items.length-1} onClick={()=>move(idx,1)}>↓</button>
           </div>
-          <input style={{...S.inp,fontSize:13}} value={o.nombre} onChange={e=>rename(o.id,e.target.value)}/>
+          <textarea style={{...S.ta,fontSize:13,minHeight:36,flex:1}} value={o.nombre} onChange={e=>rename(o.id,e.target.value)}/>
           {o.principal&&<span style={S.tag("#64748b")}>{o.principal}</span>}
           {open==="solucion"&&<button style={S.pill(!!o.ancla,GOLD)} onClick={()=>setCatalogos(p=>({...p,solucion:p.solucion.map(x=>x.id===o.id?{...x,ancla:!x.ancla}:x)}))} title="Solución ancla">★</button>}
           <button style={S.pill(false,"#f87171")} onClick={()=>remove(o.id)}>✕</button>
@@ -865,7 +868,7 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,on
     <div style={S.hdr}><div><div style={S.logo}>Catálogos</div><div style={S.sub}>Editables</div></div></div>
     <div style={S.line}/>
     <div style={{...S.sec,paddingTop:10}}>
-      {Object.keys(catalogos).map(k=><div key={k} style={{...S.cCard(GOLD),display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setOpen(k)}>
+      {Object.keys(CAT_LABEL).filter(k=>catalogos[k]).map(k=><div key={k} style={{...S.cCard(GOLD),display:"flex",justifyContent:"space-between",alignItems:"center"}} onClick={()=>setOpen(k)}>
         <span style={{fontSize:13,fontWeight:700}}>{CAT_LABEL[k]||k}</span>
         <span style={S.tag("#64748b")}>{(catalogos[k]||[]).length}</span>
       </div>)}
@@ -2186,7 +2189,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,openO
           {RECUR.map(r=><span key={r} style={S.chip(fRecur.includes(r),"#a78bfa")} onClick={()=>toggleRecur(r)}>{r}</span>)}
         </div>
         <div style={{...S.fl,marginTop:10}}>Solución</div>
-        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.solucion||[]).map(s=><span key={s.id} style={S.chip(fSol.includes(s.id),GOLD)} onClick={()=>toggleSol(s.id)}>{s.nombre.length>22?s.nombre.slice(0,22)+"…":s.nombre}</span>)}</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.solucion||[]).map(s=><span key={s.id} style={S.chip(fSol.includes(s.id),GOLD)} onClick={()=>toggleSol(s.id)}>{s.nombre}</span>)}</div>
         <div style={{...S.fl,marginTop:10}}>Contacto</div>
         <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={{...S.fl,marginTop:10}}>Empresa</div>
