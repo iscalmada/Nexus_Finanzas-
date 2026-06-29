@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Agenda Personal</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:#0c0c16;color:#e2e8f0;font-family:Arial,sans-serif;min-height:100vh;overscroll-behavior:none;}
+#loading{position:fixed;inset:0;background:#0c0c16;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .4s;}
+#loading.fade-out{opacity:0;pointer-events:none;}
+.ld-logo{font-size:22px;font-weight:900;color:#C9A84C;letter-spacing:2px;margin-bottom:6px;}
+.ld-sub{font-size:11px;color:#334155;letter-spacing:3px;}
+</style>
+</head>
+<body>
+<div id="loading"><div class="ld-logo">AGENDA PERSONAL</div><div class="ld-sub">NEXUS PARTNERS</div></div>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="text/babel">
+const{useState,useEffect,useMemo,useCallback,useRef}=React;
+const GOLD="#C9A84C";const PFX="nap_";const CFC_PFX="ncfc_";
+const ENF_COLOR={Contactar:"#60a5fa",Tareas:"#a78bfa",Acciones:"#2dd4bf"};
+const ENF_ICON={Contactar:"📞",Tareas:"📋",Acciones:"⚡"};
+const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
+const PRIOR=["Muy Alta","Alta","Media","Baja"];
+const PRIOR_COLOR={"Muy Alta":"#ef4444",Alta:"#fb923c",Media:"#fbbf24",Baja:"#94a3b8"};
+const PRIOR_RANK={"Muy Alta":0,Alta:1,Media:2,Baja:3};
+const MODO_NEXT={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Programada"};
+function loadLS(k,def){try{const v=localStorage.getItem(PFX+k);return v!==null?JSON.parse(v):def;}catch(e){return def;}}
+function saveLS(k,v){try{localStorage.setItem(PFX+k,JSON.stringify(v));}catch(e){}}
+function loadCFC(k,def){try{const v=localStorage.getItem(CFC_PFX+k);return v!==null?JSON.parse(v):def;}catch(e){return def;}}
+const hoyISO=()=>new Date().toISOString().slice(0,10);
+const fmtF=(d)=>d?d.split("-").reverse().join("/"):"";
+/* ── Estilos ── */
+const S={
+  sec:{padding:"10px 14px 90px"},
+  hdr:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"14px 14px 4px"},
+  logo:{fontSize:20,fontWeight:900,color:GOLD,letterSpacing:1},
+  sub:{fontSize:9,color:"#334155",letterSpacing:2,marginTop:2},
+  line:{height:1,background:"linear-gradient(90deg,#C9A84C33,transparent)"},
+  card:(c)=>({background:"#10101e",border:`1px solid ${c||GOLD}22`,borderRadius:11,padding:"11px 13px",marginBottom:8}),
+  inp:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",color:"#e2e8f0",fontSize:13,width:"100%",outline:"none"},
+  ta:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",color:"#e2e8f0",fontSize:13,width:"100%",outline:"none",resize:"vertical",fontFamily:"Arial,sans-serif"},
+  sel:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",color:"#e2e8f0",fontSize:13,width:"100%",outline:"none"},
+  lbl:{fontSize:10,color:"#64748b",marginBottom:5,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"},
+  pill:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:9,padding:"6px 14px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:12}),
+  chip:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:11,display:"inline-block"}),
+  tag:(c)=>({fontSize:9,fontWeight:700,color:c,background:c+"18",border:`1px solid ${c}44`,borderRadius:6,padding:"2px 7px",display:"inline-block",whiteSpace:"nowrap"}),
+  modal:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
+  mBox:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:"18px 18px 0 0",padding:"16px 14px 30px",width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto"},
+  mTit:{fontSize:14,fontWeight:800,color:GOLD,marginBottom:14,textAlign:"center"},
+  saveB:{background:GOLD,border:"none",borderRadius:11,color:"#08080f",fontWeight:800,fontSize:14,padding:"12px 0",width:"100%",cursor:"pointer",marginBottom:8},
+  cancB:{background:"none",border:"1px solid #1e293b",borderRadius:11,color:"#64748b",fontSize:13,padding:"10px 0",width:"100%",cursor:"pointer",marginBottom:6},
+  fab:{position:"fixed",bottom:80,right:16,width:52,height:52,borderRadius:"50%",background:GOLD,color:"#08080f",fontSize:26,fontWeight:900,border:"none",cursor:"pointer",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(201,168,76,.4)"},
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8},
+  fl:{fontSize:10,color:"#64748b",marginBottom:4,fontWeight:700,letterSpacing:.5},
+  srch:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"8px 11px",color:"#e2e8f0",fontSize:12,width:"100%",outline:"none"},
+  back:{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 12px",cursor:"pointer",marginBottom:12},
+};
+const Field=({label,children})=><div style={{marginBottom:10}}><div style={S.lbl}>{label}</div>{children}</div>;
+/* ── Helpers proyecto ── */
+const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
+const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
+const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,Alta:1,Media:2,Baja:3};let b=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<b)b=r;});return Object.keys(rank).find(k=>rank[k]===b)||"Media";};
+
+/* ── BuscaContactoEmpresa ── */
+function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onChange}){
+  const[q,setQ]=useState("");
+  const[open,setOpen]=useState(false);
+  const ref=useRef();
+  // label del seleccionado
+  const selectedLabel=useMemo(()=>{
+    if(contactoId){const c=cfcContactos.find(x=>x.id===contactoId);if(c)return c.nombreCompleto;}
+    if(empresaId){const e=cfcEmpresas.find(x=>x.id===empresaId);if(e)return e.nombre;}
+    return "";
+  },[contactoId,empresaId,cfcContactos,cfcEmpresas]);
+  const results=useMemo(()=>{
+    if(q.trim().length<2)return[];
+    const ql=q.toLowerCase();const items=[];const addedEmpresas=new Set();
+    // Buscar contactos por nombre
+    cfcContactos.forEach(c=>{
+      if((c.nombreCompleto||"").toLowerCase().includes(ql)){
+        // Encontrar empresa del contacto
+        const ev=(c.empresasVinculadas||[]);
+        const eId=ev[0]?.empresaId;
+        const emp=eId?cfcEmpresas.find(e=>e.id===eId):null;
+        items.push({kind:"contacto",contactoId:c.id,empresaId:eId||null,label:c.nombreCompleto,sub:emp?.nombre||""});
+      }
+    });
+    // Buscar empresas por nombre
+    cfcEmpresas.forEach(emp=>{
+      if((emp.nombre||"").toLowerCase().includes(ql)&&!addedEmpresas.has(emp.id)){
+        const linked=cfcContactos.filter(c=>(c.empresasVinculadas||[]).some(ev=>ev.empresaId===emp.id));
+        if(linked.length===0){
+          items.push({kind:"empresa",contactoId:null,empresaId:emp.id,label:emp.nombre,sub:"(sin contacto registrado)"});
+        } else {
+          linked.forEach(c=>items.push({kind:"contacto_empresa",contactoId:c.id,empresaId:emp.id,label:c.nombreCompleto,sub:emp.nombre}));
+        }
+        addedEmpresas.add(emp.id);
+      }
+    });
+    return items.slice(0,10);
+  },[q,cfcContactos,cfcEmpresas]);
+  const select=(item)=>{onChange({contactoId:item.contactoId,empresaId:item.empresaId});setQ("");setOpen(false);};
+  const clear=()=>{onChange({contactoId:null,empresaId:null});setQ("");};
+  return <div style={{position:"relative"}}>
+    {selectedLabel
+      ? <div style={{display:"flex",gap:6,alignItems:"center"}}>
+          <div style={{...S.inp,flex:1,color:"#e2e8f0"}}>{selectedLabel}</div>
+          <button style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px 10px",cursor:"pointer",fontSize:12}} onClick={clear}>✕</button>
+        </div>
+      : <input ref={ref} style={S.inp} value={q} onChange={e=>{setQ(e.target.value);setOpen(true);}} placeholder="🔍 Buscar nombre o empresa…" onFocus={()=>setOpen(true)}/>
+    }
+    {open&&q.trim().length>=2&&results.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:300,background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,.8)",marginTop:4,maxHeight:260,overflowY:"auto"}}>
+      {results.map((r,i)=><div key={i} style={{padding:"10px 13px",borderBottom:"1px solid #0f172a",cursor:"pointer"}} onClick={()=>select(r)}>
+        <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0"}}>{r.kind==="empresa"?"🏢":"👤"} {r.label}</div>
+        {r.sub&&<div style={{fontSize:10,color:"#475569",marginTop:2}}>{r.sub}</div>}
+      </div>)}
+    </div>}
+    {open&&q.trim().length>=2&&results.length===0&&<div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:300,background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:10,padding:"12px",marginTop:4,fontSize:11,color:"#475569"}}>Sin coincidencias. Los contactos personales se agregan en CFC con tipo "Personal".</div>}
+  </div>;
+}
+/* ── ChecklistEditor ── */
+function ChecklistEditor({items,onChange}){
+  const add=()=>onChange([...items,{id:"ci"+Date.now(),texto:"",descripcion:"",prioridad:"Media",done:false}]);
+  const upd=(i,k,v)=>onChange(items.map((x,j)=>j===i?{...x,[k]:v}:x));
+  const del=(i)=>onChange(items.filter((_,j)=>j!==i));
+  return <div style={{marginTop:6}}>
+    <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Ítems del checklist</div>
+    {items.map((it,i)=><div key={it.id} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,padding:"9px 10px",marginBottom:8}}>
+      <div style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:6}}>
+        <input type="checkbox" checked={!!it.done} onChange={e=>upd(i,"done",e.target.checked)} style={{width:16,height:16,flexShrink:0,accentColor:"#a78bfa",marginTop:6}}/>
+        <textarea style={{...S.ta,flex:1,minHeight:44,textDecoration:it.done?"line-through":"none",color:it.done?"#475569":"#e2e8f0",fontSize:13}} value={it.texto} onChange={e=>upd(i,"texto",e.target.value)} placeholder="Acción o tarea…"/>
+        <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12,flexShrink:0,marginTop:2}} onClick={()=>del(i)}>✕</button>
+      </div>
+      <div style={{display:"flex",gap:4,marginBottom:6}}>
+        {PRIOR.map(p=><button key={p} style={{flex:1,padding:"3px 0",fontSize:9,fontWeight:700,border:`1px solid ${(it.prioridad||"Media")===p?PRIOR_COLOR[p]:PRIOR_COLOR[p]+"33"}`,borderRadius:6,cursor:"pointer",background:(it.prioridad||"Media")===p?PRIOR_COLOR[p]+"22":"transparent",color:(it.prioridad||"Media")===p?PRIOR_COLOR[p]:"#475569"}} onClick={()=>upd(i,"prioridad",p)}>{p}</button>)}
+      </div>
+      <textarea style={{...S.ta,minHeight:40,fontSize:11}} value={it.descripcion||""} onChange={e=>upd(i,"descripcion",e.target.value)} placeholder="Descripción (opcional)…"/>
+    </div>)}
+    <button style={{...S.pill(true,"#a78bfa"),padding:"7px 0",fontWeight:700,width:"100%",marginTop:4}} onClick={add}>+ Agregar ítem</button>
+  </div>;
+}
+/* ── SubtareasEditor ── */
+function SubtareasEditor({subtareas,onChange,onIndependizar}){
+  const add=()=>onChange([...subtareas,{id:"st"+Date.now(),titulo:"",fecha:"",estatus:"Programada",prioridad:"Media",descripcion:""}]);
+  const upd=(i,k,v)=>onChange(subtareas.map((x,j)=>j===i?{...x,[k]:v}:x));
+  const del=(i)=>onChange(subtareas.filter((_,j)=>j!==i));
+  return <div style={{marginTop:6}}>
+    <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Subtareas del proyecto</div>
+    {subtareas.map((st,i)=><div key={st.id} style={{background:"#10101e",border:"1px solid #1e293b",borderRadius:8,padding:"9px 10px",marginBottom:8}}>
+      <div style={{display:"flex",gap:6,alignItems:"flex-start",marginBottom:6}}>
+        <textarea style={{...S.ta,flex:1,minHeight:48,fontSize:12}} value={st.titulo} onChange={e=>upd(i,"titulo",e.target.value)} placeholder={`Subtarea ${i+1}…`}/>
+        <div style={{display:"flex",flexDirection:"column",gap:4,flexShrink:0}}>
+          <button style={{...S.pill(false,"#f87171"),padding:"3px 9px",fontSize:12}} onClick={()=>del(i)}>✕</button>
+          {onIndependizar&&<button style={{...S.pill(false,"#60a5fa"),padding:"3px 6px",fontSize:10}} onClick={()=>onIndependizar(i)}>↗</button>}
+        </div>
+      </div>
+      <div style={{display:"flex",gap:6,marginBottom:6}}>
+        <input type="date" style={{...S.inp,flex:1}} value={st.fecha||""} onChange={e=>upd(i,"fecha",e.target.value)}/>
+        <select style={{...S.sel,flex:1}} value={st.estatus||"Programada"} onChange={e=>upd(i,"estatus",e.target.value)}>
+          {["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
+      </div>
+      <div style={{display:"flex",gap:4,marginBottom:6}}>
+        {PRIOR.map(p=><button key={p} style={{flex:1,padding:"3px 0",fontSize:9,fontWeight:700,border:`1px solid ${(st.prioridad||"Media")===p?PRIOR_COLOR[p]:PRIOR_COLOR[p]+"33"}`,borderRadius:6,cursor:"pointer",background:(st.prioridad||"Media")===p?PRIOR_COLOR[p]+"22":"transparent",color:(st.prioridad||"Media")===p?PRIOR_COLOR[p]:"#475569"}} onClick={()=>upd(i,"prioridad",p)}>{p}</button>)}
+      </div>
+      <textarea style={{...S.ta,minHeight:40,fontSize:11}} value={st.descripcion||""} onChange={e=>upd(i,"descripcion",e.target.value)} placeholder="Descripción (opcional)…"/>
+    </div>)}
+    <button style={{...S.pill(true,"#a78bfa"),padding:"7px 0",fontWeight:700,width:"100%",marginTop:4}} onClick={add}>+ Agregar subtarea</button>
+  </div>;
+}
+/* ── Modal de Actividad ── */
+function ActividadModal({init,cfcContactos,cfcEmpresas,catContactar,catTareas,catAcciones,actividades,onSave,onSaveExtra,onDelete,onClose}){
+  const[f,setF]=useState(()=>({enfoque:"Contactar",estatus:"Programada",fecha:hoyISO(),prioridad:"Media",modoTarea:"unica",...(init||{})}));
+  const[moveToProject,setMoveToProject]=useState("");
+  const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const esContactar=f.enfoque==="Contactar";
+  const modo=f.modoTarea||"unica";
+  const cat=esContactar?catContactar:(f.enfoque==="Tareas"?catTareas:catAcciones);
+  const proyectos=(actividades||[]).filter(a=>a.modoTarea==="proyecto"&&a.enfoque!=="Contactar"&&a.id!==f.id);
+  const save=()=>{
+    // Mover a proyecto
+    if(!esContactar&&modo==="unica"&&moveToProject&&onSaveExtra){
+      const proj=actividades.find(a=>a.id===moveToProject);
+      if(proj){
+        if(!f.asunto){alert("Indica el asunto");return;}
+        const ns={id:"st"+Date.now(),titulo:f.asunto,fecha:f.fecha||"",estatus:f.estatus||"Programada",prioridad:f.prioridad||"Media",descripcion:f.intencion||""};
+        const all=[...(proj.subtareas||[]),ns];
+        const sts=all.map(s=>s.estatus||"Programada");
+        const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
+        const pend=all.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
+        const compFecha=ds[0]||all.map(s=>s.fecha).filter(Boolean).sort()[0]||"";
+        onSaveExtra({...proj,subtareas:all,estatus:compEst,fecha:compFecha});
+        if(f.id)onDelete(f.id);onClose();return;
+      }
+    }
+    if(esContactar){
+      if(!f.fecha){alert("Indica la fecha");return;}
+      onSave({...f});
+    } else {
+      if(modo==="proyecto"){
+        if(!(f.subtareas||[]).length){alert("Agrega al menos una subtarea");return;}
+        const pend=(f.subtareas||[]).filter(s=>s.estatus!=="Cerrada");
+        const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
+        const compFecha=ds[0]||(f.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";
+        const sts=(f.subtareas||[]).map(s=>s.estatus||"Programada");
+        const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
+        onSave({...f,fecha:compFecha,estatus:compEst});
+      } else if(modo==="checklist"){
+        if(!f.fecha){alert("Indica la fecha");return;}
+        const done=(f.items||[]).filter(i=>i.done).length,tot=(f.items||[]).length;
+        const compEst=tot>0&&done===tot?"Cerrada":done>0?"En Proceso":"Programada";
+        onSave({...f,estatus:compEst});
+      } else {
+        if(!f.fecha){alert("Indica la fecha");return;}
+        onSave({...f});
+      }
+    }
+    onClose();
+  };
+  return <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div style={S.mBox}>
+      <div style={S.mTit}>{f.id?"Editar":"Nueva"} Actividad</div>
+      {/* Enfoque */}
+      <Field label="Enfoque">
+        <div style={{display:"flex",gap:5}}>
+          {["Contactar","Tareas","Acciones"].map(en=><button key={en} style={{...S.pill(f.enfoque===en,ENF_COLOR[en]),flex:1,fontSize:11,padding:"6px 4px"}} onClick={()=>set("enfoque",en)}>{ENF_ICON[en]} {en}</button>)}
+        </div>
+      </Field>
+      {/* CONTACTAR */}
+      {esContactar&&<>
+        <Field label="Contacto / Empresa">
+          <BuscaContactoEmpresa cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={f.contactoId} empresaId={f.empresaId} onChange={({contactoId,empresaId})=>{set("contactoId",contactoId);set("empresaId",empresaId);}}/>
+        </Field>
+        <Field label="Tipo de acción">
+          <select style={S.sel} value={f.tipoAccion||""} onChange={e=>set("tipoAccion",e.target.value||null)}>
+            <option value="">— Selecciona —</option>
+            {cat.map((t,i)=><option key={i} value={t}>{t}</option>)}
+          </select>
+        </Field>
+        <Field label="Intención / Motivo"><textarea style={{...S.ta,minHeight:60}} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="¿Para qué voy a contactar?"/></Field>
+        <div style={S.g2}>
+          <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
+          <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
+        </div>
+        <div style={S.g2}>
+          <Field label="Estatus">
+            <select style={S.sel} value={f.estatus||"Programada"} onChange={e=>set("estatus",e.target.value)}>
+              {["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+          <Field label="Prioridad">
+            <select style={S.sel} value={f.prioridad||"Media"} onChange={e=>set("prioridad",e.target.value)}>
+              {PRIOR.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
+        </div>
+        {f.estatus==="En Proceso"&&<Field label="Acción en proceso"><textarea style={{...S.ta,minHeight:60}} value={f.accionEnProceso||""} onChange={e=>set("accionEnProceso",e.target.value||null)} placeholder="¿Qué estoy haciendo actualmente con este contacto?"/></Field>}
+        {f.estatus==="Cerrada"&&<Field label="Conclusión"><textarea style={{...S.ta,minHeight:60}} value={f.conclusion||""} onChange={e=>set("conclusion",e.target.value||null)} placeholder="¿Cómo terminó?"/></Field>}
+      </>}
+      {/* TAREAS / ACCIONES */}
+      {!esContactar&&<>
+        <Field label="Tipo de tarea">
+          <div style={{display:"flex",gap:5}}>
+            {[["unica","1️⃣\nÚnica"],["checklist","☑\nChecklist"],["proyecto","📁\nProyecto"]].map(([v,l])=>(
+              <button key={v} style={{flex:1,padding:"7px 4px",fontSize:10,fontWeight:700,border:`1px solid ${modo===v?"#a78bfa":"#a78bfa33"}`,borderRadius:8,cursor:"pointer",background:modo===v?"#a78bfa22":"transparent",color:modo===v?"#a78bfa":"#475569",whiteSpace:"pre-line",lineHeight:1.4}} onClick={()=>set("modoTarea",v)}>{l}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label="Tipo de acción">
+          <select style={S.sel} value={f.tipoAccion||""} onChange={e=>set("tipoAccion",e.target.value||null)}>
+            <option value="">— Selecciona —</option>
+            {cat.map((t,i)=><option key={i} value={t}>{t}</option>)}
+          </select>
+        </Field>
+        <Field label="Asunto / Tarea"><textarea style={{...S.ta,minHeight:60}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value||null)} placeholder="Describe la tarea…"/></Field>
+        {modo==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
+        {modo==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}
+          onIndependizar={onSaveExtra?(idx)=>{
+            const st=(f.subtareas||[])[idx];
+            if(!st||!window.confirm(`¿Independizar "${st.titulo||"subtarea"}"?`))return;
+            onSaveExtra({enfoque:f.enfoque,modoTarea:"unica",asunto:st.titulo,fecha:st.fecha||"",estatus:st.estatus||"Programada",prioridad:st.prioridad||"Media",intencion:st.descripcion||""});
+            set("subtareas",(f.subtareas||[]).filter((_,j)=>j!==idx));
+          }:undefined}
+        />}
+        {modo!=="proyecto"&&<>
+          <div style={S.g2}>
+            <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
+            <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
+          </div>
+          <div style={S.g2}>
+            <Field label="Estatus">
+              <select style={S.sel} value={f.estatus||"Programada"} onChange={e=>set("estatus",e.target.value)}>
+                {["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}
+              </select>
+            </Field>
+            <Field label="Prioridad">
+              <select style={S.sel} value={f.prioridad||"Media"} onChange={e=>set("prioridad",e.target.value)}>
+                {PRIOR.map(p=><option key={p} value={p}>{p}</option>)}
+              </select>
+            </Field>
+          </div>
+        </>}
+        <Field label="Intención / Notas"><textarea style={{...S.ta,minHeight:50}} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="Contexto, notas…"/></Field>
+        {modo==="unica"&&proyectos.length>0&&<div style={{...S.card("#60a5fa"),border:"1px solid #60a5fa33",marginBottom:10}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#60a5fa",marginBottom:8}}>↙ Mover a proyecto</div>
+          <select style={S.sel} value={moveToProject} onChange={e=>setMoveToProject(e.target.value)}>
+            <option value="">— Mantener como actividad única —</option>
+            {proyectos.map(p=><option key={p.id} value={p.id}>📁 {p.asunto||"Proyecto"}</option>)}
+          </select>
+          {moveToProject&&<div style={{fontSize:9,color:"#60a5fa",marginTop:5}}>Al guardar se convertirá en subtarea del proyecto.</div>}
+        </div>}
+      </>}
+      <button style={S.saveB} onClick={save}>Guardar</button>
+      {f.id&&<button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>{if(window.confirm("¿Eliminar?")){{onDelete(f.id);onClose();}}}}>Eliminar</button>}
+      <button style={S.cancB} onClick={onClose}>Cancelar</button>
+    </div>
+  </div>;
+}
+/* ── Tarjeta de actividad ── */
+function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}){
+  const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
+  const efFech=proyFecha(a)||a.fecha||"";const modo=a.modoTarea||"unica";
+  const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
+  const esContactar=a.enfoque==="Contactar";
+  // Display del contacto/empresa para Contactar
+  const ctLabel=(()=>{if(a.contactoId){const c=cfcContactos.find(x=>x.id===a.contactoId);if(c)return c.nombreCompleto;}if(a.empresaId){const e=cfcEmpresas.find(x=>x.id===a.empresaId);if(e)return e.nombre;}return null;})();
+  const titulo=esContactar?(ctLabel||"Contacto no definido"):(a.asunto||a.tipoAccion||"Actividad");
+  const hoy=hoyISO();const pend=efEst==="Programada"||efEst==="En Proceso";
+  const rez=(pend&&efFech&&efFech<hoy)?Math.max(0,Math.round((Date.parse(hoy)-Date.parse(efFech))/86400000)):0;
+  const rezC=rez>=7?"#ef4444":rez>=3?"#fb923c":rez>=1?"#fbbf24":null;
+  const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return{done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return{done:d,total:a.subtareas.length};}return null;})();
+  const enfC=ENF_COLOR[a.enfoque]||"#64748b";
+  return <div style={{background:"#10101e",border:rezC?`1px solid ${rezC}66`:`1px solid ${col}22`,borderLeft:`3px solid ${enfC}`,borderRadius:9,padding:"9px 11px",marginBottom:7}}>
+    {/* Renglón 1: título */}
+    <div style={{cursor:"pointer",marginBottom:4}} onClick={()=>modo!=="unica"?onToggleExp():onTap(a)}>
+      <div style={{display:"flex",alignItems:"center",gap:6}}>
+        {modo==="proyecto"&&<span style={{fontSize:11}}>📁</span>}
+        {modo==="checklist"&&<span style={{fontSize:11}}>☑</span>}
+        <div style={{fontSize:13,fontWeight:800,flex:1,wordBreak:"break-word",lineHeight:1.3}}>{titulo}</div>
+        {modo!=="unica"&&<span style={{fontSize:10,color:"#475569"}}>{expanded?"▲":"▾"}</span>}
+      </div>
+    </div>
+    {/* Renglón 2: etiquetas */}
+    <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+      <span style={{...S.tag(enfC),fontSize:8}}>{ENF_ICON[a.enfoque]} {a.enfoque}</span>
+      {rezC&&<span style={S.tag(rezC)}>⚠ {rez}d</span>}
+      {efPrio&&efPrio!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
+      <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
+      {a.tipoAccion&&<span style={{fontSize:8,color:enfC,background:enfC+"11",border:`1px solid ${enfC}33`,borderRadius:5,padding:"1px 6px"}}>{a.tipoAccion}</span>}
+      {esContactar&&a.empresaId&&a.contactoId&&(()=>{const e=cfcEmpresas.find(x=>x.id===a.empresaId);return e?<span style={{fontSize:8,color:"#3b82f6",background:"#3b82f611",border:"1px solid #3b82f633",borderRadius:5,padding:"1px 6px"}}>{e.nombre}</span>:null;})()}
+      <span style={{fontSize:9,color:"#475569",marginLeft:"auto"}}>{fmtF(efFech)}</span>
+    </div>
+    {/* Barra de progreso */}
+    {prog&&<div style={{marginTop:6}}>
+      <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:2}}><span>{prog.done}/{prog.total}</span><span>{Math.round(prog.done/prog.total*100)}%</span></div>
+      <div style={{background:"#1e293b",borderRadius:4,height:5,overflow:"hidden"}}><div style={{background:prog.done===prog.total?"#22c55e":"#a78bfa",height:"100%",width:`${Math.round(prog.done/prog.total*100)}%`,borderRadius:4}}/></div>
+    </div>}
+    {/* Botón editar para proyectos/checklist */}
+    {modo!=="unica"&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();onTap(a);}}>✏ Editar {modo==="proyecto"?"proyecto":"Checklist"}</button>}
+    {/* Panel expandido checklist */}
+    {expanded&&modo==="checklist"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
+      {[...(a.items||[])].sort((x,y)=>{if(x.done!==y.done)return x.done?1:-1;return(PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);}).map((it,idx)=>{
+        const origIdx=(a.items||[]).findIndex(x=>x.id===it.id);
+        return <div key={it.id} style={{padding:"6px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}} onClick={()=>{if(!onPatch)return;const ni=(a.items||[]).map((x,j)=>j===origIdx?{...x,done:!x.done}:x);const d=ni.filter(x=>x.done).length;const ce=ni.length>0&&d===ni.length?"Cerrada":d>0?"En Proceso":"Programada";onPatch(a.id,{items:ni,estatus:ce});}}>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:14}}>{it.done?"✅":"⬜"}</span><span style={{fontSize:12,fontWeight:700,color:it.done?"#475569":"#e2e8f0",textDecoration:it.done?"line-through":"none",flex:1}}>{it.texto||"Ítem"}</span>{it.prioridad&&it.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[it.prioridad]),fontSize:7}}>{it.prioridad}</span>}</div>
+          {it.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,paddingLeft:22}}>{it.descripcion}</div>}
+        </div>;
+      })}
+    </div>}
+    {/* Panel expandido proyecto */}
+    {expanded&&modo==="proyecto"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
+      {[...(a.subtareas||[])].sort((x,y)=>{const xc=x.estatus==="Cerrada",yc=y.estatus==="Cerrada";if(xc!==yc)return xc?1:-1;return(x.fecha||"9999").localeCompare(y.fecha||"9999");}).map((st,idx)=>{
+        const origIdx=(a.subtareas||[]).findIndex(s=>s.id===st.id);
+        return <div key={st.id} style={{display:"flex",gap:8,padding:"6px 8px",marginBottom:4,background:"#0f172a",borderRadius:7,border:`1px solid ${EST_COLOR[st.estatus||"Programada"]||"#64748b"}33`,cursor:"pointer"}}
+          onClick={()=>{if(!onPatch)return;const ns=(a.subtareas||[]).map((x,j)=>j===origIdx?{...x,estatus:MODO_NEXT[x.estatus||"Programada"]}:x);const sts=ns.map(s=>s.estatus||"Programada");const ce=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=ns.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const cf=ds[0]||ns.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatch(a.id,{subtareas:ns,estatus:ce,fecha:cf});}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:2}}>
+              <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]),fontSize:8}}>{st.estatus||"Programada"}</span>
+              {st.prioridad&&st.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[st.prioridad]),fontSize:7}}>{st.prioridad}</span>}
+              {st.fecha&&<span style={{fontSize:9,color:"#64748b"}}>{fmtF(st.fecha)}</span>}
+            </div>
+            <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none"}}>{st.titulo||"Subtarea"}</div>
+            {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2}}>{st.descripcion}</div>}
+          </div>
+        </div>;
+      })}
+    </div>}
+  </div>;
+}
+/* ── App principal ── */
+function App(){
+  const[actividades,setActividades]=useState(()=>loadLS("actividades",[]));
+  const[catContactar,setCatContactarRaw]=useState(()=>loadLS("catContactar",["Llamada","WhatsApp","Correo","Visita","Video llamada","Mensaje"]));
+  const[catTareas,setCatTareasRaw]=useState(()=>loadLS("catTareas",[]));
+  const[catAcciones,setCatAccionesRaw]=useState(()=>loadLS("catAcciones",[]));
+  const setCatContactar=(v)=>{setCatContactarRaw(v);saveLS("catContactar",v);};
+  const setCatTareas=(v)=>{setCatTareasRaw(v);saveLS("catTareas",v);};
+  const setCatAcciones=(v)=>{setCatAccionesRaw(v);saveLS("catAcciones",v);};
+  // CFC data (read-only, filtered by Personal)
+  const cfcContactos=useMemo(()=>loadCFC("contactos",[]),[]);
+  const cfcEmpresas=useMemo(()=>loadCFC("empresas",[]),[]);
+  // UI state
+  const[modo,setModo]=useState("lista"); // lista | rptContactar | rptTareas | rptAcciones | config
+  const[modal,setModal]=useState(null);
+  const[filtros,setFiltros]=useState([]);
+  const[fEnfoque,setFEnfoque]=useState("");
+  const[showFil,setShowFil]=useState(false);
+  const[q,setQ]=useState("");
+  const[expandidos,setExpandidos]=useState(new Set());
+  const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
+  const toggleExp=(id)=>setExpandidos(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  // CRUD
+  const saveAct=(data)=>{
+    setActividades(prev=>{const n=data.id?prev.map(a=>a.id===data.id?{...a,...data}:a):[...prev,{...data,id:"a"+Date.now()}];saveLS("actividades",n);return n;});
+  };
+  const delAct=(id)=>{setActividades(prev=>{const n=prev.filter(a=>a.id!==id);saveLS("actividades",n);return n;});};
+  const patchAct=(id,patch)=>{setActividades(prev=>{const n=prev.map(a=>a.id===id?{...a,...patch}:a);saveLS("actividades",n);return n;});};
+  // Loading screen
+  useEffect(()=>{const el=document.getElementById("loading");if(el){el.classList.add("fade-out");setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},400);}},[]);
+  // Filtrado
+  const ql=q.trim().toLowerCase();
+  const base=actividades.filter(a=>{
+    const efEst=proyEstatus(a);const efFech=proyFecha(a)||a.fecha||"";
+    if(filtros.length&&!filtros.includes(efEst))return false;
+    if(fEnfoque&&a.enfoque!==fEnfoque)return false;
+    if(ql){
+      const ctL=(()=>{if(a.contactoId){const c=cfcContactos.find(x=>x.id===a.contactoId);if(c)return c.nombreCompleto;}if(a.empresaId){const e=cfcEmpresas.find(x=>x.id===a.empresaId);if(e)return e.nombre;}return "";})();
+      const hay=[a.asunto,a.tipoAccion,a.intencion,ctL].filter(Boolean).join(" ").toLowerCase();
+      if(!hay.includes(ql))return false;
+    }
+    return true;
+  }).sort((a,b)=>{const fa=proyFecha(a)||a.fecha||"",fb=proyFecha(b)||b.fecha||"";return fa.localeCompare(fb);});
+  const nFil=(filtros.length?1:0)+(fEnfoque?1:0);
+  const limpiar=()=>{setFiltros([]);setFEnfoque("");setQ("");};
+  // Reporte simplificado
+  const Reporte=({enfoque})=>{
+    const acts=base.filter(a=>a.enfoque===enfoque).sort((a,b)=>(proyFecha(a)||a.fecha||"").localeCompare(proyFecha(b)||b.fecha||""));
+    if(!acts.length)return <div style={{fontSize:11,color:"#475569",padding:"8px 0"}}>Sin actividades de {enfoque}.</div>;
+    return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
+      <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
+        <div style={{width:52,flexShrink:0}}>Fecha</div>
+        <div style={{flex:1,minWidth:0}}>{enfoque==="Contactar"?"Contacto":"Actividad"}</div>
+        <div style={{flex:1,minWidth:0}}>{enfoque==="Contactar"?"Tipo/Intención":"Tipo"}</div>
+        <div style={{width:56,flexShrink:0,textAlign:"right"}}>Estatus</div>
+      </div>
+      {acts.map(a=>{
+        const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
+        const efFech=proyFecha(a)||a.fecha||"";
+        const ctL=(()=>{if(a.contactoId){const c=cfcContactos.find(x=>x.id===a.contactoId);if(c)return c.nombreCompleto;}if(a.empresaId){const e=cfcEmpresas.find(x=>x.id===a.empresaId);if(e)return e.nombre;}return "—";})();
+        const titulo=enfoque==="Contactar"?ctL:(a.asunto||a.tipoAccion||"—");
+        const sub=enfoque==="Contactar"?(a.tipoAccion||""):(a.tipoAccion||"");
+        return <div key={a.id} style={{display:"flex",fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>setModal(a)}>
+          <div style={{width:52,flexShrink:0,color:"#94a3b8",fontSize:10}}>{fmtF(efFech)||"—"}</div>
+          <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word",fontSize:11}}>{titulo}</div>
+          <div style={{flex:1,minWidth:0,color:"#94a3b8",paddingRight:4,fontSize:10,lineHeight:1.3}}>{sub}</div>
+          <div style={{width:56,flexShrink:0,textAlign:"right"}}><span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
+        </div>;
+      })}
+    </div>;
+  };
+  // Vista Config catálogos
+  const Config=()=>{
+    const CatEd=({title,items,setItems,color})=>{
+      const[nuevo,setNuevo]=useState("");
+      const add=()=>{if(!nuevo.trim()||items.includes(nuevo.trim()))return;setItems([...items,nuevo.trim()]);setNuevo("");};
+      const del=(i)=>setItems(items.filter((_,j)=>j!==i));
+      return <div style={{...S.card(color),marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:800,color:color||GOLD,marginBottom:8}}>{title}</div>
+        {items.map((v,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+          <div style={{...S.inp,flex:1,fontSize:12,padding:"7px 10px"}}>{v}</div>
+          <button style={{...S.pill(false,"#f87171"),padding:"4px 9px",fontSize:11}} onClick={()=>del(i)}>✕</button>
+        </div>)}
+        <div style={{display:"flex",gap:6,marginTop:6}}>
+          <input style={{...S.inp,flex:1,fontSize:12}} placeholder="Nuevo valor…" value={nuevo} onChange={e=>setNuevo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}/>
+          <button style={{flexShrink:0,background:GOLD,border:"none",borderRadius:9,color:"#08080f",fontWeight:800,fontSize:12,padding:"6px 12px",cursor:"pointer"}} onClick={add}>+ Agregar</button>
+        </div>
+      </div>;
+    };
+    return <div style={S.sec}>
+      <button style={S.back} onClick={()=>setModo("lista")}>← Volver</button>
+      <CatEd title="📞 Tipo de acción — Contactar" items={catContactar} setItems={setCatContactar} color={ENF_COLOR.Contactar}/>
+      <CatEd title="📋 Tipo de acción — Tareas" items={catTareas} setItems={setCatTareas} color={ENF_COLOR.Tareas}/>
+      <CatEd title="⚡ Tipo de acción — Acciones" items={catAcciones} setItems={setCatAcciones} color={ENF_COLOR.Acciones}/>
+    </div>;
+  };
+  return <div style={{minHeight:"100vh",background:"#0c0c16"}}>
+    <div style={S.hdr}>
+      <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW</div></div>
+      <button style={{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 10px",cursor:"pointer"}} onClick={()=>setModo("config")}>⚙</button>
+    </div>
+    <div style={S.line}/>
+    {modo==="config"&&<Config/>}
+    {modo!=="config"&&<>
+      {/* STICKY */}
+      <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"7px 12px"}}>
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,marginBottom:6}}>
+          <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>setModo("lista")}>Lista</button>
+          <button style={{...S.pill(modo==="rptContactar",ENF_COLOR.Contactar),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptContactar")}>📞 Contactar</button>
+          <button style={{...S.pill(modo==="rptTareas",ENF_COLOR.Tareas),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptTareas")}>📋 Tareas</button>
+          <button style={{...S.pill(modo==="rptAcciones",ENF_COLOR.Acciones),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptAcciones")}>⚡ Acciones</button>
+        </div>
+        {/* Estatus chips (solo en lista) */}
+        {modo==="lista"&&<div style={{display:"flex",gap:4,marginBottom:6}}>
+          {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]),fontSize:9,padding:"3px 7px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
+          {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 7px"}} onClick={()=>setFiltros([])}>✕</span>}
+        </div>}
+        {/* Búsqueda + filtros */}
+        <div style={{display:"flex",gap:5,alignItems:"center"}}>
+          <input style={{...S.srch,flex:1}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
+          <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 10px",fontWeight:700,fontSize:11}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` ${nFil}`:""} {showFil?"▲":"▾"}</button>
+          {(q||nFil>0)&&<button style={{...S.pill(false,"#f87171"),padding:"0 9px",fontSize:11}} onClick={limpiar}>✕</button>}
+        </div>
+      </div>
+      {/* Panel filtros */}
+      {showFil&&<div style={{padding:"10px 14px 0"}}>
+        <div style={{...S.card(),padding:"10px 12px",marginBottom:8}}>
+          <div style={S.fl}>Enfoque</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {[["","Todos","#64748b"],["Contactar","📞 Contactar",ENF_COLOR.Contactar],["Tareas","📋 Tareas",ENF_COLOR.Tareas],["Acciones","⚡ Acciones",ENF_COLOR.Acciones]].map(([v,l,c])=>(
+              <button key={v} style={{...S.pill(fEnfoque===v,c),padding:"5px 10px",fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>}
+      {/* Contenido */}
+      <div style={S.sec}>
+        <div style={{fontSize:10,color:"#475569",marginBottom:8}}>{base.length} actividad{base.length!==1?"es":""}</div>
+        {modo==="lista"&&base.map(a=><ActCard key={a.id} a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} onTap={setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct}/>)}
+        {modo==="rptContactar"&&<Reporte enfoque="Contactar"/>}
+        {modo==="rptTareas"&&<Reporte enfoque="Tareas"/>}
+        {modo==="rptAcciones"&&<Reporte enfoque="Acciones"/>}
+        {base.length===0&&modo==="lista"&&<div style={{textAlign:"center",color:"#334155",fontSize:12,padding:"40px 0"}}>Sin actividades aún. Toca + para comenzar.</div>}
+      </div>
+    </>}
+    {/* FAB */}
+    {modo!=="config"&&<button style={S.fab} onClick={()=>setModal({})}>+</button>}
+    {/* Modal */}
+    {modal&&<ActividadModal init={modal.id?modal:null} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} catContactar={catContactar} catTareas={catTareas} catAcciones={catAcciones} actividades={actividades} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onClose={()=>setModal(null)}/>}
+  </div>;
+}
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>

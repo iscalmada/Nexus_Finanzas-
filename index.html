@@ -393,7 +393,7 @@ function App(){
   const[abierto,setAbierto]=useState(()=>!(pinActivo&&pinApp));
   const[vista,setVista]=useState("home");
   const[showBackup,setShowBackup]=useState(false);
-  const[cargado,setCargado]=useState({cfp:false,cfc:false});
+  const[cargado,setCargado]=useState({cfp:false,cfc:false,agenda:false});
   useEffect(()=>{const el=document.getElementById('loading');if(el){el.classList.add('fade-out');setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},380);}},[]);
   useEffect(()=>{let hid=null;const onHide=()=>{hid=Date.now();};const onShow=()=>{if(hid==null)return;const mins=Number(lsCFP('pinTimeout',5));const pa=lsCFP('pinActivo',false),pk=String(lsCFP('pinApp',''));if(pa&&pk&&mins>=0&&(Date.now()-hid)/60000>=mins)setAbierto(false);hid=null;};const vis=()=>{document.hidden?onHide():onShow();};document.addEventListener('visibilitychange',vis);window.addEventListener('focus',onShow);window.addEventListener('blur',onHide);return()=>{document.removeEventListener('visibilitychange',vis);window.removeEventListener('focus',onShow);window.removeEventListener('blur',onHide);};},[]);
   useEffect(()=>{
@@ -411,7 +411,7 @@ function App(){
     window.addEventListener('beforeunload',onBefore);
     return()=>{window.removeEventListener('popstate',onPop);window.removeEventListener('beforeunload',onBefore);};
   },[]);
-  const ir=(v)=>{ setVista(v); if(v==="cfp"||v==="cfc"){ setCargado(c=>({...c,[v]:true})); try{localStorage.setItem('nexus_flow_ultima',v);}catch(e){} } };
+  const ir=(v)=>{ setVista(v); if(v==="cfp"||v==="cfc"||v==="agenda"){ setCargado(c=>({...c,[v]:true})); try{localStorage.setItem('nexus_flow_ultima',v);}catch(e){} } };
   if(!abierto) return <Lock onOk={()=>setAbierto(true)}/>;
   const barBtn=(v,lab)=>{const on=vista===v;return <button onClick={()=>ir(v)} style={{flex:1,padding:"9px 0",fontSize:12,fontWeight:on?800:500,background:on?GOLD:"transparent",color:on?"#08080f":"#94a3b8",border:"none",borderRadius:9,cursor:"pointer"}}>{lab}</button>;};
   return <div style={{height:"100%",display:"flex",flexDirection:"column"}}>
@@ -419,7 +419,7 @@ function App(){
     <div style={{flexShrink:0,display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#0b0b16",borderBottom:"1px solid #1e293b"}}>
       <div style={{fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:GOLD,letterSpacing:2,paddingLeft:4,paddingRight:4}}>FLOW</div>
       <div style={{flex:1,display:"flex",gap:4,background:"#10101e",borderRadius:11,padding:4}}>
-        {barBtn("home","Inicio")}{barBtn("cfp","CFP")}{barBtn("cfc","CFC")}
+        {barBtn("home","Inicio")}{barBtn("cfp","CFP")}{barBtn("cfc","CFC")}{barBtn("agenda","Agenda\nPersonal")}
       </div>
     </div>
     )}
@@ -429,6 +429,7 @@ function App(){
       </div>
       <div style={{position:"absolute",inset:0,display:vista==="cfp"?"block":"none"}}>{cargado.cfp&&<iframe src="cfp.html" title="CFP"/>}</div>
       <div style={{position:"absolute",inset:0,display:vista==="cfc"?"block":"none"}}>{cargado.cfc&&<iframe src="cfc.html" title="CFC"/>}</div>
+      <div style={{position:"absolute",inset:0,display:vista==="agenda"?"block":"none"}}>{cargado.agenda&&<iframe src="APersonal.html" title="Agenda Personal"/>}</div>
     </div>
     {showBackup&&<BackupModal onClose={()=>setShowBackup(false)}/>}
   </div>;
