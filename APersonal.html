@@ -83,7 +83,7 @@ function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onC
     cfcContactos.forEach(c=>{
       if((c.nombreCompleto||"").toLowerCase().includes(ql)){
         // Encontrar empresa del contacto
-        const ev=(c.empresas||[]);
+        const ev=(c.empresas&&c.empresas.length)?c.empresas:(c.empresaId?[{empresaId:c.empresaId}]:[]);
         const eId=ev[0]?.empresaId;
         const emp=eId?cfcEmpresas.find(e=>e.id===eId):null;
         items.push({kind:"contacto",contactoId:c.id,empresaId:eId||null,label:c.nombreCompleto,sub:emp?.nombre||""});
@@ -92,7 +92,10 @@ function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onC
     // Buscar empresas por nombre
     cfcEmpresas.forEach(emp=>{
       if((emp.nombre||"").toLowerCase().includes(ql)&&!addedEmpresas.has(emp.id)){
-        const linked=cfcContactos.filter(c=>(c.empresas||[]).some(ev=>ev.empresaId===emp.id));
+        const linked=cfcContactos.filter(c=>{
+          const ev=(c.empresas&&c.empresas.length)?c.empresas:(c.empresaId?[{empresaId:c.empresaId}]:[]);
+          return ev.some(x=>x.empresaId===emp.id);
+        });
         if(linked.length===0){
           items.push({kind:"empresa",contactoId:null,empresaId:emp.id,label:emp.nombre,sub:"(sin contacto registrado)"});
         } else {
@@ -472,7 +475,14 @@ function App(){
   const hoy=hoyISO();
   // Filtrado
   const ql=q.trim().toLowerCase();
-  const ctLabel=(a)=>{if(a.contactoId){const c=cfcContactos.find(x=>x.id===a.contactoId);if(c)return c.nombreCompleto;}if(a.empresaId){const e=cfcEmpresas.find(x=>x.id===a.empresaId);if(e)return e.nombre;}return "";};
+  const ctLabel=(a)=>{
+    const cto=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
+    const emp=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
+    if(cto&&emp)return cto.nombreCompleto+" · "+emp.nombre;
+    if(cto)return cto.nombreCompleto;
+    if(emp)return emp.nombre;
+    return "";
+  };
   const base=actividades.filter(a=>{
     const efEst=proyEstatus(a);const efFech=proyFecha(a)||a.fecha||"";
     const pend=efEst==="Programada"||efEst==="En Proceso";
@@ -519,14 +529,14 @@ function App(){
     if(!acts.length)return <div style={{fontSize:11,color:"#475569",padding:"8px 0"}}>Sin actividades de {enfoque}.</div>;
     return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
       <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
-        <div style={{width:52,flexShrink:0}}>Fecha</div>
+        <div style={{width:68,flexShrink:0}}>Fecha</div>
         <div style={{flex:1,minWidth:0}}>{enfoque==="Contactar"?"Contacto":"Actividad"}</div>
         <div style={{flex:1,minWidth:0}}>{enfoque==="Contactar"?"Tipo":"Tipo"}</div>
         <div style={{width:56,flexShrink:0,textAlign:"right"}}>Estatus</div>
       </div>
       {acts.map(a=>{const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const efFech=proyFecha(a)||a.fecha||"";const titulo=enfoque==="Contactar"?(ctLabel(a)||"—"):(a.asunto||a.tipoAccion||"—");
         return <div key={a.id} style={{display:"flex",fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>setModal(a)}>
-          <div style={{width:52,flexShrink:0,color:"#94a3b8",fontSize:10}}>{fmtF(efFech)||"—"}</div>
+          <div style={{width:68,flexShrink:0,color:"#94a3b8",fontSize:10,paddingRight:4}}>{fmtF(efFech)||"—"}</div>
           <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word",fontSize:11}}>{titulo}</div>
           <div style={{flex:1,minWidth:0,color:"#94a3b8",paddingRight:4,fontSize:10}}>{a.tipoAccion||"—"}</div>
           <div style={{width:56,flexShrink:0,textAlign:"right"}}><span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
@@ -669,10 +679,10 @@ function App(){
     {/* FAB + */}
     {modo!=="config"&&!selMode&&<button style={S.fab} onClick={()=>setModal({})}>+</button>}
     {/* Botones de navegación */}
-    {modo==="lista"&&!selMode&&<>
-      <button onClick={scrollTop} style={{position:"fixed",bottom:148,right:16,width:40,height:40,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:16,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↑</button>
-      <button onClick={scrollHoy} style={{position:"fixed",bottom:100,right:16,width:40,height:40,borderRadius:"50%",background:GOLD,border:"none",color:"#08080f",fontSize:10,fontWeight:800,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>Hoy</button>
-      <button onClick={scrollBottom} style={{position:"fixed",bottom:52,right:16,width:40,height:40,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:16,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↓</button>
+    {!selMode&&<>
+      <button onClick={scrollTop} style={{position:"fixed",bottom:230,right:14,width:36,height:36,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:15,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↑</button>
+      <button onClick={scrollHoy} style={{position:"fixed",bottom:185,right:14,width:36,height:36,borderRadius:"50%",background:GOLD,border:"none",color:"#08080f",fontSize:9,fontWeight:800,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>Hoy</button>
+      <button onClick={scrollBottom} style={{position:"fixed",bottom:140,right:14,width:36,height:36,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:15,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↓</button>
     </>}
     {/* Modal */}
     {modal&&<ActividadModal init={modal.id?modal:null} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} catContactar={catContactar} catTareas={catTareas} catAcciones={catAcciones} catEtiquetas={catEtiquetas} actividades={actividades} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onClose={()=>setModal(null)}/>}
