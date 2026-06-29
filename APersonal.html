@@ -409,6 +409,275 @@ function App(){
   const setCatTareas=(v)=>{setCatTareasRaw(v);saveLS("catTareas",v);};
   const setCatAcciones=(v)=>{setCatAccionesRaw(v);saveLS("catAcciones",v);};
   const setCatEtiquetas=(v)=>{setCatEtiquetasRaw(v);saveLS("catEtiquetas",v);};
+  const cfcContactos=useMemo(()=>loadCFC("contactos",[]),[]);
+  const cfcEmpresas=useMemo(()=>loadCFC("empresas",[]),[]);
+  // UI
+  const[modo,setModo]=useState("lista");
+  const[modal,setModal]=useState(null);
+  const[expandidos,setExpandidos]=useState(new Set());
+  // Filtros
+  const[filtros,setFiltros]=useState([]);
+  const[fEnfoque,setFEnfoque]=useState("");
+  const[fEtiqueta,setFEtiqueta]=useState("");
+  const[fPrioridad,setFPrioridad]=useState([]);
+  const[fContacto,setFContacto]=useState("");
+  const[fEmpresa,setFEmpresa]=useState("");
+  const[fTipoAccion,setFTipoAccion]=useState("");
+  const[fDesde,setFDesde]=useState("");
+  const[fHasta,setFHasta]=useState("");
+  const[fRezago,setFRezago]=useState(false);
+  const[showFil,setShowFil]=useState(false);
+  const[q,setQ]=useState("");
+  // Orden
+  const[ordCampo,setOrdCampo]=useState("fechaPrio");
+  const[ordDir,setOrdDir]=useState("asc");
+  // Selección múltiple
+  const[selMode,setSelMode]=useState(false);
+  const[sel,setSel]=useState([]);
+  const toggleSel=(id)=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
+  const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
+  const toggleExp=(id)=>setExpandidos(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  // CRUD
+  const saveAct=(data)=>{setActividades(prev=>{const n=data.id?prev.map(a=>a.id===data.id?{...a,...data}:a):[...prev,{...data,id:"a"+Date.now()}];saveLS("actividades",n);return n;});};
+  const delAct=(id)=>{setActividades(prev=>{const n=prev.filter(a=>a.id!==id);saveLS("actividades",n);return n;});};
+  const patchAct=(id,patch)=>{setActividades(prev=>{const n=prev.map(a=>a.id===id?{...a,...patch}:a);saveLS("actividades",n);return n;});};
+  useEffect(()=>{const el=document.getElementById("loading");if(el){el.classList.add("fade-out");setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},400);}},[]);
+  const hoy=hoyISO();
+  // Filtrado
+  const ql=q.trim().toLowerCase();
+  const ctLabel=(a)=>{if(a.contactoId){const c=cfcContactos.find(x=>x.id===a.contactoId);if(c)return c.nombreCompleto;}if(a.empresaId){const e=cfcEmpresas.find(x=>x.id===a.empresaId);if(e)return e.nombre;}return "";};
+  const base=actividades.filter(a=>{
+    const efEst=proyEstatus(a);const efFech=proyFecha(a)||a.fecha||"";
+    const pend=efEst==="Programada"||efEst==="En Proceso";
+    const rez=pend&&efFech&&efFech<hoy;
+    if(filtros.length&&!filtros.includes(efEst))return false;
+    if(fEnfoque&&a.enfoque!==fEnfoque)return false;
+    if(fEtiqueta&&!(a.etiquetas||[]).includes(fEtiqueta))return false;
+    if(fPrioridad.length&&!fPrioridad.includes(proyPrioridad(a)))return false;
+    if(fContacto&&a.contactoId!==fContacto)return false;
+    if(fEmpresa&&a.empresaId!==fEmpresa)return false;
+    if(fTipoAccion&&a.tipoAccion!==fTipoAccion)return false;
+    if(fDesde&&efFech<fDesde)return false;
+    if(fHasta&&efFech>fHasta)return false;
+    if(fRezago&&!rez)return false;
+    if(ql){const hay=[a.asunto,a.tipoAccion,a.intencion,ctLabel(a)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
+    return true;
+  });
+  // Ordenamiento
+  const ordenadas=base.slice().sort((a,b)=>{
+    const fa=proyFecha(a)||a.fecha||"",fb=proyFecha(b)||b.fecha||"";
+    const pa=PRIOR_RANK[proyPrioridad(a)]??2,pb=PRIOR_RANK[proyPrioridad(b)]??2;
+    let r=0;
+    if(ordCampo==="fechaPrio"){r=fa.localeCompare(fb);if(r===0)r=pa-pb;}
+    else if(ordCampo==="fecha")r=fa.localeCompare(fb);
+    else r=pa-pb;
+    return ordDir==="asc"?r:-r;
+  });
+  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0);
+  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta("");setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setQ("");};
+  // Catálogo unificado de tipos de acción
+  const todosTipos=[...new Set([...catContactar,...catTareas,...catAcciones])];
+  // Listas para filtros de contacto/empresa
+  const ctoOpts=cfcContactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||""));
+  const empOpts=cfcEmpresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  // Navegación
+  const scrollTop=()=>window.scrollTo({top:0,behavior:"smooth"});
+  const scrollBottom=()=>window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
+  const scrollHoy=()=>{const el=document.getElementById("ap-hoy");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});else window.scrollTo({top:0,behavior:"smooth"});};
+  // Índice de "Hoy" en la lista
+  const hoyIdx=ordDir==="asc"?ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")>=hoy):ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")<=hoy);
+  // Reporte simplificado
+  const Reporte=({enfoque})=>{
+    const acts=ordenadas.filter(a=>a.enfoque===enfoque);
+    if(!acts.length)return <div style={{fontSize:11,color:"#475569",padding:"8px 0"}}>Sin actividades de {enfoque}.</div>;
+    return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
+      <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
+        <div style={{width:52,flexShrink:0}}>Fecha</div>
+        <div style={{flex:1,minWidth:0}}>{enfoque==="Contactar"?"Contacto":"Actividad"}</div>
+        <div style={{flex:1,minWidth:0}}>{enfoque==="Contactar"?"Tipo":"Tipo"}</div>
+        <div style={{width:56,flexShrink:0,textAlign:"right"}}>Estatus</div>
+      </div>
+      {acts.map(a=>{const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const efFech=proyFecha(a)||a.fecha||"";const titulo=enfoque==="Contactar"?(ctLabel(a)||"—"):(a.asunto||a.tipoAccion||"—");
+        return <div key={a.id} style={{display:"flex",fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>setModal(a)}>
+          <div style={{width:52,flexShrink:0,color:"#94a3b8",fontSize:10}}>{fmtF(efFech)||"—"}</div>
+          <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word",fontSize:11}}>{titulo}</div>
+          <div style={{flex:1,minWidth:0,color:"#94a3b8",paddingRight:4,fontSize:10}}>{a.tipoAccion||"—"}</div>
+          <div style={{width:56,flexShrink:0,textAlign:"right"}}><span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
+        </div>;
+      })}
+    </div>;
+  };
+  // Config catálogos
+  const Config=()=>{
+    const CatEd=({title,items,setItems,color})=>{
+      const[nuevo,setNuevo]=useState("");
+      const add=()=>{if(!nuevo.trim()||items.includes(nuevo.trim()))return;setItems([...items,nuevo.trim()]);setNuevo("");};
+      const del=(i)=>setItems(items.filter((_,j)=>j!==i));
+      return <div style={{...S.card(color),marginBottom:12}}>
+        <div style={{fontSize:12,fontWeight:800,color:color||GOLD,marginBottom:8}}>{title}</div>
+        {items.map((v,i)=><div key={i} style={{display:"flex",gap:6,alignItems:"center",marginBottom:6}}>
+          <div style={{...S.inp,flex:1,fontSize:12,padding:"7px 10px"}}>{v}</div>
+          <button style={{...S.pill(false,"#f87171"),padding:"4px 9px",fontSize:11}} onClick={()=>del(i)}>✕</button>
+        </div>)}
+        <div style={{display:"flex",gap:6,marginTop:6}}>
+          <input style={{...S.inp,flex:1,fontSize:12}} placeholder="Nuevo valor…" value={nuevo} onChange={e=>setNuevo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}/>
+          <button style={{flexShrink:0,background:GOLD,border:"none",borderRadius:9,color:"#08080f",fontWeight:800,fontSize:12,padding:"6px 12px",cursor:"pointer"}} onClick={add}>+ Agregar</button>
+        </div>
+      </div>;
+    };
+    return <div style={S.sec}>
+      <button style={S.back} onClick={()=>setModo("lista")}>← Volver</button>
+      <CatEd title="📞 Tipo de acción — Contactar" items={catContactar} setItems={setCatContactar} color={ENF_COLOR.Contactar}/>
+      <CatEd title="📋 Tipo de acción — Tareas" items={catTareas} setItems={setCatTareas} color={ENF_COLOR.Tareas}/>
+      <CatEd title="⚡ Tipo de acción — Acciones" items={catAcciones} setItems={setCatAcciones} color={ENF_COLOR.Acciones}/>
+      <CatEd title="🏷 Etiquetas personales" items={catEtiquetas} setItems={setCatEtiquetas} color="#f472b6"/>
+    </div>;
+  };
+  return <div style={{minHeight:"100vh",background:"#0c0c16"}}>
+    <div style={S.hdr}>
+      <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW · {actividades.length} actividades</div></div>
+      <button style={{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 10px",cursor:"pointer"}} onClick={()=>setModo("config")}>⚙</button>
+    </div>
+    <div style={S.line}/>
+    {modo==="config"&&<Config/>}
+    {modo!=="config"&&<>
+      {/* ══ STICKY ══ */}
+      <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"7px 12px"}}>
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,marginBottom:6}}>
+          <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>setModo("lista")}>Lista</button>
+          <button style={{...S.pill(modo==="rptContactar",ENF_COLOR.Contactar),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptContactar")}>📞</button>
+          <button style={{...S.pill(modo==="rptTareas",ENF_COLOR.Tareas),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptTareas")}>📋</button>
+          <button style={{...S.pill(modo==="rptAcciones",ENF_COLOR.Acciones),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptAcciones")}>⚡</button>
+        </div>
+        {/* Estatus chips */}
+        <div style={{display:"flex",gap:4,marginBottom:6}}>
+          {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]),fontSize:9,padding:"3px 7px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
+          {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 7px"}} onClick={()=>setFiltros([])}>✕</span>}
+        </div>
+        {/* Búsqueda + ⚙ + ✕ */}
+        <div style={{display:"flex",gap:5,alignItems:"center"}}>
+          <input style={{...S.srch,flex:1}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
+          <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 10px",fontWeight:700,fontSize:11}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` ${nFil}`:""} {showFil?"▲":"▾"}</button>
+          {(q||nFil>0)&&<button style={{...S.pill(false,"#f87171"),padding:"0 9px",fontSize:11}} onClick={limpiar}>✕</button>}
+        </div>
+      </div>
+      {/* ══ PANEL FILTROS ══ */}
+      {showFil&&<div style={{padding:"8px 12px 0"}}>
+        <div style={{...S.card(),padding:"10px 12px",marginBottom:8}}>
+          {/* Enfoque */}
+          <div style={S.fl}>Enfoque</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {[["","Todos","#64748b"],["Contactar","📞",ENF_COLOR.Contactar],["Tareas","📋",ENF_COLOR.Tareas],["Acciones","⚡",ENF_COLOR.Acciones]].map(([v,l,c])=>(
+              <button key={v} style={{...S.pill(fEnfoque===v,c),padding:"4px 8px",fontSize:11}} onClick={()=>setFEnfoque(v)}>{l} {v||"Todos"}</button>
+            ))}
+          </div>
+          {/* Selección múltiple */}
+          <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            {!selMode
+              ? <button style={{...S.pill(false,GOLD),padding:"5px 12px",fontWeight:700,width:"100%",fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
+              : <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                  <span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
+                  <button style={{...S.pill(false,"#60a5fa"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
+                  <button style={{...S.pill(false,"#64748b"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel([])}>Ninguna</button>
+                  {sel.length>0&&<button style={{...S.pill(true,"#f87171"),padding:"4px 8px",fontSize:11}} onClick={()=>{if(window.confirm(`¿Eliminar ${sel.length} actividad${sel.length!==1?"es":""}?`)){sel.forEach(id=>delAct(id));setSel([]);setSelMode(false);}}}>🗑 Eliminar</button>}
+                  <button style={{...S.pill(false,"#f87171"),padding:"4px 8px",fontSize:11}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
+                </div>}
+          </div>
+          {/* Rezago */}
+          <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 12px",width:"100%",fontWeight:700,fontSize:11,marginBottom:8}} onClick={()=>setFRezago(v=>!v)}>⚠ Solo rezagados{fRezago?" ✓":""}</button>
+          {/* Orden */}
+          <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ORDEN</div>
+            <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+              <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
+              <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
+              <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
+              <button style={{...S.pill(false,"#60a5fa"),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
+            </div>
+          </div>
+          {/* Prioridad */}
+          <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>PRIORIDAD</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {PRIOR.map(p=><span key={p} style={{...S.chip(fPrioridad.includes(p),PRIOR_COLOR[p]),fontSize:10}} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}
+            </div>
+          </div>
+          {/* Contacto */}
+          <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>CONTACTO</div>
+            <select style={{...S.sel,fontSize:11}} value={fContacto} onChange={e=>setFContacto(e.target.value)}>
+              <option value="">— Cualquiera —</option>
+              {ctoOpts.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+            </select>
+          </div>
+          {/* Empresa */}
+          <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>EMPRESA</div>
+            <select style={{...S.sel,fontSize:11}} value={fEmpresa} onChange={e=>setFEmpresa(e.target.value)}>
+              <option value="">— Cualquiera —</option>
+              {empOpts.map(e=><option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+          </div>
+          {/* Tipo de acción */}
+          {todosTipos.length>0&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>TIPO DE ACCIÓN</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {todosTipos.map(t=><span key={t} style={{...S.chip(fTipoAccion===t,GOLD),fontSize:10}} onClick={()=>setFTipoAccion(fTipoAccion===t?"":t)}>{t}</span>)}
+            </div>
+          </div>}
+          {/* Rango de fechas */}
+          <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>RANGO DE FECHAS</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+              <div><div style={{fontSize:9,color:"#475569",marginBottom:3}}>Desde</div><input type="date" style={{...S.inp,fontSize:11}} value={fDesde} onChange={e=>{setFDesde(e.target.value);if(e.target.value&&!fHasta)setFHasta(e.target.value);}}/></div>
+              <div><div style={{fontSize:9,color:"#475569",marginBottom:3}}>Hasta</div><input type="date" style={{...S.inp,fontSize:11}} value={fHasta} onChange={e=>setFHasta(e.target.value)}/></div>
+            </div>
+          </div>
+          {/* Etiqueta */}
+          {catEtiquetas.length>0&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+            <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ETIQUETA</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {catEtiquetas.map(et=><button key={et} style={{...S.pill(fEtiqueta===et,"#f472b6"),padding:"4px 10px",fontSize:11}} onClick={()=>setFEtiqueta(fEtiqueta===et?"":et)}>🏷 {et}</button>)}
+            </div>
+          </div>}
+          {nFil>0&&<button style={{...S.pill(false,"#f87171"),width:"100%",padding:"6px 0",fontWeight:700,fontSize:11}} onClick={limpiar}>✕ Limpiar filtros ({nFil})</button>}
+        </div>
+      </div>}
+      {/* ══ CONTENIDO ══ */}
+      <div style={S.sec}>
+        <div style={{fontSize:10,color:"#475569",marginBottom:8}}>{base.length} de {actividades.length} actividades</div>
+        {modo==="lista"&&ordenadas.map((a,i)=>{
+          const isSel=selMode&&sel.includes(a.id);
+          return <div key={a.id} id={i===hoyIdx?"ap-hoy":undefined} onClick={selMode?()=>toggleSel(a.id):undefined}>
+            {selMode&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:-2}}>
+              <span style={{width:16,height:16,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel?"✓":""}</span>
+            </div>}
+            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct}/>
+          </div>;
+        })}
+        {modo==="rptContactar"&&<Reporte enfoque="Contactar"/>}
+        {modo==="rptTareas"&&<Reporte enfoque="Tareas"/>}
+        {modo==="rptAcciones"&&<Reporte enfoque="Acciones"/>}
+        {base.length===0&&modo==="lista"&&<div style={{textAlign:"center",color:"#334155",fontSize:12,padding:"40px 0"}}>Sin actividades. Toca + para comenzar.</div>}
+      </div>
+    </>}
+    {/* FAB + */}
+    {modo!=="config"&&!selMode&&<button style={S.fab} onClick={()=>setModal({})}>+</button>}
+    {/* Botones de navegación */}
+    {modo==="lista"&&!selMode&&<>
+      <button onClick={scrollTop} style={{position:"fixed",bottom:148,right:16,width:40,height:40,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:16,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↑</button>
+      <button onClick={scrollHoy} style={{position:"fixed",bottom:100,right:16,width:40,height:40,borderRadius:"50%",background:GOLD,border:"none",color:"#08080f",fontSize:10,fontWeight:800,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>Hoy</button>
+      <button onClick={scrollBottom} style={{position:"fixed",bottom:52,right:16,width:40,height:40,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:16,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↓</button>
+    </>}
+    {/* Modal */}
+    {modal&&<ActividadModal init={modal.id?modal:null} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} catContactar={catContactar} catTareas={catTareas} catAcciones={catAcciones} catEtiquetas={catEtiquetas} actividades={actividades} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onClose={()=>setModal(null)}/>}
+  </div>;
+}
+ReactDOM.render(<App/>,document.getElementById("root"));
+</script>
+</body>
+</html>
   // CFC data (read-only, filtered by Personal)
   const cfcContactos=useMemo(()=>loadCFC("contactos",[]),[]);
   const cfcEmpresas=useMemo(()=>loadCFC("empresas",[]),[]);
