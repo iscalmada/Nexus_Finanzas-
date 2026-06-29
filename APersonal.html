@@ -6,6 +6,8 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{background:#0c0c16;color:#e2e8f0;font-family:Arial,sans-serif;min-height:100vh;overscroll-behavior:none;}
+.nap-chips{overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;}
+.nap-chips::-webkit-scrollbar{display:none;}
 #loading{position:fixed;inset:0;background:#0c0c16;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .4s;}
 #loading.fade-out{opacity:0;pointer-events:none;}
 .ld-logo{font-size:22px;font-weight:900;color:#C9A84C;letter-spacing:2px;margin-bottom:6px;}
@@ -571,7 +573,7 @@ function App(){
           <button style={{...S.pill(modo==="rptAcciones",ENF_COLOR.Acciones),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptAcciones")}>⚡ Acciones</button>
         </div>
         {/* Fila 2: Enfoque + Estatus chips */}
-        <div style={{display:"flex",gap:4,marginBottom:6,overflowX:"auto",flexWrap:"nowrap"}}>
+        <div className="nap-chips" style={{display:"flex",gap:4,marginBottom:6,flexWrap:"nowrap"}}>
           {[["","📋 Todos","#64748b"],["Contactar","📞 Contactar",ENF_COLOR.Contactar],["Tareas","📋 Tareas",ENF_COLOR.Tareas],["Acciones","⚡ Acciones",ENF_COLOR.Acciones]].map(([v,l,c])=>(
             <span key={v} style={{...S.chip(fEnfoque===v,c),fontSize:9,padding:"3px 7px",flexShrink:0,cursor:"pointer"}} onClick={()=>setFEnfoque(fEnfoque===v&&v?"":v)}>{l}</span>
           ))}
