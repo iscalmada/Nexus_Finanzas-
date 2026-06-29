@@ -336,7 +336,11 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
   const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
   const esContactar=a.enfoque==="Contactar";
   // Display del contacto/empresa para Contactar
-  const ctLabel=(()=>{if(a.contactoId){const c=cfcContactos.find(x=>x.id===a.contactoId);if(c)return c.nombreCompleto;}if(a.empresaId){const e=cfcEmpresas.find(x=>x.id===a.empresaId);if(e)return e.nombre;}return null;})();
+  const ctoObj=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
+  const empObj=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
+  const ctNombre=ctoObj?.nombreCompleto||null;
+  const empNombre=empObj?.nombre||null;
+  const ctLabel=ctNombre||(empNombre||null);
   const titulo=esContactar?(ctLabel||"Contacto no definido"):(a.asunto||a.tipoAccion||"Actividad");
   const hoy=hoyISO();const pend=efEst==="Programada"||efEst==="En Proceso";
   const rez=(pend&&efFech&&efFech<hoy)?Math.max(0,Math.round((Date.parse(hoy)-Date.parse(efFech))/86400000)):0;
@@ -349,7 +353,11 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
       <div style={{display:"flex",alignItems:"center",gap:6}}>
         {modo==="proyecto"&&<span style={{fontSize:11}}>📁</span>}
         {modo==="checklist"&&<span style={{fontSize:11}}>☑</span>}
-        <div style={{fontSize:13,fontWeight:800,flex:1,wordBreak:"break-word",lineHeight:1.3}}>{titulo}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3}}>{esContactar?(ctNombre||empNombre||"Contacto no definido"):(a.asunto||a.tipoAccion||"Actividad")}</div>
+          {esContactar&&ctNombre&&empNombre&&<div style={{fontSize:10,color:"#3b82f6",marginTop:1}}>{empNombre}</div>}
+          {esContactar&&!ctNombre&&empNombre&&null}
+        </div>
         {modo!=="unica"&&<span style={{fontSize:10,color:"#475569"}}>{expanded?"▲":"▾"}</span>}
       </div>
     </div>
@@ -360,7 +368,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
       {efPrio&&efPrio!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
       <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
       {a.tipoAccion&&<span style={{fontSize:8,color:enfC,background:enfC+"11",border:`1px solid ${enfC}33`,borderRadius:5,padding:"1px 6px"}}>{a.tipoAccion}</span>}
-      {esContactar&&a.empresaId&&a.contactoId&&(()=>{const e=cfcEmpresas.find(x=>x.id===a.empresaId);return e?<span style={{fontSize:8,color:"#3b82f6",background:"#3b82f611",border:"1px solid #3b82f633",borderRadius:5,padding:"1px 6px"}}>{e.nombre}</span>:null;})()}
+
       <span style={{fontSize:9,color:"#475569",marginLeft:"auto"}}>{fmtF(efFech)}</span>
       {(a.etiquetas||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
     </div>
@@ -551,11 +559,10 @@ function App(){
       <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW · {actividades.length} actividades</div></div>
       <button style={{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 10px",cursor:"pointer"}} onClick={()=>setModo("config")}>⚙</button>
     </div>
-    <div style={S.line}/>
     {modo==="config"&&<ConfigView {...configProps}/>}
     {modo!=="config"&&<>
       {/* ══ STICKY ══ */}
-      <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"7px 12px"}}>
+      <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",boxShadow:"0 2px 0 0 #0c0c16",padding:"7px 12px"}}>
         {/* Fila 1: Tabs */}
         <div style={{display:"flex",gap:4,marginBottom:6}}>
           <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>setModo("lista")}>Lista</button>
