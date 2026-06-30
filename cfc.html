@@ -769,38 +769,14 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
 /* ════════ CATÁLOGOS ════════ */
 const CAT_LABEL={
   tipoContacto:"Tipo de contacto",circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cercanía",nivelEconomico:"Nivel económico",
-  potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",actividadPrincipal:"Actividad principal",capacidadRef:"Capacidad referidor",etiquetas:"Etiquetas",
+  potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",actividadPrincipal:"Actividad principal",capacidadRef:"Capacidad referidor",etiquetas:"Marcadores",
   etapaPrincipal:"Etapa principal de contacto",etapaEspecifica:"Etapa específica de contacto",pixan:"Etapa Pixán (histórico)",
   solucion:"Solución de intervención",etapaOportunidad:"Etapa de oportunidad",areaEstrategica:"Área estratégica",
-  tipoAccion:"Acciones Comerciales",accionesInt:"Acciones Internas",estatusAccion:"Estatus de acción",
+  tipoAccion:"Tipo de acción — Contactar",accTareas:"Tipo de acción — Tareas",accAcciones:"Tipo de acción — Acciones",etiqAgenda:"Orientación",estatusAccion:"Estatus de acción",
   tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado",
   tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa"};
-function Catalogos({catalogos,setCatalogos,contactos,setContactos,catEtiqAgenda,setCatEtiqAgenda,catAccTareas,setCatAccTareas,catAccAcciones,setCatAccAcciones,onProductos,onBack}){
+function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,onBack}){
   const[open,setOpen]=useState(null);const[nuevo,setNuevo]=useState("");const[editEsp,setEditEsp]=useState(null);
-  // Editor rápido para catálogos de agenda
-  const CatAgEdRow=({title,items,setItems,color})=>{const[nv,setNv]=useState("");return <div style={{...S.card(color),marginBottom:8}}>
-    <div style={{fontSize:11,fontWeight:800,color:color||GOLD,marginBottom:6}}>{title}</div>
-    {items.map((v,i)=><div key={i} style={{display:"flex",gap:5,alignItems:"center",marginBottom:4}}>
-      <span style={{flex:1,fontSize:11,color:"#e2e8f0"}}>{v}</span>
-      <button style={{...S.pill(false,"#f87171"),padding:"2px 7px",fontSize:10}} onClick={()=>setItems(items.filter((_,j)=>j!==i))}>✕</button>
-    </div>)}
-    <div style={{display:"flex",gap:5,marginTop:4}}>
-      <input style={{...S.inp,flex:1,fontSize:11}} placeholder="Nuevo…" value={nv} onChange={e=>setNv(e.target.value)} onKeyDown={e=>e.key==="Enter"&&nv.trim()&&!items.includes(nv.trim())&&(setItems([...items,nv.trim()]),setNv(""))}/>
-      <button style={{...S.pill(true,GOLD),padding:"5px 10px",fontWeight:700,fontSize:11}} onClick={()=>{if(nv.trim()&&!items.includes(nv.trim())){setItems([...items,nv.trim()]);setNv("");}}}>+</button>
-    </div>
-  </div>;};
-  // Variante para catálogos legacy de objetos {id,nombre} (ej. catalogos.tipoAccion)
-  const CatAgEdRowObj=({title,items,setItems,color})=>{const[nv,setNv]=useState("");const names=(items||[]).map(o=>o.nombre);return <div style={{...S.card(color),marginBottom:8}}>
-    <div style={{fontSize:11,fontWeight:800,color:color||GOLD,marginBottom:6}}>{title}</div>
-    {(items||[]).map((o,i)=><div key={o.id||i} style={{display:"flex",gap:5,alignItems:"center",marginBottom:4}}>
-      <span style={{flex:1,fontSize:11,color:"#e2e8f0"}}>{o.nombre}</span>
-      <button style={{...S.pill(false,"#f87171"),padding:"2px 7px",fontSize:10}} onClick={()=>setItems(items.filter((_,j)=>j!==i))}>✕</button>
-    </div>)}
-    <div style={{display:"flex",gap:5,marginTop:4}}>
-      <input style={{...S.inp,flex:1,fontSize:11}} placeholder="Nuevo…" value={nv} onChange={e=>setNv(e.target.value)} onKeyDown={e=>e.key==="Enter"&&nv.trim()&&!names.includes(nv.trim())&&(setItems([...(items||[]),{id:"ta"+Date.now(),nombre:nv.trim()}]),setNv(""))}/>
-      <button style={{...S.pill(true,GOLD),padding:"5px 10px",fontWeight:700,fontSize:11}} onClick={()=>{if(nv.trim()&&!names.includes(nv.trim())){setItems([...(items||[]),{id:"ta"+Date.now(),nombre:nv.trim()}]);setNv("");}}}>+</button>
-    </div>
-  </div>;};
   
   if(open){
     if(open==="etapaEspecifica"){
@@ -897,12 +873,6 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,catEtiqAgenda,
         <span style={{fontSize:13,fontWeight:700}}>{CAT_LABEL[k]||k}</span>
         <span style={S.tag("#64748b")}>{(catalogos[k]||[]).length}</span>
       </div>)}
-      {/* ── Catálogos de Agenda ── */}
-      <div style={{fontSize:10,fontWeight:800,color:"#64748b",letterSpacing:1,textTransform:"uppercase",margin:"16px 0 10px"}}>📅 Agenda</div>
-      <CatAgEdRowObj title="📞 Tipo de acción — Contactar" items={catalogos.tipoAccion||[]} setItems={(v)=>setCatalogos(p=>({...p,tipoAccion:v}))} color="#60a5fa"/>
-      <CatAgEdRow title="📋 Tipo de acción — Tareas" items={catAccTareas||[]} setItems={setCatAccTareas} color="#a78bfa"/>
-      <CatAgEdRow title="⚡ Tipo de acción — Acciones" items={catAccAcciones||[]} setItems={setCatAccAcciones} color="#2dd4bf"/>
-      <CatAgEdRow title="🏷 Etiquetas de Agenda" items={catEtiqAgenda||[]} setItems={setCatEtiqAgenda} color="#f472b6"/>
     </div>
   </div>;
 }
@@ -1292,7 +1262,7 @@ function BienesInmuebles({bienes,setBienes,catalogos,contactos,onBack}){
   </div>;
 }
 
-function Configuracion({data,onRestore,onExcel,go,catEtiqAgenda,setCatEtiqAgenda,catAccTareas,setCatAccTareas,catAccAcciones,setCatAccAcciones}){
+function Configuracion({data,onRestore,onExcel,go}){
   const fileRef=useRef(null);
   const exportTotal=()=>{
     const payload={app:"Nexus CFC",tipo:"respaldo-total",version:1,fecha:new Date().toISOString(),data};
@@ -1531,7 +1501,7 @@ function BuscaCtoEmpCFC({contactos,empresas,value,onChange,placeholder,onAdd}){
   </div>;
 }
 
-function ActividadModal({init,contactos,empresas,catalogos,oportunidades,actividades,catEtiqAgenda,catAccTareas,catAccAcciones,fixedContacto,onUpdateContacto,onUpdateOportunidad,onSave,onSaveExtra,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
+function ActividadModal({init,contactos,empresas,catalogos,oportunidades,actividades,fixedContacto,onUpdateContacto,onUpdateOportunidad,onSave,onSaveExtra,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
   const[nuevoCto,setNuevoCto]=useState(null);
   const[esCopia,setEsCopia]=useState(false);
   const[showAvance,setShowAvance]=useState(false);
@@ -1679,11 +1649,11 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
     </div>
 
     <Field label={esInterno?`Tipo de ${f.enfoque||"tarea"}`:"Tipo de acción"}>
-      <CatSelect cat={esInterno?(f.enfoque==="Acciones"?(catAccAcciones||[]):(catAccTareas||[])):(catalogos.tipoAccion||[])} value={f.tipoAccion} onChange={v=>set("tipoAccion",v)}/>
+      <CatSelect cat={esInterno?(f.enfoque==="Acciones"?(catalogos.accAcciones||[]):(catalogos.accTareas||[])):(catalogos.tipoAccion||[])} value={f.tipoAccion} onChange={v=>set("tipoAccion",v)}/>
     </Field>
-    {(catEtiqAgenda||[]).length>0&&<Field label="Etiquetas">
+    {(catalogos.etiqAgenda||[]).length>0&&<Field label="Orientación">
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-        {(catEtiqAgenda||[]).map(et=>{const on=(f.etiquetasAgenda||[]).includes(et);return <span key={et} style={{...S.tag(on?"#f472b6":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>set("etiquetasAgenda",on?(f.etiquetasAgenda||[]).filter(x=>x!==et):[...(f.etiquetasAgenda||[]),et])}>🏷 {et}</span>;})}
+        {(catalogos.etiqAgenda||[]).map(et=>{const on=(f.etiquetasAgenda||[]).includes(et.nombre);return <span key={et.id} style={{...S.tag(on?"#f472b6":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>set("etiquetasAgenda",on?(f.etiquetasAgenda||[]).filter(x=>x!==et.nombre):[...(f.etiquetasAgenda||[]),et.nombre])}>🏷 {et.nombre}</span>;})}
       </div>
     </Field>}
 
@@ -1793,7 +1763,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:ENF_CFC_COLOR[a.enfoque]||"#a78bfa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap"}}>{a.tipoAccion}</span>}
             </div>
             {(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
-              {a.etiquetasAgenda.map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+              {a.etiquetasAgenda.map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
             </div>}
             <div style={{display:"flex",justifyContent:"flex-end",marginTop:3}}>
               <span style={{fontSize:9,color:"#475569"}}>{efFech||"sin fecha"}</span>
@@ -1823,7 +1793,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
         {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:"#60a5fa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap",flexShrink:0}}>{a.tipoAccion}</span>}
       </div>}
       {!esInterno&&(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
-        {a.etiquetasAgenda.map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+        {a.etiquetasAgenda.map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
       </div>}
       {/* Progress bar */}
       {prog&&<div style={{marginTop:6}}>
@@ -1929,7 +1899,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
     </div>;})}</div>;
 }
 
-function Agenda({actividades,contactos,catalogos,oportunidades,empresas,catEtiqAgenda,catAccTareas,catAccAcciones,openAct,onEditActs,onCopyActs,onSinRespuesta}){
+function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
   const[filtros,setFiltros]=useState([]);
   const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
   const[modo,setModo]=useState("lista");
@@ -2018,10 +1988,10 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,catEtiqA
             <button key={v} style={{...S.pill(fEnfoque===v,c),flex:1,padding:"5px 0",fontWeight:700,fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
           ))}
         </div>
-        {catEtiqAgenda&&catEtiqAgenda.length>0&&<div style={{marginBottom:8}}>
-          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Etiqueta</div>
+        {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orientación</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catEtiqAgenda.map(et=><span key={et} style={{...S.chip(fEtiqAgenda===et,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et?"":et)}>🏷 {et}</span>)}
+            {catalogos.etiqAgenda.map(et=><span key={et.id} style={{...S.chip(fEtiqAgenda===et.nombre,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et.nombre?"":et.nombre)}>🏷 {et.nombre}</span>)}
           </div>
         </div>}
         {/* 2 Selección múltiple */}
@@ -2126,14 +2096,14 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,catEtiqA
         <Field label="Estatus"><select style={S.sel} value={batch.estatus} onChange={e=>setBatch({...batch,estatus:e.target.value})}><option value="">— Sin cambio —</option>{["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}</select></Field>
         <Field label="Tipo de acción"><select style={S.sel} value={batch.tipoAccion} onChange={e=>setBatch({...batch,tipoAccion:e.target.value})}><option value="">— Sin cambio —</option>{(catalogos.tipoAccion||[]).map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}</select></Field>
         <Field label="Prioridad"><select style={S.sel} value={batch.prioridad||""} onChange={e=>setBatch({...batch,prioridad:e.target.value})}><option value="">— Sin cambio —</option>{PRIOR.map(p=><option key={p} value={p}>{p}</option>)}</select></Field>
-        {(catEtiqAgenda||[]).length>0&&<Field label="Etiquetas — agregar">
+        {(catalogos.etiqAgenda||[]).length>0&&<Field label="Orientación — agregar">
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catEtiqAgenda.map(et=>{const on=(batch.etiquetasAgregar||[]).includes(et);return <span key={et} style={{...S.tag(on?"#22c55e":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>setBatch(p=>({...p,etiquetasAgregar:on?(p.etiquetasAgregar||[]).filter(x=>x!==et):[...(p.etiquetasAgregar||[]),et]}))}>+ {et}</span>;})}
+            {catalogos.etiqAgenda.map(et=>{const on=(batch.etiquetasAgregar||[]).includes(et.nombre);return <span key={et.id} style={{...S.tag(on?"#22c55e":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>setBatch(p=>({...p,etiquetasAgregar:on?(p.etiquetasAgregar||[]).filter(x=>x!==et.nombre):[...(p.etiquetasAgregar||[]),et.nombre]}))}>+ {et.nombre}</span>;})}
           </div>
         </Field>}
-        {(catEtiqAgenda||[]).length>0&&<Field label="Etiquetas — quitar">
+        {(catalogos.etiqAgenda||[]).length>0&&<Field label="Orientación — quitar">
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catEtiqAgenda.map(et=>{const on=(batch.etiquetasQuitar||[]).includes(et);return <span key={et} style={{...S.tag(on?"#f87171":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>setBatch(p=>({...p,etiquetasQuitar:on?(p.etiquetasQuitar||[]).filter(x=>x!==et):[...(p.etiquetasQuitar||[]),et]}))}>− {et}</span>;})}
+            {catalogos.etiqAgenda.map(et=>{const on=(batch.etiquetasQuitar||[]).includes(et.nombre);return <span key={et.id} style={{...S.tag(on?"#f87171":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>setBatch(p=>({...p,etiquetasQuitar:on?(p.etiquetasQuitar||[]).filter(x=>x!==et.nombre):[...(p.etiquetasQuitar||[]),et.nombre]}))}>− {et.nombre}</span>;})}
           </div>
           <div style={{fontSize:9,color:"#475569",marginTop:5}}>Ej. para pasar de "Comercial" a "Interno": agrega Interno y quita Comercial.</div>
         </Field>}
@@ -2461,12 +2431,6 @@ function App(){
     }
     return acts;
   });
-  const[catEtiqAgenda,setCatEtiqAgendaRaw]=useState(()=>loadLS("catEtiqAgenda",["Comercial","Interno","Formación","Prospección","Administrativo"]));
-  const setCatEtiqAgenda=(v)=>{setCatEtiqAgendaRaw(v);try{localStorage.setItem(PFX+"catEtiqAgenda",JSON.stringify(v));}catch(e){}};
-  const[catAccTareas,setCatAccTareasRaw]=useState(()=>loadLS("catAccTareas",[]));
-  const setCatAccTareas=(v)=>{setCatAccTareasRaw(v);try{localStorage.setItem(PFX+"catAccTareas",JSON.stringify(v));}catch(e){}};
-  const[catAccAcciones,setCatAccAccionesRaw]=useState(()=>loadLS("catAccAcciones",[]));
-  const setCatAccAcciones=(v)=>{setCatAccAccionesRaw(v);try{localStorage.setItem(PFX+"catAccAcciones",JSON.stringify(v));}catch(e){}};
   const[catalogos,setCatalogos]=useState(()=>{
     const base=loadLS("catalogos",null)||SEED.catalogos;
     if(!base.actividadPrincipal){
@@ -2493,6 +2457,18 @@ function App(){
     if(!base.estatusAliado||(Array.isArray(base.estatusAliado)&&base.estatusAliado.length===estatusViejoV9.length&&base.estatusAliado.every((x,i)=>x&&x.nombre===estatusViejoV9[i]))){
       base.estatusAliado=ESTATUS_ALIADO_V10.map((n,i)=>({id:"eal"+i,nombre:n}));
     }
+    if(!localStorage.getItem(PFX+"migAgendaCat")){
+      const oldEtiq=loadLS("catEtiqAgenda",null);
+      const oldTar=loadLS("catAccTareas",null);
+      const oldAcc=loadLS("catAccAcciones",null);
+      base.etiqAgenda=(oldEtiq&&oldEtiq.length?oldEtiq:["Comercial","Interno","Formación","Prospección","Administrativo"]).map((n,i)=>({id:"etag"+i,nombre:n}));
+      base.accTareas=(oldTar||[]).map((n,i)=>({id:"actar"+i,nombre:n}));
+      base.accAcciones=(oldAcc||[]).map((n,i)=>({id:"acacc"+i,nombre:n}));
+      try{localStorage.setItem(PFX+"migAgendaCat","1");}catch(e){}
+    }
+    if(!base.etiqAgenda)base.etiqAgenda=["Comercial","Interno","Formación","Prospección","Administrativo"].map((n,i)=>({id:"etag"+i,nombre:n}));
+    if(!base.accTareas)base.accTareas=[];
+    if(!base.accAcciones)base.accAcciones=[];
     return base;
   });
   const[oportunidades,setOportunidades]=useState(()=>{
@@ -2577,17 +2553,17 @@ function App(){
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} openOpo={openOpo}/>}
-    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} catEtiqAgenda={catEtiqAgenda} catAccTareas={catAccTareas} catAccAcciones={catAccAcciones} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
-    {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} catEtiqAgenda={catEtiqAgenda} setCatEtiqAgenda={setCatEtiqAgenda} catAccTareas={catAccTareas} setCatAccTareas={setCatAccTareas} catAccAcciones={catAccAcciones} setCatAccAcciones={setCatAccAcciones} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
+    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
+    {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="bienes"&&<BienesInmuebles bienes={bienes} setBienes={setBienes} catalogos={catalogos} contactos={contactos} onBack={()=>go("configuracion")}/>}
     {view==="objetivos"&&<Objetivos productos={productos} setProductos={setProductos} catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} oportunidades={oportunidades} onProductos={()=>go("productos")}/>}
-    {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos,bienes,metaProspContactos:loadLS("metaProspContactos",0)}} catEtiqAgenda={catEtiqAgenda} setCatEtiqAgenda={setCatEtiqAgenda} catAccTareas={catAccTareas} setCatAccTareas={setCatAccTareas} catAccAcciones={catAccAcciones} setCatAccAcciones={setCatAccAcciones} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
+    {view==="configuracion"&&<Configuracion data={{contactos,empresas,actividades,oportunidades,catalogos,productos,bienes,metaProspContactos:loadLS("metaProspContactos",0)}} onRestore={restoreTotal} onExcel={()=>exportBackup(contactos,empresas,oportunidades,catalogos,productos)} go={go}/>}
     <div style={S.nav}>
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"||view==="bienes"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
-    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} oportunidades={oportunidades} actividades={actividades} catEtiqAgenda={catEtiqAgenda} catAccTareas={catAccTareas} catAccAcciones={catAccAcciones} onUpdateContacto={(id,patch)=>setContactos(prev=>prev.map(c=>c.id===id?{...c,...patch}:c))} onUpdateOportunidad={(id,patch)=>setOportunidades(prev=>prev.map(o=>o.id===id?{...o,...patch}:o))} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setActModal(null)}/>}
+    {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} oportunidades={oportunidades} actividades={actividades} onUpdateContacto={(id,patch)=>setContactos(prev=>prev.map(c=>c.id===id?{...c,...patch}:c))} onUpdateOportunidad={(id,patch)=>setOportunidades(prev=>prev.map(o=>o.id===id?{...o,...patch}:o))} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setActModal(null)}/>}
     {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setOpoModal(null)}/>}
   </div>;
 }
