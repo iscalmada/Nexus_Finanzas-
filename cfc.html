@@ -1995,14 +1995,13 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,catEtiqA
           {[["","Todos","#64748b"],["Contactar","📞 Contactar","#60a5fa"],["Tareas","📋 Tareas","#a78bfa"],["Acciones","⚡ Acciones","#2dd4bf"]].map(([v,l,c])=>(
             <button key={v} style={{...S.pill(fEnfoque===v,c),flex:1,padding:"5px 0",fontWeight:700,fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
           ))}
-          </div>
-          {catEtiqAgenda&&catEtiqAgenda.length>0&&<>
-            <div style={{fontSize:9,color:"#64748b",marginTop:8,marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Etiqueta</div>
-            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-              {catEtiqAgenda.map(et=><span key={et} style={{...S.chip(fEtiqAgenda===et,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et?"":et)}>🏷 {et}</span>)}
-            </div>
-          </>}
         </div>
+        {catEtiqAgenda&&catEtiqAgenda.length>0&&<div style={{marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Etiqueta</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {catEtiqAgenda.map(et=><span key={et} style={{...S.chip(fEtiqAgenda===et,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et?"":et)}>🏷 {et}</span>)}
+          </div>
+        </div>}
         {/* 2 Selección múltiple */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
           {!selMode
