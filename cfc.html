@@ -789,6 +789,18 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,catEtiqAgenda,
       <button style={{...S.pill(true,GOLD),padding:"5px 10px",fontWeight:700,fontSize:11}} onClick={()=>{if(nv.trim()&&!items.includes(nv.trim())){setItems([...items,nv.trim()]);setNv("");}}}>+</button>
     </div>
   </div>;};
+  // Variante para catálogos legacy de objetos {id,nombre} (ej. catalogos.tipoAccion)
+  const CatAgEdRowObj=({title,items,setItems,color})=>{const[nv,setNv]=useState("");const names=(items||[]).map(o=>o.nombre);return <div style={{...S.card(color),marginBottom:8}}>
+    <div style={{fontSize:11,fontWeight:800,color:color||GOLD,marginBottom:6}}>{title}</div>
+    {(items||[]).map((o,i)=><div key={o.id||i} style={{display:"flex",gap:5,alignItems:"center",marginBottom:4}}>
+      <span style={{flex:1,fontSize:11,color:"#e2e8f0"}}>{o.nombre}</span>
+      <button style={{...S.pill(false,"#f87171"),padding:"2px 7px",fontSize:10}} onClick={()=>setItems(items.filter((_,j)=>j!==i))}>✕</button>
+    </div>)}
+    <div style={{display:"flex",gap:5,marginTop:4}}>
+      <input style={{...S.inp,flex:1,fontSize:11}} placeholder="Nuevo…" value={nv} onChange={e=>setNv(e.target.value)} onKeyDown={e=>e.key==="Enter"&&nv.trim()&&!names.includes(nv.trim())&&(setItems([...(items||[]),{id:"ta"+Date.now(),nombre:nv.trim()}]),setNv(""))}/>
+      <button style={{...S.pill(true,GOLD),padding:"5px 10px",fontWeight:700,fontSize:11}} onClick={()=>{if(nv.trim()&&!names.includes(nv.trim())){setItems([...(items||[]),{id:"ta"+Date.now(),nombre:nv.trim()}]);setNv("");}}}>+</button>
+    </div>
+  </div>;};
   
   if(open){
     if(open==="etapaEspecifica"){
@@ -887,7 +899,7 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,catEtiqAgenda,
       </div>)}
       {/* ── Catálogos de Agenda ── */}
       <div style={{fontSize:10,fontWeight:800,color:"#64748b",letterSpacing:1,textTransform:"uppercase",margin:"16px 0 10px"}}>📅 Agenda</div>
-      <div style={{fontSize:9,color:"#475569",marginBottom:10,lineHeight:1.4}}>El catálogo "Tipo de acción — Contactar" se edita arriba como <b style={{color:GOLD}}>{CAT_LABEL.tipoAccion}</b>.</div>
+      <CatAgEdRowObj title="📞 Tipo de acción — Contactar" items={catalogos.tipoAccion||[]} setItems={(v)=>setCatalogos(p=>({...p,tipoAccion:v}))} color="#60a5fa"/>
       <CatAgEdRow title="📋 Tipo de acción — Tareas" items={catAccTareas||[]} setItems={setCatAccTareas} color="#a78bfa"/>
       <CatAgEdRow title="⚡ Tipo de acción — Acciones" items={catAccAcciones||[]} setItems={setCatAccAcciones} color="#2dd4bf"/>
       <CatAgEdRow title="🏷 Etiquetas de Agenda" items={catEtiqAgenda||[]} setItems={setCatEtiqAgenda} color="#f472b6"/>
@@ -1771,15 +1783,21 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               <div style={{fontSize:13,fontWeight:800,flex:1,wordBreak:"break-word",lineHeight:1.3}}>{tituloCard}</div>
             </div>
             {/* Renglón 2: etiquetas informativas */}
-            <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-              <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
-              {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-              {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
-              <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
-              {a.tipoAccion&&<span style={{fontSize:8,color:ENF_CFC_COLOR[a.enfoque]||"#a78bfa",background:(ENF_CFC_COLOR[a.enfoque]||"#a78bfa")+"1a",border:`1px solid ${ENF_CFC_COLOR[a.enfoque]||"#a78bfa"}33`,borderRadius:5,padding:"1px 6px"}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:7}}>🏷 {et}</span>)}
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
+                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+                {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
+                <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
+              </div>
+              {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:ENF_CFC_COLOR[a.enfoque]||"#a78bfa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap"}}>{a.tipoAccion}</span>}
+            </div>
+            {(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
+              {a.etiquetasAgenda.map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+            </div>}
+            <div style={{display:"flex",justifyContent:"flex-end",marginTop:3}}>
               <span style={{fontSize:9,color:"#475569"}}>{efFech||"sin fecha"}</span>
-              {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569",marginLeft:"auto"}}>{isExp?"▲":"▾"}</span>}
+              {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569",marginLeft:8}}>{isExp?"▲":"▾"}</span>}
             </div>
           </div>
         : <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))}>
@@ -1795,15 +1813,17 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
           </div>
       }
       {/* Renglón de fecha/detalle para comerciales */}
-      {!esInterno&&<div style={{fontSize:10,color:"#64748b",marginTop:3}}>
-        {efFech||"sin fecha"}{a.hora?" · "+a.hora:""}
-        {showContacto&&a.tipoAccion?<span> · <span style={{color:"#cbd5e1",fontWeight:600}}>{a.tipoAccion}</span></span>:""}
-        {showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}
-        {a.servicioSolucion?` · ${a.servicioSolucion}`:""}
-        {a.oportunidadId?" · 🎯":""}
+      {!esInterno&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:3,gap:6}}>
+        <div style={{fontSize:10,color:"#64748b",minWidth:0}}>
+          {efFech||"sin fecha"}{a.hora?" · "+a.hora:""}
+          {showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}
+          {a.servicioSolucion?` · ${a.servicioSolucion}`:""}
+          {a.oportunidadId?" · 🎯":""}
+        </div>
+        {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:"#60a5fa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap",flexShrink:0}}>{a.tipoAccion}</span>}
       </div>}
       {!esInterno&&(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
-        {a.etiquetasAgenda.map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:7}}>🏷 {et}</span>)}
+        {a.etiquetasAgenda.map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
       </div>}
       {/* Progress bar */}
       {prog&&<div style={{marginTop:6}}>
@@ -1905,7 +1925,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
       {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
       {a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
       {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
-      {!esInterno&&onSinRespuesta&&_pend&&<div style={{textAlign:"right",marginTop:6}}><button onClick={(ev)=>{ev.stopPropagation();onSinRespuesta(a);}} style={{background:"transparent",border:"1px solid #fb923c55",borderRadius:8,color:"#fb923c",fontSize:10,fontWeight:700,padding:"4px 10px",cursor:"pointer"}}>Sin respuesta</button></div>}
+      {!esInterno&&onSinRespuesta&&_pend&&<div style={{textAlign:"right",marginTop:6}}><button onClick={(ev)=>{ev.stopPropagation();onSinRespuesta(a);}} style={{background:"transparent",border:"1px solid #fb923c55",borderRadius:7,color:"#fb923c",fontSize:9,fontWeight:700,padding:"3px 8px",cursor:"pointer"}}>Sin respuesta</button></div>}
     </div>;})}</div>;
 }
 
