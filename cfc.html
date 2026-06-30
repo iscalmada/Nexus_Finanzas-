@@ -1705,6 +1705,27 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         </div>)}
       </div>}
     </div>}
+    {/* ── VÍNCULO A CONTACTO/OPORTUNIDAD (solo Tareas/Acciones) ── */}
+    {esInterno&&(()=>{
+      const ctoVinc=f.contactoId?contactos.find(c=>c.id===f.contactoId):null;
+      const opsDelCto=ctoVinc?(oportunidades||[]).filter(o=>o.contactoPrincipalId===ctoVinc.id||o.contactoId===ctoVinc.id||(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(ctoVinc.id)):[];
+      return <div style={{...S.card("#7dd3fc"),border:"1px solid #7dd3fc33",marginBottom:10}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#7dd3fc",marginBottom:8}}>🔗 Vincular a contacto / oportunidad</div>
+        {ctoVinc
+          ? <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:f.oportunidadId||opsDelCto.length>0?8:0}}>
+              <div style={{...S.inp,flex:1,fontSize:12}}>{ctoVinc.nombreCompleto}</div>
+              <button style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px 10px",cursor:"pointer",fontSize:12}} onClick={()=>{set("contactoId",null);set("oportunidadId",null);}}>✕</button>
+            </div>
+          : <BuscaCtoEmpCFC contactos={contactos||[]} empresas={empresas||[]} value={null} onChange={v=>set("contactoId",v||null)} placeholder="🔍 Buscar contacto a vincular…"/>
+        }
+        {ctoVinc&&opsDelCto.length>0&&<Field label="Oportunidad (opcional)">
+          <select style={S.sel} value={f.oportunidadId||""} onChange={e=>set("oportunidadId",e.target.value||null)}>
+            <option value="">— Solo el contacto —</option>
+            {opsDelCto.map(o=><option key={o.id} value={o.id}>{ABIERTA(o)?"🎯 ":"✓ "}{o.concepto}</option>)}
+          </select>
+        </Field>}
+      </div>;
+    })()}
     {/* ── MOVER A PROYECTO (solo actividades únicas internas) ── */}
     {esInterno&&(f.modoTarea||"unica")==="unica"&&onSaveExtra&&(()=>{
       const proyectos=(actividades||[]).filter(a=>(a.enfoque==="Tareas"||a.enfoque==="Acciones")&&a.modoTarea==="proyecto"&&a.id!==f.id);
@@ -1742,59 +1763,71 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
     const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return {done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return {done:d,total:a.subtareas.length};}return null;})();
     const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
     return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`,borderRadius:9,padding:"9px 11px",marginBottom:6}}>
-      {/* CABECERA — comportamiento distinto para interno vs comercial */}
-      {esInterno
-        ? <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(modo!=="unica"?toggleExp(a.id):(onTap&&onTap(a)))}>
-            {/* Renglón 1: concepto completo */}
-            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-              {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-              {modo==="proyecto"&&<span style={{fontSize:11,flexShrink:0}}>📁</span>}
-              {modo==="checklist"&&<span style={{fontSize:11,flexShrink:0}}>☑</span>}
-              <div style={{fontSize:13,fontWeight:800,flex:1,wordBreak:"break-word",lineHeight:1.3}}>{tituloCard}</div>
-            </div>
-            {/* Renglón 2: etiquetas informativas */}
-            <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
-              <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
-                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-                {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
-                <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
+      {esContactarA
+        ? <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))}>
+            {/* R1: Contacto · Empresa ………… atraso + fecha */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0,flex:1}}>
+                {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+                <div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad")}
+                  {showContacto&&c&&empN&&<span style={{color:"#475569",fontWeight:400}}> │ </span>}
+                  {showContacto&&empN&&<span style={{color:"#7dd3fc",fontWeight:700}}>{empN}</span>}
+                </div>
               </div>
-              {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:ENF_CFC_COLOR[a.enfoque]||"#a78bfa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap"}}>{a.tipoAccion}</span>}
+              <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
+                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech||"sin fecha"}</span>
+              </div>
             </div>
-            {(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
-              {a.etiquetasAgenda.map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
+            {/* R2: enfoque · etapa · prioridad · tipo acción · orientación */}
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginTop:5}}>
+              <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
+              <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
+              {a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:8}}>{a.prioridad}</span>}
+              {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:ENF_CFC_COLOR[a.enfoque]||"#60a5fa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap"}}>{a.tipoAccion}</span>}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
+            </div>
+            {/* R3: etapa contacto · etapa oportunidad · solución */}
+            {(c||op||a.servicioSolucion)&&<div style={{fontSize:10,color:"#64748b",marginTop:5}}>
+              {c&&(c.etapaEspecifica||c.etapaPrincipal)&&<span>{c.etapaEspecifica||c.etapaPrincipal}</span>}
+              {op&&<span>{c&&(c.etapaEspecifica||c.etapaPrincipal)?" · ":""}🎯 {op.etapa}</span>}
+              {a.servicioSolucion&&<span>{(c||op)?" · ":""}{a.servicioSolucion}</span>}
             </div>}
-            <div style={{display:"flex",justifyContent:"flex-end",marginTop:3}}>
-              <span style={{fontSize:9,color:"#475569"}}>{efFech||"sin fecha"}</span>
-              {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569",marginLeft:8}}>{isExp?"▲":"▾"}</span>}
-            </div>
+            {/* R4: texto según estatus */}
+            {(a.intencion||a.intencionResultado)&&efEst==="Programada"&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
+            {a.accionProceso&&efEst==="En Proceso"&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
+            {a.resultado&&efEst==="Cerrada"&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4}}>→ {a.resultado}</div>}
           </div>
-        : <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start",cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))}>
-            <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0}}>
-              {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-              <div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{tituloCard}</div>
+        : <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(modo!=="unica"?toggleExp(a.id):(onTap&&onTap(a)))}>
+            {/* R1: asunto (hasta 2 líneas) ………… fecha + atraso */}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:6,minWidth:0,flex:1}}>
+                {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>{isSel?"✓":""}</span>}
+                {modo==="proyecto"&&<span style={{fontSize:11,flexShrink:0,marginTop:1}}>📁</span>}
+                {modo==="checklist"&&<span style={{fontSize:11,flexShrink:0,marginTop:1}}>☑</span>}
+                <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{tituloCard}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
+                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech||"sin fecha"}</span>
+                {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569"}}>{isExp?"▲":"▾"}</span>}
+              </div>
             </div>
-            <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}>
-              {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-              {a.prioridad&&<span style={S.tag(PRIOR_COLOR[a.prioridad]||"#64748b")}>{a.prioridad}</span>}
-              <span style={S.tag(col)}>{efEst}</span>
+            {/* R2: enfoque · etapa · prioridad · tipo acción · orientación */}
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginTop:5}}>
+              <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
+              <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
+              {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
+              {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:ENF_CFC_COLOR[a.enfoque]||"#a78bfa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap"}}>{a.tipoAccion}</span>}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
             </div>
+            {/* R3: contacto vinculado (si aplica) */}
+            {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {ct.nombreCompleto}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
+            {/* R4: descripción */}
+            {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
           </div>
       }
-      {/* Renglón de fecha/detalle para comerciales */}
-      {!esInterno&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:3,gap:6}}>
-        <div style={{fontSize:10,color:"#64748b",minWidth:0}}>
-          {efFech||"sin fecha"}{a.hora?" · "+a.hora:""}
-          {showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}
-          {a.servicioSolucion?` · ${a.servicioSolucion}`:""}
-          {a.oportunidadId?" · 🎯":""}
-        </div>
-        {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:"#60a5fa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap",flexShrink:0}}>{a.tipoAccion}</span>}
-      </div>}
-      {!esInterno&&(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
-        {a.etiquetasAgenda.map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
-      </div>}
       {/* Progress bar */}
       {prog&&<div style={{marginTop:6}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:3}}>
