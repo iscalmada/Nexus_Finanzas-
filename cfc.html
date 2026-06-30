@@ -1669,6 +1669,11 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
     <Field label={esInterno?`Tipo de ${f.enfoque||"tarea"}`:"Tipo de acción"}>
       <CatSelect cat={esInterno?(f.enfoque==="Acciones"?(catAccAcciones||[]):(catAccTareas||[])):(catalogos.tipoAccion||[])} value={f.tipoAccion} onChange={v=>set("tipoAccion",v)}/>
     </Field>
+    {(catEtiqAgenda||[]).length>0&&<Field label="Etiquetas">
+      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+        {(catEtiqAgenda||[]).map(et=>{const on=(f.etiquetasAgenda||[]).includes(et);return <span key={et} style={{...S.tag(on?"#f472b6":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>set("etiquetasAgenda",on?(f.etiquetasAgenda||[]).filter(x=>x!==et):[...(f.etiquetasAgenda||[]),et])}>🏷 {et}</span>;})}
+      </div>
+    </Field>}
 
       {!esInterno&&(<>
         <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
@@ -1718,12 +1723,6 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         </div>)}
       </div>}
     </div>}
-    {/* ── ETIQUETAS DE AGENDA ── */}
-    {(catEtiqAgenda||[]).length>0&&<Field label="Etiquetas">
-      <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-        {(catEtiqAgenda||[]).map(et=>{const on=(f.etiquetasAgenda||[]).includes(et);return <span key={et} style={{...S.tag(on?"#f472b6":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>set("etiquetasAgenda",on?(f.etiquetasAgenda||[]).filter(x=>x!==et):[...(f.etiquetasAgenda||[]),et])}>🏷 {et}</span>;})}
-      </div>
-    </Field>}
     {/* ── MOVER A PROYECTO (solo actividades únicas internas) ── */}
     {esInterno&&(f.modoTarea||"unica")==="unica"&&onSaveExtra&&(()=>{
       const proyectos=(actividades||[]).filter(a=>(a.enfoque==="Tareas"||a.enfoque==="Acciones")&&a.modoTarea==="proyecto"&&a.id!==f.id);
@@ -2104,9 +2103,20 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,catEtiqA
         <Field label="Estatus"><select style={S.sel} value={batch.estatus} onChange={e=>setBatch({...batch,estatus:e.target.value})}><option value="">— Sin cambio —</option>{["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}</select></Field>
         <Field label="Tipo de acción"><select style={S.sel} value={batch.tipoAccion} onChange={e=>setBatch({...batch,tipoAccion:e.target.value})}><option value="">— Sin cambio —</option>{(catalogos.tipoAccion||[]).map(t=><option key={t.id} value={t.nombre}>{t.nombre}</option>)}</select></Field>
         <Field label="Prioridad"><select style={S.sel} value={batch.prioridad||""} onChange={e=>setBatch({...batch,prioridad:e.target.value})}><option value="">— Sin cambio —</option>{PRIOR.map(p=><option key={p} value={p}>{p}</option>)}</select></Field>
+        {(catEtiqAgenda||[]).length>0&&<Field label="Etiquetas — agregar">
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {catEtiqAgenda.map(et=>{const on=(batch.etiquetasAgregar||[]).includes(et);return <span key={et} style={{...S.tag(on?"#22c55e":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>setBatch(p=>({...p,etiquetasAgregar:on?(p.etiquetasAgregar||[]).filter(x=>x!==et):[...(p.etiquetasAgregar||[]),et]}))}>+ {et}</span>;})}
+          </div>
+        </Field>}
+        {(catEtiqAgenda||[]).length>0&&<Field label="Etiquetas — quitar">
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {catEtiqAgenda.map(et=>{const on=(batch.etiquetasQuitar||[]).includes(et);return <span key={et} style={{...S.tag(on?"#f87171":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>setBatch(p=>({...p,etiquetasQuitar:on?(p.etiquetasQuitar||[]).filter(x=>x!==et):[...(p.etiquetasQuitar||[]),et]}))}>− {et}</span>;})}
+          </div>
+          <div style={{fontSize:9,color:"#475569",marginTop:5}}>Ej. para pasar de "Comercial" a "Interno": agrega Interno y quita Comercial.</div>
+        </Field>}
         <div style={{display:"flex",gap:8,marginTop:14}}>
           <button style={{...S.pill(false,"#64748b"),flex:1,padding:"10px 0"}} onClick={()=>setBatch(null)}>Cancelar</button>
-          <button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={()=>{const p={};if(batch.fecha)p.fecha=batch.fecha;if(batch.estatus)p.estatus=batch.estatus;if(batch.tipoAccion)p.tipoAccion=batch.tipoAccion;if(batch.prioridad)p.prioridad=batch.prioridad;if(Object.keys(p).length)onEditActs(sel,p);setBatch(null);setSelMode(false);setSel([]);}}>Aplicar</button>
+          <button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={()=>{const p={};if(batch.fecha)p.fecha=batch.fecha;if(batch.estatus)p.estatus=batch.estatus;if(batch.tipoAccion)p.tipoAccion=batch.tipoAccion;if(batch.prioridad)p.prioridad=batch.prioridad;const addEt=batch.etiquetasAgregar||[];const remEt=batch.etiquetasQuitar||[];if(Object.keys(p).length||addEt.length||remEt.length){onEditActs(sel,(a)=>{const r={...p};if(addEt.length||remEt.length){let et=[...(a.etiquetasAgenda||[])];et=et.filter(x=>!remEt.includes(x));et=[...new Set([...et,...addEt])];r.etiquetasAgenda=et;}return r;});}setBatch(null);setSelMode(false);setSel([]);}}>Aplicar</button>
         </div>
       </div>
     </div>}
@@ -2514,7 +2524,7 @@ function App(){
   };
 
   const delAct=(id)=>setActividades(prev=>prev.filter(a=>a.id!==id));
-  const onEditActs=(ids,patch)=>setActividades(prev=>prev.map(a=>ids.indexOf(a.id)>-1?{...a,...patch}:a));
+  const onEditActs=(ids,patch)=>setActividades(prev=>prev.map(a=>ids.indexOf(a.id)>-1?{...a,...(typeof patch==="function"?patch(a):patch)}:a));
   const onCopyActs=(ids)=>setActividades(prev=>{let mx=Math.max(0,...prev.map(a=>parseInt((a.id||"a0").slice(1))||0));const cps=prev.filter(a=>ids.indexOf(a.id)>-1).map(a=>{mx+=1;const{id,...r}=a;return {...r,id:"a"+mx};});return [...prev,...cps];});
   const sinRespuesta=(a)=>{setActividades(prev=>prev.map(x=>x.id===a.id?{...x,estatus:"Cerrada",resultado:x.resultado||"Sin respuesta"}:x));if(window.confirm("Cerrada sin respuesta. ¿Agendar la siguiente acción para este contacto?")){openAct({contactoId:a.contactoId,oportunidadId:a.oportunidadId||null,tipoAccion:a.tipoAccion||"",servicioSolucion:a.servicioSolucion||null,prioridad:a.prioridad||"Media",estatus:"Programada",fecha:""},a.contactoId);}};
   const openOpo=(init,fixed)=>setOpoModal({init,fixed:fixed||null});
