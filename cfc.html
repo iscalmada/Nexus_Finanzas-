@@ -160,7 +160,7 @@ function Field({label,children}){return <div style={S.fg}><label style={S.fl}>{l
 function CatSelect({cat,value,onChange,placeholder}){
   return <select style={S.sel} value={value||""} onChange={e=>onChange(e.target.value||null)}>
     <option value="">{placeholder||"— Selecciona —"}</option>
-    {(cat||[]).map(o=><option key={o.id} value={o.nombre}>{o.nombre}</option>)}
+    {(cat||[]).map(o=>{const nm=typeof o==="string"?o:o.nombre;const k=typeof o==="string"?o:o.id;return <option key={k} value={nm}>{nm}</option>;})}
   </select>;
 }
 function ChipMulti({opts,sel,setSel,color}){
@@ -887,7 +887,7 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,catEtiqAgenda,
       </div>)}
       {/* ── Catálogos de Agenda ── */}
       <div style={{fontSize:10,fontWeight:800,color:"#64748b",letterSpacing:1,textTransform:"uppercase",margin:"16px 0 10px"}}>📅 Agenda</div>
-      <CatAgEdRow title="📞 Tipo de acción — Contactar (catálogo: tipoAccion)" items={catalogos.tipoAccion||[]} setItems={(v)=>setCatalogos(p=>({...p,tipoAccion:v}))} color="#60a5fa"/>
+      <div style={{fontSize:9,color:"#475569",marginBottom:10,lineHeight:1.4}}>El catálogo "Tipo de acción — Contactar" se edita arriba como <b style={{color:GOLD}}>{CAT_LABEL.tipoAccion}</b>.</div>
       <CatAgEdRow title="📋 Tipo de acción — Tareas" items={catAccTareas||[]} setItems={setCatAccTareas} color="#a78bfa"/>
       <CatAgEdRow title="⚡ Tipo de acción — Acciones" items={catAccAcciones||[]} setItems={setCatAccAcciones} color="#2dd4bf"/>
       <CatAgEdRow title="🏷 Etiquetas de Agenda" items={catEtiqAgenda||[]} setItems={setCatEtiqAgenda} color="#f472b6"/>
@@ -1801,6 +1801,9 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
         {showContacto&&empN?<span> · <span style={{color:"#7dd3fc",fontWeight:600}}>{empN}</span></span>:""}
         {a.servicioSolucion?` · ${a.servicioSolucion}`:""}
         {a.oportunidadId?" · 🎯":""}
+      </div>}
+      {!esInterno&&(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:5}}>
+        {a.etiquetasAgenda.map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:7}}>🏷 {et}</span>)}
       </div>}
       {/* Progress bar */}
       {prog&&<div style={{marginTop:6}}>
