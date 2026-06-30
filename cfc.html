@@ -1555,11 +1555,11 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
           const compEst=total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada";
           if(!f.fecha){alert("Indica la fecha");return;}
-          onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null,estatus:compEst});
+          onSave({...f,servicioSolucion:null,estatus:compEst});
         } else {
           if(!f.fecha){alert("Indica la fecha");return;}
           if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
-          onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null});
+          onSave({...f,servicioSolucion:null});
         }
       }
     }
