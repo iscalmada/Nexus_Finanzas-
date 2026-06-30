@@ -1590,7 +1590,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
       <div style={{display:"flex",gap:6}}>
         {[["Contactar","📞","#60a5fa"],["Tareas","📋","#a78bfa"],["Acciones","⚡","#2dd4bf"]].map(([v,ic,c])=>(
           <button key={v} style={{flex:1,padding:"8px 0",fontSize:12,fontWeight:700,border:`1px solid ${f.enfoque===v?c:c+"33"}`,borderRadius:8,cursor:"pointer",background:f.enfoque===v?c+"22":"transparent",color:f.enfoque===v?c:"#475569"}}
-            onClick={()=>{set("enfoque",v);set("tipoAccion","");set("contactoId",null);set("asunto","");}}>{ic} {v}</button>
+            onClick={()=>{set("enfoque",v);set("tipoAccion","");if(v==="Contactar")set("asunto","");else set("contactoId",null);}}>{ic} {v}</button>
         ))}
       </div>
     </Field>
@@ -1785,14 +1785,14 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:8}}>{a.prioridad}</span>}
-              {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:ENF_CFC_COLOR[a.enfoque]||"#60a5fa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap"}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
+              {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:8}}>{a.tipoAccion}</span>}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
             </div>
-            {/* R3: etapa contacto · etapa oportunidad · solución */}
-            {(c||op||a.servicioSolucion)&&<div style={{fontSize:10,color:"#64748b",marginTop:5}}>
-              {c&&(c.etapaEspecifica||c.etapaPrincipal)&&<span>{c.etapaEspecifica||c.etapaPrincipal}</span>}
-              {op&&<span>{c&&(c.etapaEspecifica||c.etapaPrincipal)?" · ":""}🎯 {op.etapa}</span>}
-              {a.servicioSolucion&&<span>{(c||op)?" · ":""}{a.servicioSolucion}</span>}
+            {/* R3: etapa contacto · etapa oportunidad · solución (formato chip) */}
+            {(c||op||a.servicioSolucion)&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginTop:5}}>
+              {c&&(c.etapaEspecifica||c.etapaPrincipal)&&<span style={{...S.tag("#a78bfa"),fontSize:8}}>{c.etapaEspecifica||c.etapaPrincipal}</span>}
+              {op&&<span style={{...S.tag(oc(op.etapa)),fontSize:8}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}
+              {a.servicioSolucion&&<span style={{...S.tag(GOLD),fontSize:8}}>{a.servicioSolucion}</span>}
             </div>}
             {/* R4: texto según estatus */}
             {(a.intencion||a.intencionResultado)&&efEst==="Programada"&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
@@ -1819,8 +1819,8 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
-              {a.tipoAccion&&<span style={{fontSize:10,fontWeight:800,color:"#08080f",background:ENF_CFC_COLOR[a.enfoque]||"#a78bfa",borderRadius:6,padding:"3px 9px",whiteSpace:"nowrap"}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{fontSize:11,fontWeight:800,color:"#08080f",background:"#f472b6",borderRadius:6,padding:"3px 10px",whiteSpace:"nowrap"}}>🏷 {et}</span>)}
+              {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{a.tipoAccion}</span>}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
             </div>
             {/* R3: contacto vinculado (si aplica) */}
             {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {ct.nombreCompleto}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
@@ -1924,10 +1924,6 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
           </div>
         </div>}
       </div>}
-      {!esInterno&&showContacto&&((c&&c.etapaEspecifica)||(op&&op.etapa))&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:4}}>{c&&c.etapaEspecifica&&<span style={{fontSize:8,fontWeight:700,color:"#a78bfa",background:"#a78bfa1a",border:"1px solid #a78bfa44",borderRadius:5,padding:"1px 6px"}}>{c.etapaEspecifica}</span>}{op&&op.etapa&&<span style={{fontSize:8,fontWeight:700,color:oc(op.etapa),background:oc(op.etapa)+"1a",border:`1px solid ${oc(op.etapa)}44`,borderRadius:5,padding:"1px 6px"}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}</div>}
-      {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
-      {a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:3,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
-      {a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:3,lineHeight:1.4}}>→ {a.resultado}</div>}
       {!esInterno&&onSinRespuesta&&_pend&&<div style={{textAlign:"right",marginTop:6}}><button onClick={(ev)=>{ev.stopPropagation();onSinRespuesta(a);}} style={{background:"transparent",border:"1px solid #fb923c55",borderRadius:7,color:"#fb923c",fontSize:9,fontWeight:700,padding:"3px 8px",cursor:"pointer"}}>Sin respuesta</button></div>}
     </div>;})}</div>;
 }
