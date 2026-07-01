@@ -1992,17 +1992,25 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"8px 12px 8px"}}>
       {/* Fila 1: tabs */}
       <div style={{display:"flex",gap:5,marginBottom:7}}>
-        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:12}} onClick={()=>setModo("lista")}>Lista</button>
-        <button style={{...S.pill(modo==="rptCom","#60a5fa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptCom")}>📞 Contactar</button>
-        <button style={{...S.pill(modo==="rptTar","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptTar")}>📋 Tareas</button>
-        <button style={{...S.pill(modo==="rptAcc","#2dd4bf"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptAcc")}>⚡ Acciones</button>
+        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:12}} onClick={()=>setModo("lista")}>Vista General</button>
+        <button style={{...S.pill(modo==="rptCom","#60a5fa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptCom")}>📞 Seguimiento</button>
+        <button style={{...S.pill(modo==="rptTar","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptTar")}>📋 Mis Tareas</button>
+        <button style={{...S.pill(modo==="rptAcc","#2dd4bf"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptAcc")}>⚡ Mis Acciones</button>
       </div>
-      {/* Fila 2: chips estatus */}
-      <div style={{display:"flex",gap:5,flexWrap:"nowrap",marginBottom:7}}>
+      {/* Fila 2: Enfoque */}
+      <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"nowrap",marginBottom:7}}>
+        <span style={{fontSize:10,color:"#64748b",fontWeight:700,flexShrink:0}}>Enfoque:</span>
+        {[["","Todos","#64748b"],["Contactar","📞 Contactar","#60a5fa"],["Tareas","📋 Tareas","#a78bfa"],["Acciones","⚡ Acciones","#2dd4bf"]].map(([v,l,c])=>(
+          <span key={v} style={{...S.chip(fEnfoque===v,c),fontSize:10,padding:"3px 8px",flexShrink:0}} onClick={()=>setFEnfoque(fEnfoque===v&&v?"":v)}>{l}</span>
+        ))}
+      </div>
+      {/* Fila 3: Etapa */}
+      <div style={{display:"flex",gap:5,alignItems:"center",flexWrap:"nowrap",marginBottom:7}}>
+        <span style={{fontSize:10,color:"#64748b",fontWeight:700,flexShrink:0}}>Etapa:</span>
         {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]||GOLD),fontSize:10,padding:"3px 8px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
         {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:10,padding:"3px 8px",opacity:.8}} onClick={()=>setFiltros([])}>✕</span>}
       </div>
-      {/* Fila 3: búsqueda + filtros */}
+      {/* Fila 4: búsqueda + filtros */}
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
         <input style={{...S.inp,flex:1,padding:"7px 10px",fontSize:12}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
         <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 12px",fontWeight:700,whiteSpace:"nowrap",fontSize:12}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` ${nFil}`:""} {showFil?"▲":"▾"}</button>
@@ -2011,12 +2019,6 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     {/* ── PANEL DE FILTROS ── */}
     <div style={{...S.sec,paddingTop:4}}>
       {showFil&&<div style={{...S.card(),marginTop:6,padding:"10px 12px"}}>
-        {/* 1 Enfoque */}
-        <div style={{display:"flex",gap:5,marginBottom:8}}>
-          {[["","Todos","#64748b"],["Contactar","📞 Contactar","#60a5fa"],["Tareas","📋 Tareas","#a78bfa"],["Acciones","⚡ Acciones","#2dd4bf"]].map(([v,l,c])=>(
-            <button key={v} style={{...S.pill(fEnfoque===v,c),flex:1,padding:"5px 0",fontWeight:700,fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
-          ))}
-        </div>
         {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{marginBottom:8}}>
           <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orientación</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>

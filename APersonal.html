@@ -567,21 +567,25 @@ function App(){
       <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",boxShadow:"0 2px 0 0 #0c0c16",padding:"7px 12px"}}>
         {/* Fila 1: Tabs */}
         <div style={{display:"flex",gap:4,marginBottom:6}}>
-          <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>setModo("lista")}>Lista</button>
-          <button style={{...S.pill(modo==="rptContactar",ENF_COLOR.Contactar),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptContactar")}>📞 Contactar</button>
-          <button style={{...S.pill(modo==="rptTareas",ENF_COLOR.Tareas),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptTareas")}>📋 Tareas</button>
-          <button style={{...S.pill(modo==="rptAcciones",ENF_COLOR.Acciones),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptAcciones")}>⚡ Acciones</button>
+          <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>setModo("lista")}>Vista General</button>
+          <button style={{...S.pill(modo==="rptContactar",ENF_COLOR.Contactar),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptContactar")}>📞 Seguimiento</button>
+          <button style={{...S.pill(modo==="rptTareas",ENF_COLOR.Tareas),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptTareas")}>📋 Mis Tareas</button>
+          <button style={{...S.pill(modo==="rptAcciones",ENF_COLOR.Acciones),flex:1,padding:"5px 0",fontSize:10}} onClick={()=>setModo("rptAcciones")}>⚡ Mis Acciones</button>
         </div>
-        {/* Fila 2: Enfoque + Estatus chips */}
-        <div className="nap-chips" style={{display:"flex",gap:4,marginBottom:6,flexWrap:"nowrap"}}>
-          {[["","📋 Todos","#64748b"],["Contactar","📞 Contactar",ENF_COLOR.Contactar],["Tareas","📋 Tareas",ENF_COLOR.Tareas],["Acciones","⚡ Acciones",ENF_COLOR.Acciones]].map(([v,l,c])=>(
+        {/* Fila 2: Enfoque */}
+        <div className="nap-chips" style={{display:"flex",gap:4,marginBottom:6,alignItems:"center",flexWrap:"nowrap"}}>
+          <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Enfoque:</span>
+          {[["","Todos","#64748b"],["Contactar","📞 Contactar",ENF_COLOR.Contactar],["Tareas","📋 Tareas",ENF_COLOR.Tareas],["Acciones","⚡ Acciones",ENF_COLOR.Acciones]].map(([v,l,c])=>(
             <span key={v} style={{...S.chip(fEnfoque===v,c),fontSize:9,padding:"3px 7px",flexShrink:0,cursor:"pointer"}} onClick={()=>setFEnfoque(fEnfoque===v&&v?"":v)}>{l}</span>
           ))}
-          <span style={{borderLeft:"1px solid #334155",margin:"0 2px"}}/>
+        </div>
+        {/* Fila 3: Etapa */}
+        <div className="nap-chips" style={{display:"flex",gap:4,marginBottom:6,alignItems:"center",flexWrap:"nowrap"}}>
+          <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Etapa:</span>
           {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]),fontSize:9,padding:"3px 6px",flexShrink:0,cursor:"pointer"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
           {(filtros.length>0||fEnfoque)&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 7px",flexShrink:0,cursor:"pointer"}} onClick={()=>{setFiltros([]);setFEnfoque("");}}>✕</span>}
         </div>
-        {/* Fila 3: Búsqueda + ⚙ + ✕ */}
+        {/* Fila 4: Búsqueda + ⚙ + ✕ */}
         <div style={{display:"flex",gap:5,alignItems:"center"}}>
           <input style={{...S.srch,flex:1}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
           <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 10px",fontWeight:700,fontSize:11}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` ${nFil}`:""} {showFil?"▲":"▾"}</button>
