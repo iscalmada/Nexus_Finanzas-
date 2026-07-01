@@ -49,7 +49,7 @@ const S={
   lbl:{fontSize:10,color:"#64748b",marginBottom:5,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"},
   pill:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:9,padding:"6px 14px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:12}),
   chip:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:11,display:"inline-block"}),
-  tag:(c)=>({fontSize:9,fontWeight:700,color:c,background:c+"18",border:`1px solid ${c}44`,borderRadius:6,padding:"2px 7px",display:"inline-block",whiteSpace:"nowrap"}),
+  tag:(c)=>({fontSize:9,fontWeight:700,color:c,background:c+"26",border:`1px solid ${c}55`,borderRadius:6,padding:"2px 7px",display:"inline-block",whiteSpace:"nowrap"}),
   modal:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
   mBox:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:"18px 18px 0 0",padding:"16px 14px 30px",width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto"},
   mTit:{fontSize:14,fontWeight:800,color:GOLD,marginBottom:14,textAlign:"center"},
@@ -352,7 +352,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
   return <div style={{background:"#10101e",border:rezC?`1px solid ${rezC}66`:`1px solid ${col}22`,borderLeft:`3px solid ${enfC}`,borderRadius:9,padding:"9px 11px",marginBottom:7}}>
     {/* Renglón 1: título */}
     <div style={{cursor:"pointer",marginBottom:4}} onClick={()=>modo!=="unica"?onToggleExp():onTap(a)}>
-      <div style={{display:"flex",alignItems:"center",gap:6}}>
+      <div style={{display:"flex",alignItems:"flex-start",gap:6}}>
         {modo==="proyecto"&&<span style={{fontSize:11}}>📁</span>}
         {modo==="checklist"&&<span style={{fontSize:11}}>☑</span>}
         <div style={{flex:1,minWidth:0}}>
@@ -360,7 +360,10 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
           {esContactar&&ctNombre&&empNombre&&<div style={{fontSize:10,color:"#3b82f6",marginTop:1}}>{empNombre}</div>}
           {esContactar&&!ctNombre&&empNombre&&null}
         </div>
-        {modo!=="unica"&&<span style={{fontSize:10,color:"#475569"}}>{expanded?"▲":"▾"}</span>}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
+          {a.hora&&<span style={{fontSize:9,color:"#64748b"}}>{a.hora}</span>}
+        </div>
+        {(modo!=="unica"||a.intencion)&&<span style={{fontSize:10,color:"#475569",cursor:"pointer"}} onClick={modo==="unica"?(ev)=>{ev.stopPropagation();onToggleExp();}:undefined}>{expanded?"▲":"▾"}</span>}
       </div>
     </div>
     {/* Renglón 2: etiquetas */}
@@ -374,6 +377,8 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
       <span style={{fontSize:9,color:"#475569",marginLeft:"auto"}}>{fmtF(efFech)}</span>
       {(a.etiquetas||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
     </div>
+    {/* Intención — colapsada por defecto */}
+    {expanded&&modo==="unica"&&a.intencion&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion}</div>}
     {/* Barra de progreso */}
     {prog&&<div style={{marginTop:6}}>
       <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:2}}><span>{prog.done}/{prog.total}</span><span>{Math.round(prog.done/prog.total*100)}%</span></div>
