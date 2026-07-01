@@ -49,7 +49,7 @@ const S={
   lbl:{fontSize:10,color:"#64748b",marginBottom:5,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"},
   pill:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:9,padding:"6px 14px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:12}),
   chip:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:11,display:"inline-block"}),
-  tag:(c)=>({fontSize:9,fontWeight:700,color:c,background:c+"26",border:`1px solid ${c}55`,borderRadius:6,padding:"2px 7px",display:"inline-block",whiteSpace:"nowrap"}),
+  tag:(c)=>({fontSize:9,fontWeight:700,color:c,background:c+"26",border:`1px solid ${c}55`,borderRadius:6,padding:"2px 7px",display:"inline-block",whiteSpace:"nowrap",maxWidth:170,overflow:"hidden",textOverflow:"ellipsis",verticalAlign:"middle"}),
   modal:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
   mBox:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:"18px 18px 0 0",padding:"16px 14px 30px",width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto"},
   mTit:{fontSize:14,fontWeight:800,color:GOLD,marginBottom:14,textAlign:"center"},
@@ -361,7 +361,8 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
           {esContactar&&!ctNombre&&empNombre&&null}
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
-          {a.hora&&<span style={{fontSize:9,color:"#64748b"}}>{a.hora}</span>}
+          <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{fmtF(efFech)}</span>
+          {a.hora&&<span style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{a.hora}</span>}
         </div>
         {(modo!=="unica"||a.intencion)&&<span style={{fontSize:10,color:"#475569",cursor:"pointer"}} onClick={modo==="unica"?(ev)=>{ev.stopPropagation();onToggleExp();}:undefined}>{expanded?"▲":"▾"}</span>}
       </div>
@@ -372,9 +373,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
       {rezC&&<span style={S.tag(rezC)}>⚠ {rez}d</span>}
       {efPrio&&efPrio!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
       <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
-      {a.tipoAccion&&<span style={{fontSize:8,color:enfC,background:enfC+"11",border:`1px solid ${enfC}33`,borderRadius:5,padding:"1px 6px"}}>{a.tipoAccion}</span>}
-
-      <span style={{fontSize:9,color:"#475569",marginLeft:"auto"}}>{fmtF(efFech)}</span>
+      {a.tipoAccion&&<span style={{fontSize:8,color:enfC,background:enfC+"11",border:`1px solid ${enfC}33`,borderRadius:5,padding:"1px 6px",maxWidth:170,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"inline-block"}}>{a.tipoAccion}</span>}
       {(a.etiquetas||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
     </div>
     {/* Intención — colapsada por defecto */}
