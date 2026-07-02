@@ -660,7 +660,7 @@ function App(){
                   <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
                   <button style={{...S.pill(false,"#60a5fa"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
                   <button style={{...S.pill(false,"#64748b"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel([])}>Ninguna</button>
-                  <button style={{...S.pill(false,GOLD),padding:"3px 7px",fontWeight:700,fontSize:10,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",enfoque:"",estatus:"",prioridad:""});}}>Editar</button>
+                  <button style={{...S.pill(false,GOLD),padding:"3px 7px",fontWeight:700,fontSize:10,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",enfoque:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
                   {sel.length>0&&<button style={{...S.pill(true,"#f87171"),padding:"3px 7px",fontSize:10}} onClick={()=>{if(window.confirm(`¿Eliminar ${sel.length}?`)){sel.forEach(id=>delAct(id));setSel([]);setSelMode(false);}}}>🗑</button>}
                   <button style={{...S.pill(false,"#f87171"),padding:"3px 7px",fontSize:10}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
                 </div>}
@@ -765,6 +765,7 @@ function App(){
         <Field label="Fecha"><input type="date" style={S.inp} value={batch.fecha} onChange={e=>setBatch({...batch,fecha:e.target.value})}/></Field>
         <Field label="Enfoque"><select style={S.sel} value={batch.enfoque||""} onChange={e=>setBatch({...batch,enfoque:e.target.value})}><option value="">— Sin cambio —</option><option value="Contactar">📞 Contactar</option><option value="Tareas">📋 Tareas</option><option value="Acciones">⚡ Acciones</option></select></Field>
         <Field label="Estatus"><select style={S.sel} value={batch.estatus} onChange={e=>setBatch({...batch,estatus:e.target.value})}><option value="">— Sin cambio —</option>{["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}</select></Field>
+        <Field label="Tipo de acción"><select style={S.sel} value={batch.tipoAccion||""} onChange={e=>setBatch({...batch,tipoAccion:e.target.value})}><option value="">— Sin cambio —</option>{[...new Set([...catContactar,...catTareas,...catAcciones])].map(t=><option key={t} value={t}>{t}</option>)}</select></Field>
         <Field label="Prioridad"><select style={S.sel} value={batch.prioridad||""} onChange={e=>setBatch({...batch,prioridad:e.target.value})}><option value="">— Sin cambio —</option>{PRIOR.map(p=><option key={p} value={p}>{p}</option>)}</select></Field>
         {catEtiquetas.length>0&&<Field label="Orientación — agregar">
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
@@ -778,7 +779,7 @@ function App(){
         </Field>}
         <div style={{display:"flex",gap:8,marginTop:14}}>
           <button style={{...S.pill(false,"#64748b"),flex:1,padding:"10px 0"}} onClick={()=>setBatch(null)}>Cancelar</button>
-          <button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={()=>{const p={};if(batch.fecha)p.fecha=batch.fecha;if(batch.enfoque)p.enfoque=batch.enfoque;if(batch.estatus)p.estatus=batch.estatus;if(batch.prioridad)p.prioridad=batch.prioridad;const addEt=batch.etiquetasAgregar||[];const remEt=batch.etiquetasQuitar||[];if(Object.keys(p).length||addEt.length||remEt.length){editActs(sel,(a)=>{const r={...p};if(addEt.length||remEt.length){let et=[...(a.etiquetas||[])];et=et.filter(x=>!remEt.includes(x));et=[...new Set([...et,...addEt])];r.etiquetas=et;}return r;});}setBatch(null);setSelMode(false);setSel([]);}}>Aplicar</button>
+          <button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={()=>{const p={};if(batch.fecha)p.fecha=batch.fecha;if(batch.enfoque)p.enfoque=batch.enfoque;if(batch.estatus)p.estatus=batch.estatus;if(batch.tipoAccion)p.tipoAccion=batch.tipoAccion;if(batch.prioridad)p.prioridad=batch.prioridad;const addEt=batch.etiquetasAgregar||[];const remEt=batch.etiquetasQuitar||[];if(Object.keys(p).length||addEt.length||remEt.length){editActs(sel,(a)=>{const r={...p};if(addEt.length||remEt.length){let et=[...(a.etiquetas||[])];et=et.filter(x=>!remEt.includes(x));et=[...new Set([...et,...addEt])];r.etiquetas=et;}return r;});}setBatch(null);setSelMode(false);setSel([]);}}>Aplicar</button>
         </div>
       </div>
     </div>}
