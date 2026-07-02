@@ -43,25 +43,27 @@ const S={
   sub:{fontSize:9,color:"#334155",letterSpacing:2,marginTop:2},
   line:{height:1,background:"linear-gradient(90deg,#C9A84C33,transparent)"},
   card:(c)=>({background:"#10101e",border:`1px solid ${c||GOLD}22`,borderRadius:11,padding:"11px 13px",marginBottom:8}),
-  inp:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",color:"#e2e8f0",fontSize:13,width:"100%",outline:"none"},
-  ta:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",color:"#e2e8f0",fontSize:13,width:"100%",outline:"none",resize:"vertical",fontFamily:"Arial,sans-serif"},
-  sel:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"9px 11px",color:"#e2e8f0",fontSize:13,width:"100%",outline:"none"},
+  inp:{background:"#13131f",border:"1px solid #1e293b",borderRadius:9,padding:"9px 12px",color:"#e2e8f0",fontSize:15,width:"100%",boxSizing:"border-box",outline:"none"},
+  ta:{background:"#13131f",border:"1px solid #1e293b",borderRadius:9,padding:"9px 12px",color:"#e2e8f0",fontSize:14,width:"100%",boxSizing:"border-box",outline:"none",minHeight:64,resize:"vertical",lineHeight:1.5},
+  sel:{background:"#13131f",border:"1px solid #1e293b",borderRadius:9,padding:"9px 12px",color:"#e2e8f0",fontSize:13,width:"100%",boxSizing:"border-box",outline:"none"},
   lbl:{fontSize:10,color:"#64748b",marginBottom:5,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"},
+  fg:{marginBottom:12},
+  fl:{fontSize:9,color:"#64748b",letterSpacing:1.5,textTransform:"uppercase",marginBottom:5,display:"block"},
   pill:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:9,padding:"6px 14px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:12}),
   chip:(on,c)=>({border:`1px solid ${on?c||GOLD:(c||GOLD)+"44"}`,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontWeight:on?700:400,background:on?(c||GOLD)+"18":"transparent",color:on?c||GOLD:"#475569",fontSize:11,display:"inline-block"}),
   tag:(c)=>({fontSize:9,fontWeight:700,color:c,background:c+"26",border:`1px solid ${c}55`,borderRadius:6,padding:"2px 7px",display:"inline-block",whiteSpace:"nowrap",maxWidth:170,overflow:"hidden",textOverflow:"ellipsis",verticalAlign:"middle"}),
-  modal:{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
-  mBox:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:"18px 18px 0 0",padding:"16px 14px 30px",width:"100%",maxWidth:520,maxHeight:"92vh",overflowY:"auto"},
-  mTit:{fontSize:14,fontWeight:800,color:GOLD,marginBottom:14,textAlign:"center"},
-  saveB:{background:GOLD,border:"none",borderRadius:11,color:"#08080f",fontWeight:800,fontSize:14,padding:"12px 0",width:"100%",cursor:"pointer",marginBottom:8},
-  cancB:{background:"none",border:"1px solid #1e293b",borderRadius:11,color:"#64748b",fontSize:13,padding:"10px 0",width:"100%",cursor:"pointer",marginBottom:6},
+  modal:{position:"fixed",inset:0,background:"rgba(0,0,0,.88)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center"},
+  mBox:{background:"#0d0d1a",borderRadius:"16px 16px 0 0",padding:20,width:"100%",maxWidth:480,maxHeight:"93vh",overflowY:"auto",border:"1px solid #C9A84C33",borderBottom:"none"},
+  mTit:{fontSize:13,fontWeight:800,color:GOLD,marginBottom:16,letterSpacing:1},
+  saveB:{width:"100%",padding:12,borderRadius:11,border:"none",cursor:"pointer",background:"linear-gradient(135deg,#C9A84C,#8a6520)",color:"#080810",fontSize:12,fontWeight:800,marginTop:6},
+  cancB:{width:"100%",padding:10,borderRadius:11,border:"1px solid #1e293b",cursor:"pointer",background:"transparent",color:"#475569",fontSize:11,marginTop:6},
   fab:{position:"fixed",bottom:80,right:16,width:52,height:52,borderRadius:"50%",background:GOLD,color:"#08080f",fontSize:26,fontWeight:900,border:"none",cursor:"pointer",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 4px 20px rgba(201,168,76,.4)"},
-  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8},
+  g2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:8},
   fl:{fontSize:10,color:"#64748b",marginBottom:4,fontWeight:700,letterSpacing:.5},
   srch:{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,padding:"8px 11px",color:"#e2e8f0",fontSize:12,width:"100%",outline:"none"},
   back:{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 12px",cursor:"pointer",marginBottom:12},
 };
-const Field=({label,children})=><div style={{marginBottom:10}}><div style={S.lbl}>{label}</div>{children}</div>;
+const Field=({label,children})=><div style={S.fg}><label style={S.fl}>{label}</label>{children}</div>;
 /* ── Helpers proyecto ── */
 const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
 const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
@@ -243,7 +245,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
   return <div style={S.modal} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
     <div style={S.mBox}>
       <div style={S.mTit}>{esCopia?"Copia de actividad":(f.id?"Editar":"Nueva")+" Actividad"}</div>
-      {esCopia&&<div style={{fontSize:10,color:GOLD,marginBottom:10,marginTop:-6,textAlign:"center"}}>Se guardará como una actividad nueva.</div>}
+      {esCopia&&<div style={{fontSize:10,color:GOLD,marginBottom:10,marginTop:-6}}>Se guardará como una actividad nueva.</div>}
       {/* Enfoque */}
       <Field label="Enfoque">
         <div style={{display:"flex",gap:5}}>
@@ -255,13 +257,6 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
         <Field label="Contacto / Empresa">
           <BuscaContactoEmpresa cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={f.contactoId} empresaId={f.empresaId} onChange={({contactoId,empresaId})=>{set("contactoId",contactoId);set("empresaId",empresaId);}} onAdd={onCreateContacto?(nombre)=>{const id=onCreateContacto(nombre);if(id){set("contactoId",id);set("empresaId",null);}}:undefined}/>
         </Field>
-        <Field label="Tipo de acción">
-          <select style={S.sel} value={f.tipoAccion||""} onChange={e=>set("tipoAccion",e.target.value||null)}>
-            <option value="">— Selecciona —</option>
-            {cat.map((t,i)=><option key={i} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Intención / Motivo"><textarea style={{...S.ta,minHeight:60}} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="¿Para qué voy a contactar?"/></Field>
         <div style={S.g2}>
           <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
           <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
@@ -278,15 +273,21 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
             </select>
           </Field>
         </div>
-        {f.estatus==="En Proceso"&&<Field label="Acción en proceso"><textarea style={{...S.ta,minHeight:60}} value={f.accionEnProceso||""} onChange={e=>set("accionEnProceso",e.target.value||null)} placeholder="¿Qué estoy haciendo actualmente con este contacto?"/></Field>}
-        {f.estatus==="Cerrada"&&<Field label="Conclusión"><textarea style={{...S.ta,minHeight:60}} value={f.conclusion||""} onChange={e=>set("conclusion",e.target.value||null)} placeholder="¿Cómo terminó?"/></Field>}
+        <Field label="Tipo de acción">
+          <select style={S.sel} value={f.tipoAccion||""} onChange={e=>set("tipoAccion",e.target.value||null)}>
+            <option value="">— Selecciona —</option>
+            {cat.map((t,i)=><option key={i} value={t}>{t}</option>)}
+          </select>
+        </Field>
+        {catEtiquetas.length>0&&<Field label="Orientación">
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {catEtiquetas.map(et=>{const on=(f.etiquetas||[]).includes(et);return <span key={et} style={{...S.chip(on,"#f472b6"),fontSize:11,cursor:"pointer"}} onClick={()=>set("etiquetas",on?(f.etiquetas||[]).filter(x=>x!==et):[...(f.etiquetas||[]),et])}>🏷 {et}</span>;})}
+          </div>
+        </Field>}
+        <Field label="Intención (al programar)"><textarea style={S.ta} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="¿Para qué voy a contactar?"/></Field>
+        {(f.estatus==="En Proceso"||f.estatus==="Cerrada"||f.accionEnProceso)&&<Field label="Acción ejecutada (en proceso)"><textarea style={S.ta} value={f.accionEnProceso||""} onChange={e=>set("accionEnProceso",e.target.value||null)} placeholder="¿Qué estoy haciendo actualmente con este contacto?"/></Field>}
+        {(f.estatus==="Cerrada"||f.conclusion)&&<Field label="Resultado (al concluir)"><textarea style={S.ta} value={f.conclusion||""} onChange={e=>set("conclusion",e.target.value||null)} placeholder="¿Cómo terminó?"/></Field>}
       </>}
-      {/* Orientación - aplica a todos los enfoques */}
-      {catEtiquetas.length>0&&<Field label="Orientación">
-        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-          {catEtiquetas.map(et=>{const on=(f.etiquetas||[]).includes(et);return <span key={et} style={{...S.chip(on,"#f472b6"),fontSize:11,cursor:"pointer"}} onClick={()=>set("etiquetas",on?(f.etiquetas||[]).filter(x=>x!==et):[...(f.etiquetas||[]),et])}>🏷 {et}</span>;})}
-        </div>
-      </Field>}
       {/* TAREAS / ACCIONES */}
       {!esContactar&&<>
         <Field label="Tipo de tarea">
@@ -296,13 +297,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
             ))}
           </div>
         </Field>
-        <Field label="Tipo de acción">
-          <select style={S.sel} value={f.tipoAccion||""} onChange={e=>set("tipoAccion",e.target.value||null)}>
-            <option value="">— Selecciona —</option>
-            {cat.map((t,i)=><option key={i} value={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Asunto / Tarea"><textarea style={{...S.ta,minHeight:60}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value||null)} placeholder="Describe la tarea…"/></Field>
+        <Field label="Asunto / Tarea"><textarea style={{...S.ta,minHeight:72}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value||null)} placeholder="Describe la tarea…"/></Field>
         {modo==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
         {modo==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}
           onIndependizar={onSaveExtra?(idx)=>{
@@ -330,7 +325,18 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
             </Field>
           </div>
         </>}
-        <Field label="Intención / Notas"><textarea style={{...S.ta,minHeight:50}} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="Contexto, notas…"/></Field>
+        <Field label={`Tipo de ${f.enfoque||"tarea"}`}>
+          <select style={S.sel} value={f.tipoAccion||""} onChange={e=>set("tipoAccion",e.target.value||null)}>
+            <option value="">— Selecciona —</option>
+            {cat.map((t,i)=><option key={i} value={t}>{t}</option>)}
+          </select>
+        </Field>
+        {catEtiquetas.length>0&&<Field label="Orientación">
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {catEtiquetas.map(et=>{const on=(f.etiquetas||[]).includes(et);return <span key={et} style={{...S.chip(on,"#f472b6"),fontSize:11,cursor:"pointer"}} onClick={()=>set("etiquetas",on?(f.etiquetas||[]).filter(x=>x!==et):[...(f.etiquetas||[]),et])}>🏷 {et}</span>;})}
+          </div>
+        </Field>}
+        <Field label="Descripción / objetivo"><textarea style={S.ta} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="Qué se va a hacer o revisar…"/></Field>
         {modo==="unica"&&proyectos.length>0&&<div style={{...S.card("#60a5fa"),border:"1px solid #60a5fa33",marginBottom:10}}>
           <div style={{fontSize:11,fontWeight:700,color:"#60a5fa",marginBottom:8}}>↙ Mover a proyecto</div>
           <select style={S.sel} value={moveToProject} onChange={e=>setMoveToProject(e.target.value)}>
