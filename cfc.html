@@ -1396,7 +1396,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
 
 /* ════════ ACTIVIDADES ════════ */
 const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
-const hoyISO=()=>new Date().toISOString().slice(0,10);
+const hoyISO=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
 
 /* ── Helpers de modo interno ── */
 function ChecklistEditor({items,onChange}){
@@ -2122,23 +2122,30 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         if(rptActs.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades {esCom?"comerciales":"internas"} en el rango y filtros elegidos.</div>;
         return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
           <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:0.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
-            <div style={{width:58,flexShrink:0}}>Fecha</div>
-            <div style={{flex:1,minWidth:0}}>{esCom?"Acción":"Actividad / Asunto"}</div>
-            <div style={{flex:1,minWidth:0}}>{esCom?"Contacto":"Descripción"}</div>
-            <div style={{width:60,flexShrink:0,textAlign:"right"}}>Estatus</div>
+            <div style={{width:54,flexShrink:0}}>Fecha</div>
+            <div style={{flex:1.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
+            <div style={{flex:1,minWidth:0}}>Tipo</div>
+            <div style={{width:62,flexShrink:0,textAlign:"right"}}>Estatus</div>
           </div>
           {rptActs.map((a,i)=>{
             const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
             const efFech=proyFecha(a)||a.fecha||"";
             const isSel=selMode&&sel.indexOf(a.id)>-1;
-            const desc=esCom?cn(a.contactoId):(a.intencion||a.intencionResultado||a.resultado||"—");
-            const accion=esCom?(a.tipoAccion||"Actividad"):(a.asunto||a.tipoAccion||"Actividad");
+            const ct=esCom?ctById(a.contactoId):null;
+            const empN=(ct&&cEmpresas(ct)[0])?((empresas.find(e=>e.id===cEmpresas(ct)[0].empresaId)||{}).nombre||""):"";
+            const principal=esCom?(ct?ct.nombreCompleto:"—"):(a.asunto||a.tipoAccion||"Actividad");
             return <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${esCom?col:"#a78bfa"}`}}>
-              {selMode&&<span style={{width:14,height:14,flexShrink:0,marginRight:6,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-              <div style={{width:58,flexShrink:0,color:"#94a3b8",fontSize:10}}>{efFech?efFech.split("-").reverse().join("/"):"—"}</div>
-              <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word",fontSize:11}}>{accion}</div>
-              <div style={{flex:1,minWidth:0,color:"#94a3b8",paddingRight:4,wordBreak:"break-word",fontSize:10,lineHeight:1.3}}>{desc}</div>
-              <div style={{width:60,flexShrink:0,textAlign:"right"}}>{a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
+              {selMode&&<span style={{width:14,height:14,flexShrink:0,marginRight:6,marginTop:1,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+              <div style={{width:54,flexShrink:0,display:"flex",flexDirection:"column"}}>
+                <span style={{color:"#94a3b8",fontSize:10,fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"—"}</span>
+                {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
+              </div>
+              <div style={{flex:1.4,minWidth:0,paddingRight:6}}>
+                <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{principal}</div>
+                {esCom&&empN&&<div style={{fontSize:9,color:"#7dd3fc",marginTop:1,wordBreak:"break-word"}}>{empN}</div>}
+              </div>
+              <div style={{flex:1,minWidth:0,color:"#94a3b8",paddingRight:6,fontSize:10,wordBreak:"break-word"}}>{a.tipoAccion||"—"}</div>
+              <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&a.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
             </div>;
           })}
         </div>;
