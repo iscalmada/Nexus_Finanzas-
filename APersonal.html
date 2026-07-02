@@ -588,8 +588,8 @@ function App(){
     return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
       <div style={{display:"flex",gap:8,fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
         <div style={{width:62,flexShrink:0}}>Fecha</div>
-        <div style={{flex:esCom?1.9:2.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
-        {esCom&&<div style={{flex:0.7,minWidth:0}}>Tipo</div>}
+        <div style={{flex:esCom?1.6:2.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
+        {esCom&&<div style={{flex:1,minWidth:0,whiteSpace:"nowrap"}}>Tipo</div>}
         <div style={{width:62,flexShrink:0,textAlign:"right"}}>Estatus</div>
       </div>
       {acts.map(a=>{const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const efFech=proyFecha(a)||a.fecha||"";
@@ -601,11 +601,11 @@ function App(){
             <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{fmtF(efFech)||"—"}</span>
             {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
           </div>
-          <div style={{flex:esCom?1.9:2.4,minWidth:0}}>
+          <div style={{flex:esCom?1.6:2.4,minWidth:0}}>
             <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word"}}>{principal}</div>
             {esCom&&ctoObj?.nombreCompleto&&empObj?.nombre&&<div style={{fontSize:9,color:"#3b82f6",marginTop:1,wordBreak:"break-word"}}>{empObj.nombre}</div>}
           </div>
-          {esCom&&<div style={{flex:0.7,minWidth:0,color:"#94a3b8",fontSize:10,wordBreak:"break-word"}}>{a.tipoAccion||"—"}</div>}
+          {esCom&&<div style={{flex:1,minWidth:0,color:"#94a3b8",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.tipoAccion||"—"}</div>}
           <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&a.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
         </div>;
       })}
