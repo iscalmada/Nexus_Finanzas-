@@ -278,7 +278,12 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
           <BuscaContactoEmpresa cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={f.contactoId} empresaId={f.empresaId} onChange={({contactoId,empresaId})=>{set("contactoId",contactoId);set("empresaId",empresaId);}} onAdd={onCreateContacto?(nombre)=>{const id=onCreateContacto(nombre);if(id){set("contactoId",id);set("empresaId",null);}}:undefined}/>
         </Field>
         <div style={S.g2}>
-          <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
+          <Field label="Fecha">
+            <div style={{display:"flex",gap:6}}>
+              <input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/>
+              {f.fecha&&<button type="button" onClick={()=>set("fecha",null)} title="Quitar fecha" style={{flexShrink:0,border:"1px solid #334155",background:"none",borderRadius:9,color:"#94a3b8",padding:"0 13px",cursor:"pointer",fontSize:14}}>✕</button>}
+            </div>
+          </Field>
           <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
         </div>
         <div style={S.g2}>
@@ -329,7 +334,12 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
         />}
         {modo!=="proyecto"&&<>
           <div style={S.g2}>
-            <Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>
+            <Field label="Fecha">
+            <div style={{display:"flex",gap:6}}>
+              <input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/>
+              {f.fecha&&<button type="button" onClick={()=>set("fecha",null)} title="Quitar fecha" style={{flexShrink:0,border:"1px solid #334155",background:"none",borderRadius:9,color:"#94a3b8",padding:"0 13px",cursor:"pointer",fontSize:14}}>✕</button>}
+            </div>
+          </Field>
             <Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>
           </div>
           <div style={S.g2}>

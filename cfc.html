@@ -1650,7 +1650,12 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
     </>)}
 
     <div style={S.g2}>
-      {(f.modoTarea||"unica")!=="proyecto"&&<Field label="Fecha"><input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/></Field>}
+      {(f.modoTarea||"unica")!=="proyecto"&&<Field label="Fecha">
+        <div style={{display:"flex",gap:6}}>
+          <input type="date" style={S.inp} value={f.fecha||""} onChange={e=>set("fecha",e.target.value)}/>
+          {f.fecha&&<button type="button" onClick={()=>set("fecha",null)} title="Quitar fecha" style={{flexShrink:0,border:"1px solid #334155",background:"none",borderRadius:9,color:"#94a3b8",padding:"0 13px",cursor:"pointer",fontSize:14}}>✕</button>}
+        </div>
+      </Field>}
       {(f.modoTarea||"unica")==="proyecto"&&<Field label="Fecha"><div style={{fontSize:10,color:"#64748b",padding:"9px 10px",background:"#0f172a",borderRadius:8,border:"1px solid #1e293b"}}>Calculada de subtareas</div></Field>}
       {(f.modoTarea||"unica")!=="proyecto"&&<Field label="Hora"><input type="time" style={S.inp} value={f.hora||""} onChange={e=>set("hora",e.target.value||null)}/></Field>}
     </div>
