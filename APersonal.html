@@ -238,8 +238,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
       }
     }
     if(esContactar){
-      if(!f.fecha){alert("Indica la fecha");return;}
-      onSave({...f});
+            onSave({...f});
       if(f.estatus==="Cerrada"&&window.confirm("Actividad cerrada. ¿Agendar la siguiente actividad de Contactar para este contacto?")){
         setF({contactoId:f.contactoId||null,empresaId:f.empresaId||null,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",hora:null,prioridad:f.prioridad||"Media",tipoAccion:"",intencion:"",accionEnProceso:"",conclusion:"",enfoque:"Contactar",modoTarea:"unica"});
         return;
@@ -254,13 +253,11 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
         const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
         onSave({...f,fecha:compFecha,estatus:compEst});
       } else if(modo==="checklist"){
-        if(!f.fecha){alert("Indica la fecha");return;}
-        const done=(f.items||[]).filter(i=>i.done).length,tot=(f.items||[]).length;
+                const done=(f.items||[]).filter(i=>i.done).length,tot=(f.items||[]).length;
         const compEst=tot>0&&done===tot?"Cerrada":done>0?"En Proceso":"Programada";
         onSave({...f,estatus:compEst});
       } else {
-        if(!f.fecha){alert("Indica la fecha");return;}
-        onSave({...f});
+                onSave({...f});
       }
     }
     onClose();
@@ -533,6 +530,7 @@ function App(){
   const[fDesde,setFDesde]=useState("");
   const[fHasta,setFHasta]=useState("");
   const[modoFecha,setModoFecha]=useState("todas");
+  const[fSinFecha,setFSinFecha]=useState(false);
   const[fRezago,setFRezago]=useState(false);
   const[showFil,setShowFil]=useState(false);
   const[q,setQ]=useState("");
@@ -574,8 +572,8 @@ function App(){
     if(fContacto&&a.contactoId!==fContacto)return false;
     if(fEmpresa&&a.empresaId!==fEmpresa)return false;
     if(fTipoAccion&&a.tipoAccion!==fTipoAccion)return false;
-    if(fDesde&&efFech<fDesde)return false;
-    if(fHasta&&efFech>fHasta)return false;
+    if(fSinFecha){if(efFech)return false;}
+    else{if(fDesde&&efFech<fDesde)return false;if(fHasta&&efFech>fHasta)return false;}
     if(fRezago&&!rez)return false;
     if(ql){const hay=[a.asunto,a.tipoAccion,a.intencion,a.accionEnProceso,a.conclusion,ctLabel(a)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
@@ -588,17 +586,38 @@ function App(){
     if(!hb)return -1;
     return ha.localeCompare(hb);
   };
+  const fechaCmp=(fa,fb)=>{
+    if(!fa&&!fb)return 0;
+    if(!fa)return 1;
+    if(!fb)return -1;
+    const c=fa.localeCompare(fb);
+    return ordDir==="asc"?c:-c;
+  };
   const ordenadas=base.slice().sort((a,b)=>{
     const fa=proyFecha(a)||a.fecha||"",fb=proyFecha(b)||b.fecha||"";
     const pa=PRIOR_RANK[proyPrioridad(a)]??2,pb=PRIOR_RANK[proyPrioridad(b)]??2;
-    let r=0;
-    if(ordCampo==="fechaPrio"){r=fa.localeCompare(fb);if(r===0)r=pa-pb;if(r===0)return horaCmp(a,b);}
-    else if(ordCampo==="fecha"){r=fa.localeCompare(fb);if(r===0)return horaCmp(a,b);}
-    else{r=pa-pb;if(r===0)r=fa.localeCompare(fb);if(r===0)return horaCmp(a,b);}
-    return ordDir==="asc"?r:-r;
+    if(ordCampo==="fechaPrio"){
+      const fc=fechaCmp(fa,fb);
+      if(fc!==0)return fc;
+      const rp=pa-pb;
+      if(rp!==0)return ordDir==="asc"?rp:-rp;
+      return horaCmp(a,b);
+    }
+    if(ordCampo==="fecha"){
+      const fc=fechaCmp(fa,fb);
+      if(fc!==0)return fc;
+      return horaCmp(a,b);
+    }
+    const rp=pa-pb;
+    const rpd=ordDir==="asc"?rp:-rp;
+    if(rpd!==0)return rpd;
+    const fc=fechaCmp(fa,fb);
+    if(fc!==0)return fc;
+    return horaCmp(a,b);
   });
-  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0);
-  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta("");setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setQ("");setModoFecha("todas");};
+  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0)+(fSinFecha?1:0);
+  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta("");setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setFSinFecha(false);setQ("");setModoFecha("todas");};
+  const sinFechaCount=actividades.filter(a=>!(proyFecha(a)||a.fecha||"")).length;
   // Catálogo unificado de tipos de acción
   const todosTipos=fEnfoque==="Contactar"?catContactar:fEnfoque==="Tareas"?catTareas:fEnfoque==="Acciones"?catAcciones:[...new Set([...catContactar,...catTareas,...catAcciones])];
   // Listas para filtros de contacto/empresa
@@ -646,7 +665,10 @@ function App(){
   return <div style={{minHeight:"100vh",background:"#0c0c16"}}>
     <div style={S.hdr}>
       <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW · {actividades.length} actividades</div></div>
-      <button style={{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 10px",cursor:"pointer"}} onClick={()=>setModo("config")}>⚙</button>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        {sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setFDesde("");setFHasta("");setModoFecha("todas");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}
+        <button style={{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 10px",cursor:"pointer"}} onClick={()=>setModo("config")}>⚙</button>
+      </div>
     </div>
     {modo==="config"&&<ConfigView {...configProps}/>}
     {modo!=="config"&&<>

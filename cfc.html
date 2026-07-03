@@ -1561,8 +1561,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
     if(!esInterno){
       const cid=f.contactoId||fixedContacto;
       if(!cid){alert("Selecciona un contacto");return;}
-      if(!f.fecha){alert("Indica la fecha");return;}
-      if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
+            if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
       onSave({...f,contactoId:cid,asunto:null});
     } else {
       if(modo==="proyecto"){
@@ -1577,11 +1576,9 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         if(modo==="checklist"){
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
           const compEst=total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada";
-          if(!f.fecha){alert("Indica la fecha");return;}
-          onSave({...f,servicioSolucion:null,estatus:compEst});
+                    onSave({...f,servicioSolucion:null,estatus:compEst});
         } else {
-          if(!f.fecha){alert("Indica la fecha");return;}
-          if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
+                    if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
           onSave({...f,servicioSolucion:null});
         }
       }
@@ -1595,8 +1592,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   };
   const cerrarSinRespuesta=()=>{
     if(!cid){alert("Selecciona un contacto");return;}
-    if(!f.fecha){alert("Indica la fecha");return;}
-    if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
+        if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
     onSave({...f,contactoId:cid,estatus:"Cerrada",resultado:f.resultado||"Sin respuesta"});
     if(window.confirm("Cerrada sin respuesta. ¿Agendar la siguiente acción para este contacto?")){
       setF({contactoId:cid,oportunidadId:f.oportunidadId||null,estatus:"Programada",fecha:"",hora:null,prioridad:f.prioridad||"Media",tipoAccion:f.tipoAccion||"",servicioSolucion:f.servicioSolucion||null,intencion:"",resultado:"",enfoque:"Contactar"});
@@ -1971,6 +1967,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[fServicio,setFServicio]=useState("");
   const[fOportunidad,setFOportunidad]=useState("");
   const[modoFecha,setModoFecha]=useState("todas");
+  const[fSinFecha,setFSinFecha]=useState(false);
   const[q,setQ]=useState("");
   const[fEmpresa,setFEmpresa]=useState("");
   const[fPrioridad,setFPrioridad]=useState([]);
@@ -1995,8 +1992,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const base=actividades.filter(a=>{
     const efEst=proyEstatus(a); const efFech=proyFecha(a)||a.fecha||"";
     if(filtros.length&&!filtros.includes(efEst))return false;
-    if(desde&&efFech<desde)return false;
-    if(hasta&&efFech>hasta)return false;
+    if(fSinFecha){if(efFech)return false;}
+    else{if(desde&&efFech<desde)return false;if(hasta&&efFech>hasta)return false;}
     if(fContacto&&a.contactoId!==fContacto)return false;
     if(fEmpresa){const c=ctById(a.contactoId);if(!c||!cEmpresas(c).some(x=>x.empresaId===fEmpresa))return false;}
     if(fPrioridad.length&&fPrioridad.indexOf(a.prioridad)<0)return false;
@@ -2016,31 +2013,46 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(!hb)return -1;
     return ha.localeCompare(hb);
   };
+  const fechaCmp=(fa,fb)=>{
+    if(!fa&&!fb)return 0;
+    if(!fa)return 1;
+    if(!fb)return -1;
+    const c=fa.localeCompare(fb);
+    return ordDir==="asc"?c:-c;
+  };
   const ordenadas=base.slice().sort((a,b)=>{
     const fa=proyFecha(a)||a.fecha||"", fb=proyFecha(b)||b.fecha||"";
-    let r;
     if(ordCampo==="prioridad"){
       const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];
-      r=pa-pb;
-      if(r===0)r=fa.localeCompare(fb);
-      if(r===0)return horaCmp(a,b);
-      return ordDir==="asc"?r:-r;
+      let r=pa-pb;
+      r=ordDir==="asc"?r:-r;
+      if(r!==0)return r;
+      const fc=fechaCmp(fa,fb);
+      if(fc!==0)return fc;
+      return horaCmp(a,b);
     }
     if(ordCampo==="fecha"){
-      r=fa.localeCompare(fb);
-      if(r===0)return horaCmp(a,b);
-      return ordDir==="asc"?r:-r;
+      const fc=fechaCmp(fa,fb);
+      if(fc!==0)return fc;
+      return horaCmp(a,b);
     }
-    r=fa.localeCompare(fb);
-    if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}
-    if(r===0)return horaCmp(a,b);
-    return ordDir==="asc"?r:-r;
+    const fc=fechaCmp(fa,fb);
+    if(fc!==0)return fc;
+    const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];
+    let rp=pa-pb;
+    rp=ordDir==="asc"?rp:-rp;
+    if(rp!==0)return rp;
+    return horaCmp(a,b);
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fServicio?1:0)+(fOportunidad?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0)+(fEtiqAgenda?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFServicio("");setFOportunidad("");setDesde("");setHasta("");setModoFecha("todas");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFEtiqAgenda("");setFiltros([]);};
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fServicio?1:0)+(fOportunidad?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0)+(fEtiqAgenda?1:0)+(fSinFecha?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFServicio("");setFOportunidad("");setDesde("");setHasta("");setModoFecha("todas");setFSinFecha(false);setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFEtiqAgenda("");setFiltros([]);};
+  const sinFechaCount=actividades.filter(a=>!(proyFecha(a)||a.fecha||"")).length;
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
+    <div style={S.hdr}>
+      <div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div>
+      {sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setDesde("");setHasta("");setModoFecha("todas");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 11px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}
+    </div>
     <div style={S.line}/>
     {/* ── BARRA STICKY COMPACTA ── */}
     <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"8px 12px 8px"}}>
