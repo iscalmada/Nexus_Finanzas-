@@ -157,6 +157,29 @@ const POT_COLOR={Alto:"#22c55e",Medio:"#fbbf24",Bajo:"#f87171",Desconocido:"#475
 
 /* ─── helpers UI ─── */
 function Field({label,children}){return <div style={S.fg}><label style={S.fl}>{label}</label>{children}</div>;}
+function DictadoBtn({onResult}){
+  const[listening,setListening]=useState(false);
+  const recRef=useRef(null);
+  const toggle=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){alert("Tu navegador no soporta dictado por voz. Usa Chrome en Android.");return;}
+    if(listening){recRef.current&&recRef.current.stop();setListening(false);return;}
+    const rec=new SR();
+    rec.lang="es-MX";
+    rec.continuous=true;
+    rec.interimResults=false;
+    rec.onresult=(e)=>{
+      let texto="";
+      for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)texto+=e.results[i][0].transcript;}
+      if(texto.trim())onResult(texto.trim());
+    };
+    rec.onend=()=>setListening(false);
+    rec.onerror=()=>setListening(false);
+    try{rec.start();recRef.current=rec;setListening(true);}catch(err){setListening(false);}
+  };
+  return <button type="button" onClick={toggle} title={listening?"Detener dictado":"Dictar por voz"} style={{border:"none",background:listening?"#ef4444":"#334155",color:"#fff",borderRadius:20,width:26,height:26,fontSize:12,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{listening?"⏹":"🎤"}</button>;
+}
+const LblVoz=(texto,onDictado)=><span style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}><span>{texto}</span><DictadoBtn onResult={onDictado}/></span>;
 function CatSelect({cat,value,onChange,placeholder}){
   return <select style={S.sel} value={value||""} onChange={e=>onChange(e.target.value||null)}>
     <option value="">{placeholder||"— Selecciona —"}</option>
@@ -1681,9 +1704,9 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         </Field>}
       </>)}
 
-    <Field label={esInterno?"Descripción / objetivo":"Intención (al programar)"}><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder={esInterno?"Qué se va a hacer o revisar…":"Qué se busca lograr…"}/></Field>
-    {(f.estatus==="En Proceso"||f.estatus==="Cerrada"||f.accionProceso)&&<Field label="Acción ejecutada (en proceso)"><textarea style={S.ta} value={f.accionProceso||""} onChange={e=>set("accionProceso",e.target.value||null)} placeholder="Qué se hizo…"/></Field>}
-    {(f.estatus==="Cerrada"||f.resultado)&&<Field label="Resultado (al concluir)"><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
+    <Field label={LblVoz(esInterno?"Descripción / objetivo":"Intención (al programar)",t=>set("intencion",((f.intencion||f.intencionResultado||"")+" "+t).trim()))}><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder={esInterno?"Qué se va a hacer o revisar…":"Qué se busca lograr…"}/></Field>
+    {(f.estatus==="En Proceso"||f.estatus==="Cerrada"||f.accionProceso)&&<Field label={LblVoz("Acción ejecutada (en proceso)",t=>set("accionProceso",((f.accionProceso||"")+" "+t).trim()))}><textarea style={S.ta} value={f.accionProceso||""} onChange={e=>set("accionProceso",e.target.value||null)} placeholder="Qué se hizo…"/></Field>}
+    {(f.estatus==="Cerrada"||f.resultado)&&<Field label={LblVoz("Resultado (al concluir)",t=>set("resultado",((f.resultado||"")+" "+t).trim()))}><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
 
     {!esInterno&&cont&&<button style={{...S.cancB,color:"#a78bfa",borderColor:"#a78bfa55"}} onClick={()=>setShowAvance(v=>!v)}>{showAvance?"▾ Ocultar avance del contacto":"▸ Avance del contacto"}</button>}
     {!esInterno&&showAvance&&cont&&<div style={{...S.card("#a78bfa44"),marginBottom:12}}>
@@ -1986,12 +2009,31 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,a.asunto,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
   });
+  const horaCmp=(a,b)=>{
+    const ha=a.hora||"", hb=b.hora||"";
+    if(!ha&&!hb)return 0;
+    if(!ha)return 1;
+    if(!hb)return -1;
+    return ha.localeCompare(hb);
+  };
   const ordenadas=base.slice().sort((a,b)=>{
     const fa=proyFecha(a)||a.fecha||"", fb=proyFecha(b)||b.fecha||"";
     let r;
-    if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=(fa+(a.hora||"")).localeCompare(fb+(b.hora||""));}
-    else if(ordCampo==="fecha"){r=fa.localeCompare(fb);if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
-    else {r=fa.localeCompare(fb);if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
+    if(ordCampo==="prioridad"){
+      const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];
+      r=pa-pb;
+      if(r===0)r=fa.localeCompare(fb);
+      if(r===0)return horaCmp(a,b);
+      return ordDir==="asc"?r:-r;
+    }
+    if(ordCampo==="fecha"){
+      r=fa.localeCompare(fb);
+      if(r===0)return horaCmp(a,b);
+      return ordDir==="asc"?r:-r;
+    }
+    r=fa.localeCompare(fb);
+    if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}
+    if(r===0)return horaCmp(a,b);
     return ordDir==="asc"?r:-r;
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
