@@ -554,22 +554,46 @@ function App(){
   const recargarCFC=()=>{setCfcContactos(loadCFC("contactos",[]));setCfcEmpresas(loadCFC("empresas",[]));};
   const[pullY,setPullY]=useState(0);
   const[refreshing,setRefreshing]=useState(false);
-  const touchStartY=useRef(null);
-  const onTouchStart=(e)=>{touchStartY.current=window.scrollY===0?e.touches[0].clientY:null;};
-  const onTouchMove=(e)=>{
-    if(touchStartY.current==null)return;
-    const dy=e.touches[0].clientY-touchStartY.current;
-    if(dy>0&&window.scrollY===0)setPullY(Math.min(dy,80));
-  };
-  const onTouchEnd=()=>{
-    if(pullY>60){
-      setRefreshing(true);
-      recargarCFC();
-      setTimeout(()=>setRefreshing(false),500);
-    }
-    setPullY(0);
-    touchStartY.current=null;
-  };
+  const rootRef=useRef(null);
+  useEffect(()=>{
+    const el=rootRef.current;
+    if(!el)return;
+    let startY=null;
+    let pulling=false;
+    const onStart=(e)=>{ startY=window.scrollY<=0?e.touches[0].clientY:null; pulling=false; };
+    const onMove=(e)=>{
+      if(startY==null)return;
+      const dy=e.touches[0].clientY-startY;
+      if(dy>0&&window.scrollY<=0){
+        pulling=true;
+        if(e.cancelable)e.preventDefault(); // bloquea el pull-to-refresh nativo del navegador
+        setPullY(Math.min(dy*0.5,90));
+      }
+    };
+    const onEnd=()=>{
+      if(pulling){
+        setPullY(py=>{
+          if(py>55){
+            setRefreshing(true);
+            recargarCFC();
+            setTimeout(()=>setRefreshing(false),700);
+          }
+          return 0;
+        });
+      }
+      startY=null;pulling=false;
+    };
+    el.addEventListener("touchstart",onStart,{passive:true});
+    el.addEventListener("touchmove",onMove,{passive:false});
+    el.addEventListener("touchend",onEnd,{passive:true});
+    el.addEventListener("touchcancel",onEnd,{passive:true});
+    return()=>{
+      el.removeEventListener("touchstart",onStart);
+      el.removeEventListener("touchmove",onMove);
+      el.removeEventListener("touchend",onEnd);
+      el.removeEventListener("touchcancel",onEnd);
+    };
+  },[]);
   useEffect(()=>{
     const onStorage=(e)=>{
       if(!e.key)return; // limpieza total del storage
@@ -740,8 +764,12 @@ function App(){
   };
   // Config catálogos
   const configProps={catContactar,setCatContactar,catTareas,setCatTareas,catAcciones,setCatAcciones,catEtiquetas,setCatEtiquetas,onBack:()=>setModo("lista")};
-  return <div style={{minHeight:"100vh",background:"#0c0c16"}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
-    {(pullY>0||refreshing)&&<div style={{textAlign:"center",padding:"6px 0",fontSize:11,fontWeight:700,color:"#C9A84C",overflow:"hidden",height:Math.min(pullY,40),transition:refreshing?"none":"height .15s"}}>{refreshing?"↻ Actualizando…":pullY>60?"↓ Suelta para actualizar":"↓ Desliza para actualizar"}</div>}
+  return <div ref={rootRef} style={{minHeight:"100vh",background:"#0c0c16"}}>
+    {(pullY>0||refreshing)&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:6,overflow:"hidden",height:refreshing?36:Math.min(pullY,50),transition:refreshing?"none":"height .1s linear"}}>
+      <span style={{display:"inline-block",fontSize:16,color:"#C9A84C",animation:refreshing?"napSpin .7s linear infinite":"none",transform:refreshing?"none":`rotate(${Math.min(pullY*2.4,180)}deg)`}}>↻</span>
+      <span style={{fontSize:11,fontWeight:700,color:"#C9A84C"}}>{refreshing?"Actualizando…":pullY>55?"Suelta para actualizar":"Desliza para actualizar"}</span>
+    </div>}
+    <style>{`@keyframes napSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     <div style={S.hdr}>
       <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW · {actividades.length} actividades</div></div>
       <div style={{display:"flex",gap:6,alignItems:"center"}}>

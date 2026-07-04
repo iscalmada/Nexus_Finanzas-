@@ -2391,6 +2391,7 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
     </div>
     <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
       <span style={S.tag(col)}>{(o.etapa||"").replace("Oportunidad ","")}</span>
+      {o.fechaEstimadaCierre&&<span style={S.tag("#60a5fa")}>📅 {o.fechaEstimadaCierre.split("-").reverse().join("/")}</span>}
       {o.recurrencia&&<span style={S.tag("#a78bfa")}>{o.recurrencia}</span>}
       {o.probabilidad&&<span style={S.tag(PROB_COLOR[o.probabilidad])}>{o.probabilidad}</span>}
       {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
@@ -2463,7 +2464,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     const cmpEtapa=(x,y)=>(ETAPA_RANK[x.etapa]??9)-(ETAPA_RANK[y.etapa]??9);
     const cmpFecha=(x,y)=>(x.fechaEstimadaCierre||"9999").localeCompare(y.fechaEstimadaCierre||"9999");
     const cmpProb=(x,y)=>(PROB_RANK[x.probabilidad]??9)-(PROB_RANK[y.probabilidad]??9);
-    const cmpMonto=(x,y)=>(Number(y.montoEstimado)||0)-(Number(x.montoEstimado)||0);
+    const cmpMonto=(x,y)=>(Number(x.montoEstimado)||0)-(Number(y.montoEstimado)||0);
     const cmps={etapa:cmpEtapa,fecha:cmpFecha,probabilidad:cmpProb,monto:cmpMonto};
     const orden=["etapa","fecha","probabilidad","monto"];
     const secuencia=[ordCampo,...orden.filter(k=>k!==ordCampo)];
