@@ -1435,6 +1435,7 @@ function App(){
   const[carteraTab,setCarteraTab]=useState("acreedores"); // acreedores|deudores|ingresosExt
   const[carteraOrigen,setCarteraOrigen]=useState("Todos");
   const[carteraNivel,setCarteraNivel]=useState("Todos");
+  const[carteraAvance,setCarteraAvance]=useState([]);
   const[showCarteraForm,setShowCarteraForm]=useState(false);
   const[editCarteraId,setEditCarteraId]=useState(null);
   const[formCartera,setFormCartera]=useState({});
@@ -1448,6 +1449,8 @@ function App(){
   const[opoOrden,setOpoOrden]=useState("fechaCierre"); // "fechaCierre"|"pctAvance"
   const[opoFiltroEtapa,setOpoFiltroEtapa]=useState(null);
   const[opoQ,setOpoQ]=useState("");
+  const[opoOrdCampo,setOpoOrdCampo]=useState("etapa");
+  const[opoOrdDir,setOpoOrdDir]=useState("asc");
   // ── Catálogos del Sistema ──
   const[catOrigenAcr,setCatOrigenAcrRaw]=useState(()=>loadLS('ncfp_catOrigenAcr',["Sicresa","Familia","Terceros"]));
   const[catOrigenDeu,setCatOrigenDeuRaw]=useState(()=>loadLS('ncfp_catOrigenDeu',["Sicresa","Terceros"]));
@@ -2128,6 +2131,15 @@ function App(){
     }
     return Math.max(0,(registro.montoActual||0)-abonadoCapital);
   },[]);
+
+  // Avance de pago derivado: Sin movimiento | En proceso | Concretado
+  const avancePago = useCallback((registro,movs)=>{
+    const vinc=(registro.movIdsVinculados||[]);
+    const ejecutados=movs.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
+    if(ejecutados.length===0) return "Sin movimiento";
+    const sp=saldoPendiente(registro,movs);
+    return sp<=0.01?"Concretado":"En proceso";
+  },[saldoPendiente]);
 
   // Saldo pendiente desglosado capital/interés acumulado
   // tipoAbono posibles: "capital" | "interes_acumulado" | "interes_convencional"
@@ -3340,7 +3352,7 @@ function App(){
           const solName=(id)=>(sols.find(s=>s.id===id)||{}).nombre||"";
           const contName=(id)=>(conts.find(c=>c.id===id)||{}).nombreCompleto||"";
           const empName=(id)=>(emps.find(e=>e.id===id)||{}).nombre||"";
-          const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
+          const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad En Espera";
           const etColor=(et)=>et==="Oportunidad Concretada"?"#C9A84C":et==="Oportunidad Rechazada"?"#475569":"#22c55e";
           const abiertas=opos.filter(ABIERTA);
           const concret=opos.filter(o=>o.etapa==="Oportunidad Concretada");
@@ -3352,7 +3364,24 @@ function App(){
             if(opoFiltroEtapa&&o.etapa!==opoFiltroEtapa)return false;
             if(ql){const hay=[o.concepto,solName(o.solucionId),contName(o.contactoPrincipalId||o.contactoId),empName(o.empresaId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
             return true;
-          }).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+          }).slice().sort((a,b)=>{
+            const ETAPA_RANK={"Oportunidad Identificada":0,"Oportunidad en Preparación":1,"Propuesta Presentada":2,"Oportunidad Aceptada":3,"Oportunidad Concretada":4,"Oportunidad En Espera":5,"Oportunidad Rechazada":6};
+            const PROB_RANK={Alta:0,Media:1,Baja:2};
+            const cmpEtapa=(x,y)=>(ETAPA_RANK[x.etapa]??9)-(ETAPA_RANK[y.etapa]??9);
+            const cmpFecha=(x,y)=>(x.fechaEstimadaCierre||"9999").localeCompare(y.fechaEstimadaCierre||"9999");
+            const cmpProb=(x,y)=>(PROB_RANK[x.probabilidad]??9)-(PROB_RANK[y.probabilidad]??9);
+            const cmpMonto=(x,y)=>(Number(y.montoEstimado)||0)-(Number(x.montoEstimado)||0);
+            const cmps={etapa:cmpEtapa,fecha:cmpFecha,probabilidad:cmpProb,monto:cmpMonto};
+            const orden=["etapa","fecha","probabilidad","monto"];
+            const secuencia=[opoOrdCampo,...orden.filter(k=>k!==opoOrdCampo)];
+            for(let i=0;i<secuencia.length;i++){
+              const k=secuencia[i];
+              let r=cmps[k](a,b);
+              if(k===opoOrdCampo)r=opoOrdDir==="asc"?r:-r;
+              if(r!==0)return r;
+            }
+            return 0;
+          });
           const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
           const cardS={background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8};
           return (
@@ -3371,6 +3400,14 @@ function App(){
                   <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
                   {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
                 </div>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8,alignItems:"center"}}>
+                  <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Orden</span>
+                  <button style={S.chip(opoOrdCampo==="etapa","#C9A84C")} onClick={()=>setOpoOrdCampo("etapa")}>Etapa</button>
+                  <button style={S.chip(opoOrdCampo==="fecha","#C9A84C")} onClick={()=>setOpoOrdCampo("fecha")}>Fecha cierre</button>
+                  <button style={S.chip(opoOrdCampo==="probabilidad","#C9A84C")} onClick={()=>setOpoOrdCampo("probabilidad")}>Probabilidad</button>
+                  <button style={S.chip(opoOrdCampo==="monto","#C9A84C")} onClick={()=>setOpoOrdCampo("monto")}>Monto</button>
+                  <button style={S.chip(false,"#60a5fa")} onClick={()=>setOpoOrdDir(d=>d==="asc"?"desc":"asc")}>{opoOrdDir==="asc"?"↑ Asc":"↓ Desc"}</button>
+                </div>
               </div>
               {lista.map(o=>{ const monto=o.comisionEstimada||o.montoEstimado; return (
                 <div key={o.id} style={{...cardS,cursor:"pointer",borderColor:etColor(o.etapa)+"55"}} onClick={()=>setVerRef(o)}>
@@ -3385,6 +3422,8 @@ function App(){
                     {o.solucionId&&<span style={tag("#C9A84C")}>◈ {solName(o.solucionId)}</span>}
                     {(o.contactoPrincipalId||o.contactoId)&&<span style={tag("#94a3b8")}>{contName(o.contactoPrincipalId||o.contactoId)}</span>}
                     {o.empresaId&&<span style={tag("#3b82f6")}>{empName(o.empresaId)}</span>}
+                    {o.aliadoEstrategicoId&&<span style={tag("#2dd4bf")}>🤝 Estrat: {contName(o.aliadoEstrategicoId)}</span>}
+                    {o.aliadoComercialId&&<span style={tag("#2dd4bf")}>🤝 Comercial: {contName(o.aliadoComercialId)}</span>}
                   </div>
                 </div>
               );})}
@@ -3408,6 +3447,8 @@ function App(){
                         {row("Monto estimado",o.montoEstimado?fmt(o.montoEstimado):null)}
                         {row("Comisión estimada",o.comisionEstimada?fmt(o.comisionEstimada):null)}
                         {row("Cierre estimado",o.fechaEstimadaCierre?fmtDate(o.fechaEstimadaCierre):null)}
+                        {row("Aliado Estratégico",o.aliadoEstrategicoId?contName(o.aliadoEstrategicoId):null)}
+                        {row("Aliado Comercial",o.aliadoComercialId?contName(o.aliadoComercialId):null)}
                         {row("Concretada",o.fechaConcretada?fmtDate(o.fechaConcretada):null)}
                       </div>
                       {(()=>{
@@ -3508,7 +3549,7 @@ function App(){
                 {[["acreedores","🔴 Acreedores"],["deudores","🟢 Deudores"],["ingresosExt","⭐ Ing. Ext."]].map(([k,l])=>(
                   <button key={k} style={{flex:1,padding:"10px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
                     color:carteraTab===k?"#C9A84C":"#334155",borderBottom:carteraTab===k?"2px solid #C9A84C":"2px solid transparent"}}
-                    onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");}}>{l}</button>
+                    onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");setCarteraAvance([]);}}>{l}</button>
                 ))}
               </div>
               {/* Origen por tab */}
@@ -3520,16 +3561,25 @@ function App(){
                 })}
               </div>
               {/* Prioridad de pago — solo Acreedores */}
-              {carteraTab==="acreedores"&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+              {carteraTab==="acreedores"&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
                 <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Pago</span>
                 {["Todos",...catPrioPago].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]||"#64748b"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
+              </div>}
+              {/* Avance de pago — Acreedores y Deudores */}
+              {(carteraTab==="acreedores"||carteraTab==="deudores")&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Avance</span>
+                {["Sin movimiento","En proceso","Concretado"].map(av=>{
+                  const on=carteraAvance.includes(av);
+                  return <button key={av} style={{...S.prioB2(on,av==="Concretado"?"#22c55e":av==="En proceso"?"#fbbf24":"#64748b"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraAvance(p=>on?p.filter(x=>x!==av):[...p,av])}>{av}</button>;
+                })}
+                {carteraAvance.length>0&&<button style={{...S.prioB2(false,"#f87171"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraAvance([])}>✕</button>}
               </div>}
             </div>
 
             {/* ── ACREEDORES ── */}
             {carteraTab==="acreedores"&&(()=>{
               const origenes=["Todos",...ORIG_ACREEDOR];
-              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
+              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>carteraAvance.length===0||carteraAvance.includes(avancePago(x,movs)));
               const total=acrFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector origen y prioridad ya en sticky arriba */}
@@ -3598,7 +3648,7 @@ function App(){
             {/* ── DEUDORES ── */}
             {carteraTab==="deudores"&&(()=>{
               const origenes=["Todos",...ORIG_DEUDOR];
-              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
+              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>carteraAvance.length===0||carteraAvance.includes(avancePago(x,movs)));
               const total=deuFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector origen ya en sticky */}

@@ -385,6 +385,8 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
 }
 /* ── Tarjeta de actividad ── */
 function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}){
+  const[selSub,setSelSub]=useState(new Set());
+  const[batchSub,setBatchSub]=useState(null);
   const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
   const efFech=proyFecha(a)||a.fecha||"";const modo=a.modoTarea||"unica";
   const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
@@ -451,10 +453,16 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
     </div>}
     {/* Panel expandido proyecto */}
     {expanded&&modo==="proyecto"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
+      <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
+        <span style={{fontSize:10,color:"#64748b"}}>Subtareas:</span>
+        <button style={{...S.pill(false,"#64748b"),padding:"2px 8px",fontSize:10}} onClick={()=>setSelSub(new Set((a.subtareas||[]).map(s=>s.id)))}>Todas</button>
+        <button style={{...S.pill(false,"#64748b"),padding:"2px 8px",fontSize:10}} onClick={()=>setSelSub(new Set())}>Ninguna</button>
+        {selSub.size>0&&<button style={{...S.pill(true,"#a78bfa"),padding:"2px 10px",fontSize:10,fontWeight:700}} onClick={()=>setBatchSub({fecha:"",estatus:"",prioridad:""})}>✏ Editar {selSub.size}</button>}
+      </div>
       {[...(a.subtareas||[])].sort((x,y)=>{const xc=x.estatus==="Cerrada",yc=y.estatus==="Cerrada";if(xc!==yc)return xc?1:-1;return(x.fecha||"9999").localeCompare(y.fecha||"9999");}).map((st,idx)=>{
-        const origIdx=(a.subtareas||[]).findIndex(s=>s.id===st.id);
-        return <div key={st.id} style={{display:"flex",gap:8,padding:"6px 8px",marginBottom:4,background:"#0f172a",borderRadius:7,border:`1px solid ${EST_COLOR[st.estatus||"Programada"]||"#64748b"}33`,cursor:"pointer"}}
-          onClick={()=>{if(!onPatch)return;const ns=(a.subtareas||[]).map((x,j)=>j===origIdx?{...x,estatus:MODO_NEXT[x.estatus||"Programada"]}:x);const sts=ns.map(s=>s.estatus||"Programada");const ce=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=ns.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const cf=ds[0]||ns.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatch(a.id,{subtareas:ns,estatus:ce,fecha:cf});}}>
+        const isSel=selSub.has(st.id);
+        return <div key={st.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 8px",marginBottom:4,background:isSel?"#1e1b4b":"#0f172a",borderRadius:7,border:`1px solid ${isSel?"#a78bfa":(EST_COLOR[st.estatus||"Programada"]||"#64748b")}33`}}>
+          <input type="checkbox" checked={isSel} onChange={()=>setSelSub(p=>{const n=new Set(p);n.has(st.id)?n.delete(st.id):n.add(st.id);return n;})} style={{width:15,height:15,flexShrink:0,accentColor:"#a78bfa",marginTop:2,cursor:"pointer"}}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:2}}>
               <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]),fontSize:8}}>{st.estatus||"Programada"}</span>
@@ -466,6 +474,35 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
           </div>
         </div>;
       })}
+      {batchSub&&<div style={{background:"#0f172a",border:"1px solid #a78bfa44",borderRadius:9,padding:"10px 12px",marginTop:8}}>
+        <div style={{fontSize:11,fontWeight:700,color:"#a78bfa",marginBottom:8}}>Editar {selSub.size} subtarea{selSub.size===1?"":"s"}</div>
+        <div style={S.g2}>
+          <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Fecha</div><input type="date" style={{...S.inp,fontSize:11}} value={batchSub.fecha} onChange={e=>setBatchSub(p=>({...p,fecha:e.target.value}))}/></div>
+          <div><div style={{fontSize:10,color:"#64748b",marginBottom:4}}>Estatus</div><select style={{...S.sel,fontSize:11}} value={batchSub.estatus} onChange={e=>setBatchSub(p=>({...p,estatus:e.target.value}))}>
+            <option value="">— Sin cambio —</option>
+            {["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}
+          </select></div>
+        </div>
+        <div style={{display:"flex",gap:5,marginTop:8,flexWrap:"wrap"}}>
+          {[["Muy Alta","#ef4444"],["Alta","#fb923c"],["Media","#fbbf24"],["Baja","#60a5fa"]].map(([v,c])=>(
+            <button key={v} style={{...S.pill(batchSub.prioridad===v,c),padding:"4px 8px",fontSize:10}} onClick={()=>setBatchSub(p=>({...p,prioridad:v}))}>{v}</button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:6,marginTop:10}}>
+          <button style={{...S.pill(false,"#64748b"),flex:1,padding:"8px 0",fontSize:11}} onClick={()=>setBatchSub(null)}>Cancelar</button>
+          <button style={{...S.pill(true,"#a78bfa"),flex:1,padding:"8px 0",fontSize:11,fontWeight:700}} onClick={()=>{
+            if(!onPatch)return;
+            const nst=(a.subtareas||[]).map(s=>selSub.has(s.id)?{...s,...(batchSub.fecha&&{fecha:batchSub.fecha}),...(batchSub.estatus&&{estatus:batchSub.estatus}),...(batchSub.prioridad&&{prioridad:batchSub.prioridad})}:s);
+            const sts=nst.map(s=>s.estatus||"Programada");
+            const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
+            const pend=nst.filter(s=>s.estatus!=="Cerrada");
+            const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
+            const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";
+            onPatch(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});
+            setBatchSub(null);setSelSub(new Set());
+          }}>Aplicar</button>
+        </div>
+      </div>}
     </div>}
   </div>;
 }
@@ -513,7 +550,34 @@ function App(){
   const setCatAcciones=(v)=>{setCatAccionesRaw(v);saveLS("catAcciones",v);};
   const setCatEtiquetas=(v)=>{setCatEtiquetasRaw(v);saveLS("catEtiquetas",v);};
   const[cfcContactos,setCfcContactos]=useState(()=>loadCFC("contactos",[]));
-  const cfcEmpresas=useMemo(()=>loadCFC("empresas",[]),[]);
+  const[cfcEmpresas,setCfcEmpresas]=useState(()=>loadCFC("empresas",[]));
+  const recargarCFC=()=>{setCfcContactos(loadCFC("contactos",[]));setCfcEmpresas(loadCFC("empresas",[]));};
+  const[pullY,setPullY]=useState(0);
+  const[refreshing,setRefreshing]=useState(false);
+  const touchStartY=useRef(null);
+  const onTouchStart=(e)=>{touchStartY.current=window.scrollY===0?e.touches[0].clientY:null;};
+  const onTouchMove=(e)=>{
+    if(touchStartY.current==null)return;
+    const dy=e.touches[0].clientY-touchStartY.current;
+    if(dy>0&&window.scrollY===0)setPullY(Math.min(dy,80));
+  };
+  const onTouchEnd=()=>{
+    if(pullY>60){
+      setRefreshing(true);
+      recargarCFC();
+      setTimeout(()=>setRefreshing(false),500);
+    }
+    setPullY(0);
+    touchStartY.current=null;
+  };
+  useEffect(()=>{
+    const onStorage=(e)=>{
+      if(!e.key)return; // limpieza total del storage
+      if(e.key===CFC_PFX+"contactos"||e.key===CFC_PFX+"empresas")recargarCFC();
+    };
+    window.addEventListener("storage",onStorage);
+    return()=>window.removeEventListener("storage",onStorage);
+  },[]);
   const addCfcContacto=(nombre)=>{
     const n=(nombre||"").trim();
     if(!n)return null;
@@ -639,6 +703,8 @@ function App(){
   const scrollHoy=()=>{const el=document.getElementById("ap-hoy");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});else window.scrollTo({top:0,behavior:"smooth"});};
   // Índice de "Hoy" en la lista
   const hoyIdx=ordDir==="asc"?ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")>=hoy):ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")<=hoy);
+  const enfRptActual=modo==="rptContactar"?"Contactar":modo==="rptTareas"?"Tareas":modo==="rptAcciones"?"Acciones":null;
+  const visibles=enfRptActual?ordenadas.filter(a=>a.enfoque===enfRptActual):ordenadas;
   // Reporte simplificado
   const Reporte=({enfoque})=>{
     const acts=ordenadas.filter(a=>a.enfoque===enfoque);
@@ -652,10 +718,12 @@ function App(){
         <div style={{width:62,flexShrink:0,textAlign:"right"}}>Estatus</div>
       </div>
       {acts.map(a=>{const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const efFech=proyFecha(a)||a.fecha||"";
+        const isSel=selMode&&sel.indexOf(a.id)>-1;
         const ctoObj=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
         const empObj=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
         const principal=esCom?(ctoObj?.nombreCompleto||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
-        return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>setModal(a)}>
+        return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>selMode?toggleSel(a.id):setModal(a)}>
+          {selMode&&<span style={{width:14,height:14,flexShrink:0,marginTop:1,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
           <div style={{width:62,flexShrink:0,display:"flex",flexDirection:"column"}}>
             <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{fmtF(efFech)||"—"}</span>
             {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
@@ -672,7 +740,8 @@ function App(){
   };
   // Config catálogos
   const configProps={catContactar,setCatContactar,catTareas,setCatTareas,catAcciones,setCatAcciones,catEtiquetas,setCatEtiquetas,onBack:()=>setModo("lista")};
-  return <div style={{minHeight:"100vh",background:"#0c0c16"}}>
+  return <div style={{minHeight:"100vh",background:"#0c0c16"}} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+    {(pullY>0||refreshing)&&<div style={{textAlign:"center",padding:"6px 0",fontSize:11,fontWeight:700,color:"#C9A84C",overflow:"hidden",height:Math.min(pullY,40),transition:refreshing?"none":"height .15s"}}>{refreshing?"↻ Actualizando…":pullY>60?"↓ Suelta para actualizar":"↓ Desliza para actualizar"}</div>}
     <div style={S.hdr}>
       <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW · {actividades.length} actividades</div></div>
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -720,7 +789,7 @@ function App(){
               ? <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,flex:1,fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
               : <div style={{display:"flex",gap:4,flex:1,flexWrap:"wrap",alignItems:"center"}}>
                   <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
-                  <button style={{...S.pill(false,"#60a5fa"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
+                  <button style={{...S.pill(false,"#60a5fa"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel(visibles.map(a=>a.id))}>Todas</button>
                   <button style={{...S.pill(false,"#64748b"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel([])}>Ninguna</button>
                   <button style={{...S.pill(false,GOLD),padding:"3px 7px",fontWeight:700,fontSize:10,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",enfoque:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
                   {sel.length>0&&<button style={{...S.pill(true,"#f87171"),padding:"3px 7px",fontSize:10}} onClick={()=>{if(window.confirm(`¿Eliminar ${sel.length}?`)){sel.forEach(id=>delAct(id));setSel([]);setSelMode(false);}}}>🗑</button>}

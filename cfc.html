@@ -535,7 +535,12 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   const list=useMemo(()=>contactos.filter(c=>{
     const esAliado=!!(c.tiposAliado&&c.tiposAliado.length);
     if(aliadosOnly&&!esAliado)return false;
-    if(q&&!(c.nombreCompleto||"").toLowerCase().includes(q.toLowerCase()))return false;
+    if(q){
+      const ql=q.toLowerCase();
+      const nombreMatch=(c.nombreCompleto||"").toLowerCase().includes(ql);
+      const empMatch=cEmpresas(c).some(ev=>{const emp=empresas.find(e=>e.id===ev.empresaId);return emp&&(emp.nombre||"").toLowerCase().includes(ql);});
+      if(!nombreMatch&&!empMatch)return false;
+    }
     if(fEtapa.length&&!fEtapa.includes(c.etapaPrincipal))return false;
     if(fEsp.length&&!fEsp.includes(c.etapaEspecifica))return false;
     if(fGiro.length&&!(c.giros||[]).some(g=>fGiro.includes(g)))return false;
@@ -1911,12 +1916,11 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
           const isSel=(selSub[a.id]||new Set()).has(st.id);
           return <div key={st.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 8px",marginBottom:4,background:isSel?"#1e1b4b":"#0f172a",borderRadius:7,border:`1px solid ${isSel?"#a78bfa":(EST_COLOR[st.estatus||"Programada"]||"#64748b")}33`}}>
             <input type="checkbox" checked={isSel} onChange={()=>toggleSubSel(a.id,st.id)} style={{width:15,height:15,flexShrink:0,accentColor:"#a78bfa",marginTop:2,cursor:"pointer"}}/>
-            <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{if(!onPatchAct)return;const nst=(a.subtareas||[]).map((x,j)=>j===origIdx?{...x,estatus:MODO_NEXT_EST[x.estatus||"Programada"]}:x);const sts=nst.map(s=>s.estatus||"Programada");const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=nst.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatchAct(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});}}>
+            <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:2}}>
                 <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]||"#64748b"),fontSize:8}}>{st.estatus||"Programada"}</span>
                 {st.prioridad&&st.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[st.prioridad]||"#64748b"),fontSize:7}}>{st.prioridad}</span>}
                 {st.fecha&&<span style={{fontSize:9,color:"#64748b"}}>{st.fecha.split("-").reverse().join("/")}</span>}
-                <span style={{fontSize:9,color:"#475569"}}>tap→cicla</span>
               </div>
               <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",lineHeight:1.3}}>{st.titulo||"Subtarea sin nombre"}</div>
               {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,lineHeight:1.4}}>{st.descripcion}</div>}
@@ -2050,6 +2054,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     return horaCmp(a,b);
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
+  const enfRptActual=modo==="rptCom"?"Contactar":modo==="rptTar"?"Tareas":modo==="rptAcc"?"Acciones":null;
+  const visibles=enfRptActual?ordenadas.filter(a=>(a.enfoque||"Contactar")===enfRptActual):ordenadas;
   const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fServicio?1:0)+(fOportunidad?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0)+(fEtiqAgenda?1:0)+(fSinFecha?1:0);
   const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFServicio("");setFOportunidad("");setDesde("");setHasta("");setModoFecha("todas");setFSinFecha(false);setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFEtiqAgenda("");setFiltros([]);};
   const sinFechaCount=actividades.filter(a=>!(proyFecha(a)||a.fecha||"")).length;
@@ -2096,7 +2102,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
             ? <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,flex:1,fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
             : <div style={{display:"flex",gap:4,flex:1,flexWrap:"wrap",alignItems:"center"}}>
                 <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
-                <button style={{...S.pill(false,"#60a5fa"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
+                <button style={{...S.pill(false,"#60a5fa"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel(visibles.map(a=>a.id))}>Todas</button>
                 <button style={{...S.pill(false,"#64748b"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel([])}>Ninguna</button>
                 <button style={{...S.pill(false,GOLD),padding:"3px 7px",fontWeight:700,fontSize:10,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",enfoque:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
                 <button style={{...S.pill(false,"#f87171"),padding:"3px 7px",fontSize:10}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
@@ -2246,7 +2252,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
 }
 
 /* ════════ OPORTUNIDADES ════════ */
-const OPO_COLOR={"Oportunidad Identificada":"#60a5fa","Oportunidad en Preparación":"#a78bfa","Propuesta Presentada":"#fbbf24","Oportunidad Aceptada":"#2dd4bf","Oportunidad Concretada":"#22c55e","Oportunidad Rechazada":"#64748b"};
+const OPO_COLOR={"Oportunidad Identificada":"#60a5fa","Oportunidad en Preparación":"#a78bfa","Propuesta Presentada":"#fbbf24","Oportunidad Aceptada":"#2dd4bf","Oportunidad Concretada":"#22c55e","Oportunidad En Espera":"#f97316","Oportunidad Rechazada":"#64748b"};
 const oc=(n)=>OPO_COLOR[n]||"#94a3b8";
 const RECUR=["Única","Mensual","Anual"];
 const PROB=["Alta","Media","Baja"];
@@ -2257,7 +2263,7 @@ const ENF_CFC_COLOR={Contactar:"#60a5fa",Tareas:"#a78bfa",Acciones:"#2dd4bf"};
 const ENF_CFC_ICON={Contactar:"📞",Tareas:"📋",Acciones:"⚡"};
 const PRIOR_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
 const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
-const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
+const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad En Espera";
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
 
 function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
@@ -2395,7 +2401,8 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
       })()}
       {e&&<span style={S.tag("#3b82f6")}>{e.nombre}</span>}
       {(()=>{const nm=(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===o.solucionId)||{}).nombre||o.solucionNexus;return nm?<span style={S.tag(GOLD)}>{nm.length>22?nm.slice(0,22)+"…":nm}</span>:null;})()}
-      {o.aliadoEstrategicoId&&(()=>{const ae=contactos.find(x=>x.id===o.aliadoEstrategicoId);return ae?<span style={S.tag("#2dd4bf")}>🤝 {ae.nombreCompleto}</span>:null;})()}
+      {o.aliadoEstrategicoId&&(()=>{const ae=contactos.find(x=>x.id===o.aliadoEstrategicoId);return ae?<span style={S.tag("#2dd4bf")}>🤝 Estrat: {ae.nombreCompleto}</span>:null;})()}
+      {o.aliadoComercialId&&(()=>{const ac=contactos.find(x=>x.id===o.aliadoComercialId);return ac?<span style={S.tag("#2dd4bf")}>🤝 Comercial: {ac.nombreCompleto}</span>:null;})()}
     </div>
   </div>;
 }
@@ -2413,6 +2420,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const[cHasta,setCHasta]=useState("");
   const[q,setQ]=useState("");
   const[fSinAct,setFSinAct]=useState(false);
+  const[ordCampo,setOrdCampo]=useState("etapa");
+  const[ordDir,setOrdDir]=useState("asc");
   const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
   const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"";
   const en=(id)=>(empresas.find(e=>e.id===id)||{}).nombre||"";
@@ -2448,7 +2457,24 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     if(cHasta&&(o.fechaEstimadaCierre||"")>cHasta)return false;
     if(ql){const hay=[o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
-  }).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  }).sort((a,b)=>{
+    const ETAPA_RANK={"Oportunidad Identificada":0,"Oportunidad en Preparación":1,"Propuesta Presentada":2,"Oportunidad Aceptada":3,"Oportunidad Concretada":4,"Oportunidad En Espera":5,"Oportunidad Rechazada":6};
+    const PROB_RANK={Alta:0,Media:1,Baja:2};
+    const cmpEtapa=(x,y)=>(ETAPA_RANK[x.etapa]??9)-(ETAPA_RANK[y.etapa]??9);
+    const cmpFecha=(x,y)=>(x.fechaEstimadaCierre||"9999").localeCompare(y.fechaEstimadaCierre||"9999");
+    const cmpProb=(x,y)=>(PROB_RANK[x.probabilidad]??9)-(PROB_RANK[y.probabilidad]??9);
+    const cmpMonto=(x,y)=>(Number(y.montoEstimado)||0)-(Number(x.montoEstimado)||0);
+    const cmps={etapa:cmpEtapa,fecha:cmpFecha,probabilidad:cmpProb,monto:cmpMonto};
+    const orden=["etapa","fecha","probabilidad","monto"];
+    const secuencia=[ordCampo,...orden.filter(k=>k!==ordCampo)];
+    for(let i=0;i<secuencia.length;i++){
+      const k=secuencia[i];
+      let r=cmps[k](a,b);
+      if(k===ordCampo)r=ordDir==="asc"?r:-r;
+      if(r!==0)return r;
+    }
+    return 0;
+  });
   const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0);
   const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);};
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
@@ -2476,6 +2502,14 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap"}}>Act: {list.length}</span>
       </div>
       {showFil&&<div style={{...S.card(),marginTop:10}}>
+        <div style={S.fl}>Orden</div>
+        <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible",marginBottom:10}}>
+          <span style={S.chip(ordCampo==="etapa",GOLD)} onClick={()=>setOrdCampo("etapa")}>Etapa</span>
+          <span style={S.chip(ordCampo==="fecha",GOLD)} onClick={()=>setOrdCampo("fecha")}>Fecha cierre</span>
+          <span style={S.chip(ordCampo==="probabilidad",GOLD)} onClick={()=>setOrdCampo("probabilidad")}>Probabilidad</span>
+          <span style={S.chip(ordCampo==="monto",GOLD)} onClick={()=>setOrdCampo("monto")}>Monto</span>
+          <span style={S.chip(false,"#60a5fa")} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</span>
+        </div>
         <div style={S.fl}>Etapa</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
           <span style={S.chip(!fEt)} onClick={()=>setFEt("")}>Todas</span>
@@ -2562,6 +2596,12 @@ function App(){
     }
     if(!(base.capacidadRef||[]).some(o=>o.nombre==="Muy Alta")){
       base.capacidadRef=[{id:"capMA",nombre:"Muy Alta"},...(base.capacidadRef||[])];
+    }
+    if(!(base.etapaOportunidad||[]).some(o=>o.nombre==="Oportunidad En Espera")){
+      const arr=[...(base.etapaOportunidad||[])];
+      const idx=arr.findIndex(o=>o.nombre==="Oportunidad Rechazada");
+      const nueva={id:"eoEspera",nombre:"Oportunidad En Espera"};
+      base.etapaOportunidad=idx>=0?[...arr.slice(0,idx),nueva,...arr.slice(idx)]:[...arr,nueva];
     }
     if(!base.etiquetas){ base.etiquetas=[]; }
     if(!localStorage.getItem(PFX+"migAnclaCat")){ const _A=["sol2","sol6","sol20","sol8","sol7","sol4","sol15","sol3"]; if(Array.isArray(base.solucion))base.solucion=base.solucion.map(s=>_A.indexOf(s.id)>=0?{...s,ancla:true}:s); try{localStorage.setItem(PFX+"migAnclaCat","1");}catch(e){} }
