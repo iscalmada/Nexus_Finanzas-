@@ -2162,14 +2162,31 @@ function App(){
   const saldoPendienteDesglose = useCallback((registro,movs)=>{
     const vinc=(registro.movIdsVinculados||[]);
     const ejecutados=movs.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes"&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional")).reduce((s,m)=>s+m.monto*signoVinc(m),0);
+    const esCapital=(m)=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes"&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional");
+    const capitalMovs=ejecutados.filter(esCapital);
+    // Pagos reales (reducen deuda) y préstamos adicionales (aumentan deuda), siempre positivos por separado
+    const abonadoCapital=capitalMovs.filter(m=>signoVinc(m)>0).reduce((s,m)=>s+m.monto,0);
+    const prestamosCapital=capitalMovs.filter(m=>signoVinc(m)<0).reduce((s,m)=>s+m.monto,0);
+    const netoCapital=abonadoCapital-prestamosCapital;
     // Retrocompatibilidad: "interes" antiguo equivale a "interes_acumulado"
     const abonadoIntAcum=ejecutados.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto*signoVinc(m),0);
     const abonadoIntConv=ejecutados.filter(m=>m.tipoAbono==="interes_convencional").reduce((s,m)=>s+m.monto,0);
-    const pendCapital=Math.max(0,(registro.montoCapital||registro.montoActual||0)-abonadoCapital);
+    const capitalBase=registro.montoCapital||registro.montoActual||0;
+    const pendCapital=Math.max(0,capitalBase-netoCapital);
     const pendIntAcum=Math.max(0,(registro.montoInteres||0)-abonadoIntAcum);
-    return{pendCapital,pendIntAcum,pendInteres:pendIntAcum,abonadoCapital,abonadoInteres:abonadoIntAcum,abonadoIntAcum,abonadoIntConv};
+    const deudaTotalVigente=capitalBase+prestamosCapital;
+    return{pendCapital,pendIntAcum,pendInteres:pendIntAcum,abonadoCapital,prestamosCapital,deudaTotalVigente,abonadoInteres:abonadoIntAcum,abonadoIntAcum,abonadoIntConv};
   },[signoVinc]);
+
+  // Desglose de movimientos aún programados de un acreedor: pagos que reducirán la deuda
+  // vs préstamos que la aumentarán, para no sumarlos como si fueran lo mismo.
+  const programadoDesglose = useCallback((registro,movs)=>{
+    const vinc=(registro.movIdsVinculados||[]);
+    const prog=movs.filter(m=>vinc.includes(m.id)&&m.estatus==="PROGRAMADO");
+    const prestamos=prog.filter(m=>m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso").reduce((s,m)=>s+m.monto,0);
+    const pagos=prog.filter(m=>!(m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso")).reduce((s,m)=>s+m.monto,0);
+    return{pagos,prestamos};
+  },[]);
 
   // Estatus derivado para Ingresos Extraordinarios
   const estatusIngExt = useCallback((registro,movs)=>{
@@ -3863,6 +3880,10 @@ function App(){
                             <span style={{fontSize:9,color:"#64748b"}}>Inicial</span>
                             <span style={{fontSize:11,fontWeight:800,color:"#22c55e88"}}>{fmt(registroActual.montoCapital||0)}</span>
                           </div>
+                          {desglose.prestamosCapital>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
+                            <span style={{fontSize:9,color:"#fb923c"}}>📈 Préstamos adicionales</span>
+                            <span style={{fontSize:11,fontWeight:700,color:"#fb923c"}}>{fmt(desglose.prestamosCapital)}</span>
+                          </div>}
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
                             <span style={{fontSize:9,color:"#64748b"}}>Abonado</span>
                             <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(desglose.abonadoCapital)}</span>
@@ -3872,7 +3893,7 @@ function App(){
                             <span style={{fontSize:13,fontWeight:800,color:desglose.pendCapital>0?"#f87171":"#22c55e"}}>{fmt(desglose.pendCapital)}</span>
                           </div>
                           <div style={{marginTop:5,height:3,borderRadius:2,background:"#1e293b",overflow:"hidden"}}>
-                            <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${registroActual.montoCapital>0?Math.max(0,Math.min(100,(desglose.abonadoCapital/(registroActual.montoCapital))*100)):0}%`}}/>
+                            <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${desglose.deudaTotalVigente>0?Math.max(0,Math.min(100,(desglose.abonadoCapital/desglose.deudaTotalVigente)*100)):0}%`}}/>
                           </div>
                         </div>
                         <div style={{background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:9,padding:"9px 8px"}}>
@@ -3899,12 +3920,19 @@ function App(){
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
                       <div style={{background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
                         <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:3}}>Deuda total</div>
-                        <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(registroActual.montoActual)}</div>
+                        <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(desglose.deudaTotalVigente)}</div>
                       </div>
                       <div style={{background:carteraDetalleModo==="programados"?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.08)",border:`1px solid ${carteraDetalleModo==="programados"?"#a78bfa":"#a78bfa33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
                         onClick={()=>setCarteraDetalleModo(carteraDetalleModo==="programados"?"ejecutados":"programados")}>
                         <div style={{fontSize:8,color:"#a78bfa",fontWeight:700,marginBottom:3}}>Programado {carteraDetalleModo==="programados"?"▲":"▼"}</div>
-                        <div style={{fontSize:11,fontWeight:800,color:"#a78bfa"}}>{fmt(prog)}</div>
+                        {(()=>{const pd=programadoDesglose(registroActual,movs);
+                          if(pd.prestamos>0&&pd.pagos>0)return(<>
+                            <div style={{fontSize:9,fontWeight:700,color:"#a78bfa"}}>📉{fmt(pd.pagos)}</div>
+                            <div style={{fontSize:9,fontWeight:700,color:"#fb923c"}}>📈{fmt(pd.prestamos)}</div>
+                          </>);
+                          if(pd.prestamos>0)return <div style={{fontSize:11,fontWeight:800,color:"#fb923c"}}>📈{fmt(pd.prestamos)}</div>;
+                          return <div style={{fontSize:11,fontWeight:800,color:"#a78bfa"}}>{fmt(pd.pagos)}</div>;
+                        })()}
                       </div>
                       <div style={{background:carteraDetalleModo==="ejecutados"?`${sp>0?"#f87171":"#22c55e"}22`:`${sp>0?"#f87171":"#22c55e"}08`,border:`1px solid ${sp>0?"#f87171":"#22c55e"}${carteraDetalleModo==="ejecutados"?"66":"33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
                         onClick={()=>setCarteraDetalleModo("ejecutados")}>
