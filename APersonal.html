@@ -23,6 +23,8 @@ body{background:#0c0c16;color:#e2e8f0;font-family:Arial,sans-serif;min-height:10
 <script type="text/babel">
 const{useState,useEffect,useMemo,useCallback,useRef}=React;
 const GOLD="#C9A84C";const PFX="nap_";const CFC_PFX="nexus_crm_";
+// Normaliza texto para búsquedas sin distinguir acentos/mayúsculas (José === Jose)
+function normTxt(s){return (s||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
 const ENF_COLOR={Contactar:"#60a5fa",Tareas:"#a78bfa",Acciones:"#2dd4bf"};
 const ENF_ICON={Contactar:"📞",Tareas:"📋",Acciones:"⚡"};
 const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
@@ -107,23 +109,23 @@ function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onC
     return eId?cfcEmpresas.find(e=>e.id===eId):null;
   },[selCto,cfcEmpresas]);
   const empresaMostrada=selEmpDirecta||empresaDeContacto;
-  const selectedLabel=selCto?selCto.nombreCompleto:(selEmpDirecta?selEmpDirecta.nombre:"");
+  const selectedLabel=selCto?(selCto.prefijo?selCto.prefijo+" ":"")+selCto.nombreCompleto:(selEmpDirecta?selEmpDirecta.nombre:"");
   const results=useMemo(()=>{
     if(q.trim().length<2)return[];
-    const ql=q.toLowerCase();const items=[];const addedEmpresas=new Set();
+    const ql=normTxt(q);const items=[];const addedEmpresas=new Set();
     // Buscar contactos por nombre
     cfcContactos.forEach(c=>{
-      if((c.nombreCompleto||"").toLowerCase().includes(ql)){
+      if(normTxt(c.nombreCompleto).includes(ql)){
         // Encontrar empresa del contacto
         const ev=(c.empresas&&c.empresas.length)?c.empresas:(c.empresaId?[{empresaId:c.empresaId}]:[]);
         const eId=ev[0]?.empresaId;
         const emp=eId?cfcEmpresas.find(e=>e.id===eId):null;
-        items.push({kind:"contacto",contactoId:c.id,empresaId:eId||null,label:c.nombreCompleto,sub:emp?.nombre||""});
+        items.push({kind:"contacto",contactoId:c.id,empresaId:eId||null,label:(c.prefijo?c.prefijo+" ":"")+c.nombreCompleto,sub:emp?.nombre||""});
       }
     });
     // Buscar empresas por nombre
     cfcEmpresas.forEach(emp=>{
-      if((emp.nombre||"").toLowerCase().includes(ql)&&!addedEmpresas.has(emp.id)){
+      if(normTxt(emp.nombre).includes(ql)&&!addedEmpresas.has(emp.id)){
         const linked=cfcContactos.filter(c=>{
           const ev=(c.empresas&&c.empresas.length)?c.empresas:(c.empresaId?[{empresaId:c.empresaId}]:[]);
           return ev.some(x=>x.empresaId===emp.id);
@@ -131,7 +133,7 @@ function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onC
         if(linked.length===0){
           items.push({kind:"empresa",contactoId:null,empresaId:emp.id,label:emp.nombre,sub:"(sin contacto registrado)"});
         } else {
-          linked.forEach(c=>items.push({kind:"contacto_empresa",contactoId:c.id,empresaId:emp.id,label:c.nombreCompleto,sub:emp.nombre}));
+          linked.forEach(c=>items.push({kind:"contacto_empresa",contactoId:c.id,empresaId:emp.id,label:(c.prefijo?c.prefijo+" ":"")+c.nombreCompleto,sub:emp.nombre}));
         }
         addedEmpresas.add(emp.id);
       }
@@ -394,7 +396,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
   // Display del contacto/empresa para Contactar
   const ctoObj=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
   const empObj=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
-  const ctNombre=ctoObj?.nombreCompleto||null;
+  const ctNombre=ctoObj?.nombreCompleto?((ctoObj.prefijo?ctoObj.prefijo+" ":"")+ctoObj.nombreCompleto):null;
   const empNombre=empObj?.nombre||null;
   const ctLabel=ctNombre||(empNombre||null);
   const titulo=esContactar?(ctLabel||"Contacto no definido"):(a.asunto||a.tipoAccion||"Actividad");
@@ -614,11 +616,11 @@ function App(){
     return id;
   };
   // UI
-  const[modo,setModo]=useState("lista");
+  const[modo,setModo]=useState("rptContactar");
   const[modal,setModal]=useState(null);
   const[expandidos,setExpandidos]=useState(new Set());
   // Filtros
-  const[filtros,setFiltros]=useState([]);
+  const[filtros,setFiltros]=useState(["Programada"]);
   const[fEnfoque,setFEnfoque]=useState("");
   const[fEtiqueta,setFEtiqueta]=useState("");
   const[fPrioridad,setFPrioridad]=useState([]);
@@ -650,7 +652,7 @@ function App(){
   useEffect(()=>{const el=document.getElementById("loading");if(el){el.classList.add("fade-out");setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},400);}},[]);
   const hoy=hoyISO();
   // Filtrado
-  const ql=q.trim().toLowerCase();
+  const ql=normTxt(q);
   const ctLabel=(a)=>{
     const cto=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
     const emp=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
@@ -673,7 +675,7 @@ function App(){
     if(fSinFecha){if(efFech)return false;}
     else{if(fDesde&&efFech<fDesde)return false;if(fHasta&&efFech>fHasta)return false;}
     if(fRezago&&!rez)return false;
-    if(ql){const hay=[a.asunto,a.tipoAccion,a.intencion,a.accionEnProceso,a.conclusion,ctLabel(a)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
+    if(ql){const hay=normTxt([a.asunto,a.tipoAccion,a.intencion,a.accionEnProceso,a.conclusion,ctLabel(a)].filter(Boolean).join(" "));if(!hay.includes(ql))return false;}
     return true;
   });
   // Ordenamiento

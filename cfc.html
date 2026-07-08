@@ -193,10 +193,13 @@ function ChipMulti({opts,sel,setSel,color}){
   </div>;
 }
 
+// Normaliza texto para búsquedas sin distinguir acentos/mayúsculas (José === Jose)
+function normTxt(s){return (s||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
+
 function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd,addLabel="contacto"}){
   const[abierto,setAbierto]=useState(false);const[q,setQ]=useState("");
   const sel=opciones.find(o=>o.id===value);
-  const filt=opciones.filter(o=>!q||(o.label||"").toLowerCase().includes(q.toLowerCase()));
+  const filt=opciones.filter(o=>!q||normTxt(o.label).includes(normTxt(q)));
   return <div style={{position:"relative"}}>
     <div style={{...S.sel,display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}} onClick={()=>{setAbierto(a=>!a);setQ("");}}>
       <span style={{color:sel?"#e2e8f0":"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{sel?sel.label:(placeholder||"— Selecciona —")}</span>
@@ -240,11 +243,14 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <div style={S.mTit}>{init.id?"Editar contacto":"Nuevo contacto"}</div>
 
       <div style={S.sTit}>Identidad</div>
-      <div style={S.g2}>
-        <Field label="Alias"><input style={S.inp} value={f.alias||""} onChange={e=>set("alias",e.target.value||null)}/></Field>
-        <Field label="Nombre"><input style={S.inp} value={f.nombre||""} onChange={e=>set("nombre",e.target.value)}/></Field>
+      <div style={{display:"flex",gap:9}}>
+        <div style={{width:84,flexShrink:0}}><Field label="Prefijo"><input style={S.inp} value={f.prefijo||""} onChange={e=>set("prefijo",e.target.value||null)} placeholder="Lic., Dr…"/></Field></div>
+        <div style={{flex:1,minWidth:0}}><Field label="Alias"><input style={S.inp} value={f.alias||""} onChange={e=>set("alias",e.target.value||null)}/></Field></div>
       </div>
-      <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
+      <div style={S.g2}>
+        <Field label="Nombre"><input style={S.inp} value={f.nombre||""} onChange={e=>set("nombre",e.target.value)}/></Field>
+        <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
+      </div>
 
       <div style={S.sTit}>Generales</div>
       <Field label="Tipo de contacto">
@@ -408,7 +414,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
       </div>
     </div>
     <div style={S.sec}>
-      <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{c.nombreCompleto}</div>
+      <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{c.prefijo&&<span style={{color:"#94a3b8"}}>{c.prefijo} </span>}{c.nombreCompleto}</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
         {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}{c.etapaEspecifica?` · ${c.etapaEspecifica}`:""}</span>}
         {(c.tiposContacto||[c.tipoContacto].filter(Boolean)).map(t=><span key={t} style={S.tag("#7dd3fc")}>{t}</span>)}
@@ -536,9 +542,9 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     const esAliado=!!(c.tiposAliado&&c.tiposAliado.length);
     if(aliadosOnly&&!esAliado)return false;
     if(q){
-      const ql=q.toLowerCase();
-      const nombreMatch=(c.nombreCompleto||"").toLowerCase().includes(ql);
-      const empMatch=cEmpresas(c).some(ev=>{const emp=empresas.find(e=>e.id===ev.empresaId);return emp&&(emp.nombre||"").toLowerCase().includes(ql);});
+      const ql=normTxt(q);
+      const nombreMatch=normTxt(c.nombreCompleto).includes(ql);
+      const empMatch=cEmpresas(c).some(ev=>{const emp=empresas.find(e=>e.id===ev.empresaId);return emp&&normTxt(emp.nombre).includes(ql);});
       if(!nombreMatch&&!empMatch)return false;
     }
     if(fEtapa.length&&!fEtapa.includes(c.etapaPrincipal))return false;
@@ -687,7 +693,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
       {list.map(c=>{const emp=empresas.find(e=>e.id===c.empresaId);return (
         <div key={c.id} style={S.cCard(ec(c.etapaPrincipal))} onClick={()=>setSel(c.id)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-            <div style={{fontSize:14,fontWeight:700}}>{c.nombreCompleto}</div>
+            <div style={{fontSize:14,fontWeight:700}}>{c.prefijo&&<span style={{color:"#94a3b8"}}>{c.prefijo} </span>}{c.nombreCompleto}</div>
             {c.potencial&&<span style={S.tag(POT_COLOR[c.potencial]||"#475569")}>{c.potencial}</span>}
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
@@ -740,7 +746,7 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
     if(n>0){alert(`Esta empresa tiene ${n} contacto(s) vinculado(s). Desvincúlalos o reasígnalos primero (desde cada contacto, en "Empresa vinculada").`);return;}
     if(window.confirm("¿Eliminar esta empresa? Esta acción no se puede deshacer."))
       {setEmpresas(prev=>prev.filter(x=>x.id!==e.id));setSel(null);}};
-  const list=empresas.filter(e=>!q||(e.nombre||"").toLowerCase().includes(q.toLowerCase())).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
+  const list=empresas.filter(e=>!q||normTxt(e.nombre).includes(normTxt(q))).sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||""));
   if(sel){
     const e=empresas.find(x=>x.id===sel);if(!e){setSel(null);return null;}
     const vinc=contactos.filter(c=>cEmpresas(c).some(x=>x.empresaId===e.id));
@@ -1498,20 +1504,20 @@ function BuscaCtoEmpCFC({contactos,empresas,value,onChange,placeholder,onAdd}){
   const empName=(c)=>{const ids=getEmpIds(c);const e=ids[0]&&empresas.find(x=>x.id===ids[0]);return e?e.nombre:"";};
   const results=useMemo(()=>{
     if(q.trim().length<2)return[];
-    const ql=q.toLowerCase();const items=[];const addedEmp=new Set();
-    contactos.forEach(c=>{if((c.nombreCompleto||"").toLowerCase().includes(ql)){items.push({kind:"cto",id:c.id,label:c.nombreCompleto,sub:empName(c)});}});
+    const ql=normTxt(q);const items=[];const addedEmp=new Set();
+    contactos.forEach(c=>{if(normTxt(c.nombreCompleto).includes(ql)){items.push({kind:"cto",id:c.id,label:(c.prefijo?c.prefijo+" ":"")+c.nombreCompleto,sub:empName(c)});}});
     empresas.forEach(emp=>{
-      if((emp.nombre||"").toLowerCase().includes(ql)&&!addedEmp.has(emp.id)){
+      if(normTxt(emp.nombre).includes(ql)&&!addedEmp.has(emp.id)){
         const linked=contactos.filter(c=>getEmpIds(c).includes(emp.id));
         if(linked.length===0){items.push({kind:"emp",id:null,empId:emp.id,label:emp.nombre,sub:"(sin contacto)"});}
-        else{linked.forEach(c=>items.push({kind:"cto_emp",id:c.id,label:c.nombreCompleto,sub:emp.nombre}));}
+        else{linked.forEach(c=>items.push({kind:"cto_emp",id:c.id,label:(c.prefijo?c.prefijo+" ":"")+c.nombreCompleto,sub:emp.nombre}));}
         addedEmp.add(emp.id);
       }
     });
     return items.slice(0,10);
   },[q,contactos,empresas]);
   if(sel)return <div style={{display:"flex",gap:6,alignItems:"center"}}>
-    <div style={{...S.inp,flex:1,fontSize:13}}>{sel.nombreCompleto}{empName(sel)&&<span style={{color:"#60a5fa",fontSize:11}}> · {empName(sel)}</span>}</div>
+    <div style={{...S.inp,flex:1,fontSize:13}}>{sel.prefijo?sel.prefijo+" ":""}{sel.nombreCompleto}{empName(sel)&&<span style={{color:"#60a5fa",fontSize:11}}> · {empName(sel)}</span>}</div>
     <button style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px 10px",cursor:"pointer",fontSize:12}} onClick={()=>onChange(null)}>✕</button>
   </div>;
   return <div style={{position:"relative"}}>
@@ -1799,7 +1805,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               <div style={{display:"flex",alignItems:"flex-start",gap:7,minWidth:0,flex:1}}>
                 {selectable&&<span style={{width:16,height:16,flexShrink:0,marginTop:2,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
                 <div style={{minWidth:0,flex:1}}>
-                  <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3}}>{showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad")}</div>
+                  <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3}}>{showContacto&&c?(c.prefijo?c.prefijo+" ":"")+c.nombreCompleto:(a.tipoAccion||"Actividad")}</div>
                   {showContacto&&empN&&<div style={{fontSize:10,color:"#7dd3fc",fontWeight:600,marginTop:1,wordBreak:"break-word"}}>{empN}</div>}
                 </div>
               </div>
@@ -1858,7 +1864,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
             </div>
             {/* R3: contacto vinculado (si aplica) */}
-            {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {ct.nombreCompleto}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
+            {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {ct.prefijo?ct.prefijo+" ":""}{ct.nombreCompleto}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
             {/* R4: descripción — colapsada por defecto */}
             {isExp&&(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
             {isExp&&a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
@@ -1965,9 +1971,9 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
 }
 
 function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
-  const[filtros,setFiltros]=useState([]);
+  const[filtros,setFiltros]=useState(["Programada"]);
   const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
-  const[modo,setModo]=useState("lista");
+  const[modo,setModo]=useState("rptCom");
   const[desde,setDesde]=useState("");
   const[hasta,setHasta]=useState("");
   const[showFil,setShowFil]=useState(false);
@@ -1997,7 +2003,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const solNombre=(sid)=>((catalogos.solucion||[]).find(s=>s.id===sid)||{}).nombre||"";
   const tipoAccionOpts=fEnfoque==="Tareas"?(catalogos.accTareas||[]):fEnfoque==="Acciones"?(catalogos.accAcciones||[]):fEnfoque==="Contactar"?(catalogos.tipoAccion||[]):[...(catalogos.tipoAccion||[]),...(catalogos.accTareas||[]),...(catalogos.accAcciones||[])];
   const hoy=hoyISO();
-  const ql=q.trim().toLowerCase();
+  const ql=normTxt(q);
   const base=actividades.filter(a=>{
     const efEst=proyEstatus(a); const efFech=proyFecha(a)||a.fecha||"";
     if(filtros.length&&!filtros.includes(efEst))return false;
@@ -2012,7 +2018,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(fOportunidad&&a.oportunidadId!==fOportunidad)return false;
     if(fEnfoque&&(a.enfoque||"Contactar")!==fEnfoque)return false;
     if(fEtiqAgenda&&!(a.etiquetasAgenda||[]).includes(fEtiqAgenda))return false;
-    if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,a.asunto,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
+    if(ql){const c=ctById(a.contactoId);const hay=normTxt([a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,a.asunto,c&&c.nombreCompleto].filter(Boolean).join(" "));if(!hay.includes(ql))return false;}
     return true;
   });
   const horaCmp=(a,b)=>{
@@ -2443,7 +2449,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   };
   const abiertas=oportunidades.filter(ABIERTA);
   const sinSeguimiento=abiertas.filter(o=>!tieneSeg(o));
-  const ql=q.trim().toLowerCase();
+  const ql=normTxt(q);
   const list=oportunidades.filter(o=>{
     if(fSinAct&&tieneSeg(o))return false;
     if(fSinAct&&!ABIERTA(o))return false;
@@ -2456,7 +2462,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     if(fRecur.length&&!fRecur.includes(o.recurrencia||"Única"))return false;
     if(cDesde&&(o.fechaEstimadaCierre||"")<cDesde)return false;
     if(cHasta&&(o.fechaEstimadaCierre||"")>cHasta)return false;
-    if(ql){const hay=[o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
+    if(ql){const hay=normTxt([o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" "));if(!hay.includes(ql))return false;}
     return true;
   }).sort((a,b)=>{
     const ETAPA_RANK={"Oportunidad Identificada":0,"Oportunidad en Preparación":1,"Propuesta Presentada":2,"Oportunidad Aceptada":3,"Oportunidad Concretada":4,"Oportunidad En Espera":5,"Oportunidad Rechazada":6};

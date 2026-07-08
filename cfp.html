@@ -154,6 +154,8 @@ self.addEventListener("fetch", function(e) {
   <script type="text/babel" data-presets="react">
 
 const { useState, useMemo, useRef, useCallback, memo, useEffect } = React;
+// Normaliza texto para búsquedas sin distinguir acentos/mayúsculas (José === Jose)
+function normTxt(s){return (s||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
 // Recharts: desestructurar después de que los scripts cargaron
 const _RC = window.Recharts || {};
 const PieChart = _RC.PieChart || 'div';
@@ -1556,7 +1558,7 @@ function App(){
     return [...pendientes, ...conSaldo]
       .filter(r=>filterTipo==="TODOS"||r.tipoOp===filterTipo)
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
-      .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
+      .filter(r=>!search||normTxt(r.concepto).includes(normTxt(search))||normTxt(r.obs).includes(normTxt(search))||(r.monto+"").includes(search))
       .filter(r=>{
         const hasFiltCuenta=filterCuentas.size>0;
         const hasFiltTarjeta=filterTarjetasFiltro.size>0;
@@ -1644,11 +1646,11 @@ function App(){
   // Resultados de búsqueda global en cartera
   const globalSearchResults=useMemo(()=>{
     if(!search||search.length<2) return {acreedores:[],deudores:[],ingresosExt:[]};
-    const q=search.toLowerCase();
+    const q=normTxt(search);
     return {
-      acreedores: acreedores.filter(x=>(x.nombre||"").toLowerCase().includes(q)||(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
-      deudores:   deudores.filter(x=>(x.nombre||"").toLowerCase().includes(q)||(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
-      ingresosExt:ingresosExt.filter(x=>(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
+      acreedores: acreedores.filter(x=>normTxt(x.nombre).includes(q)||normTxt(x.concepto).includes(q)||normTxt(x.condiciones).includes(q)),
+      deudores:   deudores.filter(x=>normTxt(x.nombre).includes(q)||normTxt(x.concepto).includes(q)||normTxt(x.condiciones).includes(q)),
+      ingresosExt:ingresosExt.filter(x=>normTxt(x.concepto).includes(q)||normTxt(x.condiciones).includes(q)),
     };
   },[search,acreedores,deudores,ingresosExt]);
 
