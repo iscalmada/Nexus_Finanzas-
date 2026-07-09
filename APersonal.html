@@ -386,7 +386,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
   </div>;
 }
 /* ── Tarjeta de actividad ── */
-function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}){
+function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch,catEtiquetas}){
   const[selSub,setSelSub]=useState(new Set());
   const[batchSub,setBatchSub]=useState(null);
   const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
@@ -405,6 +405,9 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
   const rezC=rez>=7?"#ef4444":rez>=3?"#fb923c":rez>=1?"#fbbf24":null;
   const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return{done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return{done:d,total:a.subtareas.length};}return null;})();
   const enfC=ENF_COLOR[a.enfoque]||"#64748b";
+  const featTag=(catEtiquetas||[])[0];
+  const isFeat=featTag&&(a.etiquetas||[]).includes(featTag);
+  const toggleFeat=(ev)=>{ev.stopPropagation();if(!featTag||!onPatch)return;const cur=a.etiquetas||[];const has=cur.includes(featTag);onPatch(a.id,{etiquetas:has?cur.filter(x=>x!==featTag):[...cur,featTag]});};
   return <div style={{background:"#10101e",border:rezC?`1px solid ${rezC}66`:`1px solid ${col}22`,borderLeft:`3px solid ${enfC}`,borderRadius:9,padding:"9px 11px",marginBottom:7}}>
     {/* Renglón 1: título */}
     <div style={{cursor:"pointer",marginBottom:4}} onClick={()=>modo!=="unica"?onToggleExp():onTap(a)}>
@@ -417,7 +420,10 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch}
           {esContactar&&!ctNombre&&empNombre&&null}
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
-          <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{fmtF(efFech)}</span>
+          <div style={{display:"flex",alignItems:"center",gap:5}}>
+            {featTag&&<span onClick={toggleFeat} title={featTag} style={{cursor:"pointer",fontSize:15,filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
+            <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{fmtF(efFech)}</span>
+          </div>
           {a.hora&&<span style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{a.hora}</span>}
         </div>
         {(modo!=="unica"||a.intencion||a.accionEnProceso||a.conclusion)&&<span style={{fontSize:10,color:"#475569",cursor:"pointer"}} onClick={modo==="unica"?(ev)=>{ev.stopPropagation();onToggleExp();}:undefined}>{expanded?"▲":"▾"}</span>}
@@ -551,6 +557,11 @@ function App(){
   const setCatTareas=(v)=>{setCatTareasRaw(v);saveLS("catTareas",v);};
   const setCatAcciones=(v)=>{setCatAccionesRaw(v);saveLS("catAcciones",v);};
   const setCatEtiquetas=(v)=>{setCatEtiquetasRaw(v);saveLS("catEtiquetas",v);};
+  useEffect(()=>{
+    if(!catEtiquetas.includes("Pronta recuperación")){
+      setCatEtiquetas(["Pronta recuperación",...catEtiquetas]);
+    }
+  },[]);
   const[cfcContactos,setCfcContactos]=useState(()=>loadCFC("contactos",[]));
   const[cfcEmpresas,setCfcEmpresas]=useState(()=>loadCFC("empresas",[]));
   const recargarCFC=()=>{setCfcContactos(loadCFC("contactos",[]));setCfcEmpresas(loadCFC("empresas",[]));};
@@ -735,9 +746,12 @@ function App(){
   const Reporte=({enfoque})=>{
     const acts=ordenadas.filter(a=>a.enfoque===enfoque);
     const esCom=enfoque==="Contactar";
+    const featTag=(catEtiquetas||[])[0];
+    const toggleFeat=(a,ev)=>{ev.stopPropagation();if(!featTag)return;const cur=a.etiquetas||[];const has=cur.includes(featTag);patchAct(a.id,{etiquetas:has?cur.filter(x=>x!==featTag):[...cur,featTag]});};
     if(!acts.length)return <div style={{fontSize:11,color:"#475569",padding:"8px 0"}}>Sin actividades de {enfoque}.</div>;
     return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
       <div style={{display:"flex",gap:8,fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
+        {featTag&&<div style={{width:18,flexShrink:0}}></div>}
         <div style={{width:62,flexShrink:0}}>Fecha</div>
         <div style={{flex:esCom?1.6:2.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
         {esCom&&<div style={{flex:1,minWidth:0,whiteSpace:"nowrap"}}>Tipo</div>}
@@ -747,9 +761,11 @@ function App(){
         const isSel=selMode&&sel.indexOf(a.id)>-1;
         const ctoObj=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
         const empObj=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
-        const principal=esCom?(ctoObj?.nombreCompleto||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
+        const principal=esCom?((ctoObj?.nombreCompleto&&(ctoObj?.prefijo?ctoObj.prefijo+" ":"")+ctoObj.nombreCompleto)||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
+        const isFeat=featTag&&(a.etiquetas||[]).includes(featTag);
         return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>selMode?toggleSel(a.id):setModal(a)}>
           {selMode&&<span style={{width:14,height:14,flexShrink:0,marginTop:1,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+          {featTag&&<span onClick={(ev)=>toggleFeat(a,ev)} title={featTag} style={{width:18,flexShrink:0,fontSize:13,cursor:"pointer",filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
           <div style={{width:62,flexShrink:0,display:"flex",flexDirection:"column"}}>
             <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{fmtF(efFech)||"—"}</span>
             {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
@@ -899,7 +915,7 @@ function App(){
             {selMode&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:-2}}>
               <span style={{width:16,height:16,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel?"✓":""}</span>
             </div>}
-            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct}/>
+            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas}/>
           </div>;
         })}
         {modo==="rptContactar"&&<Reporte enfoque="Contactar"/>}
