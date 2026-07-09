@@ -214,7 +214,7 @@ function SubtareasEditor({subtareas,onChange,onIndependizar}){
   </div>;
 }
 /* ── Modal de Actividad ── */
-function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catContactar,catTareas,catAcciones,catEtiquetas,actividades,onSave,onSaveExtra,onDelete,onClose}){
+function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreateContacto,catContactar,catTareas,catAcciones,catEtiquetas,actividades,onSave,onSaveExtra,onDelete,onClose}){
   const[f,setF]=useState(()=>({enfoque:"Contactar",estatus:"Programada",fecha:hoyISO(),prioridad:"Media",modoTarea:"unica",...(init||{})}));
   const[moveToProject,setMoveToProject]=useState("");
   const[esCopia,setEsCopia]=useState(false);
@@ -369,6 +369,26 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
           </div>
         </Field>}
         <Field label={LblVoz("Descripción / objetivo",t=>set("intencion",((f.intencion||"")+" "+t).trim()))}><textarea style={S.ta} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="Qué se va a hacer o revisar…"/></Field>
+        {(()=>{
+          const ctoVinc=f.contactoId?cfcContactos.find(c=>c.id===f.contactoId):null;
+          const opsDelCto=ctoVinc?(cfcOportunidades||[]).filter(o=>o.contactoPrincipalId===ctoVinc.id||o.contactoId===ctoVinc.id||(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(ctoVinc.id)):[];
+          return <div style={{...S.card("#7dd3fc"),border:"1px solid #7dd3fc33",marginBottom:10}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#7dd3fc",marginBottom:8}}>🔗 Vincular a contacto / oportunidad</div>
+            {ctoVinc
+              ? <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:f.oportunidadId||opsDelCto.length>0?8:0}}>
+                  <div style={{...S.inp,flex:1,fontSize:12}}>{ctoVinc.prefijo?ctoVinc.prefijo+" ":""}{ctoVinc.nombreCompleto}</div>
+                  <button style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px 10px",cursor:"pointer",fontSize:12}} onClick={()=>{set("contactoId",null);set("oportunidadId",null);}}>✕</button>
+                </div>
+              : <BuscaContactoEmpresa cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={null} empresaId={null} onChange={({contactoId})=>{if(contactoId)set("contactoId",contactoId);}}/>
+            }
+            {ctoVinc&&opsDelCto.length>0&&<Field label="Oportunidad (opcional)">
+              <select style={S.sel} value={f.oportunidadId||""} onChange={e=>set("oportunidadId",e.target.value||null)}>
+                <option value="">— Solo el contacto —</option>
+                {opsDelCto.map(o=><option key={o.id} value={o.id}>{o.concepto}</option>)}
+              </select>
+            </Field>}
+          </div>;
+        })()}
         {modo==="unica"&&proyectos.length>0&&<div style={{...S.card("#60a5fa"),border:"1px solid #60a5fa33",marginBottom:10}}>
           <div style={{fontSize:11,fontWeight:700,color:"#60a5fa",marginBottom:8}}>↙ Mover a proyecto</div>
           <select style={S.sel} value={moveToProject} onChange={e=>setMoveToProject(e.target.value)}>
@@ -386,7 +406,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
   </div>;
 }
 /* ── Tarjeta de actividad ── */
-function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch,catEtiquetas}){
+function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onToggleExp,onPatch,catEtiquetas}){
   const[selSub,setSelSub]=useState(new Set());
   const[batchSub,setBatchSub]=useState(null);
   const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
@@ -418,6 +438,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch,
           <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3}}>{esContactar?(ctNombre||empNombre||"Contacto no definido"):(a.asunto||a.tipoAccion||"Actividad")}</div>
           {esContactar&&ctNombre&&empNombre&&<div style={{fontSize:10,color:"#3b82f6",marginTop:1}}>{empNombre}</div>}
           {esContactar&&!ctNombre&&empNombre&&null}
+          {!esContactar&&ctoObj&&(()=>{const opv=a.oportunidadId?(cfcOportunidades||[]).find(o=>o.id===a.oportunidadId):null;return <div style={{fontSize:10,color:"#3b82f6",marginTop:1}}>👤 {ctoObj.prefijo?ctoObj.prefijo+" ":""}{ctoObj.nombreCompleto}{opv?` · 🎯 ${(opv.etapa||"").replace("Oportunidad ","")}`:""}</div>;})()}
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:5}}>
@@ -564,7 +585,8 @@ function App(){
   },[]);
   const[cfcContactos,setCfcContactos]=useState(()=>loadCFC("contactos",[]));
   const[cfcEmpresas,setCfcEmpresas]=useState(()=>loadCFC("empresas",[]));
-  const recargarCFC=()=>{setCfcContactos(loadCFC("contactos",[]));setCfcEmpresas(loadCFC("empresas",[]));};
+  const[cfcOportunidades,setCfcOportunidades]=useState(()=>loadCFC("oportunidades",[]));
+  const recargarCFC=()=>{setCfcContactos(loadCFC("contactos",[]));setCfcEmpresas(loadCFC("empresas",[]));setCfcOportunidades(loadCFC("oportunidades",[]));};
   const[pullY,setPullY]=useState(0);
   const[refreshing,setRefreshing]=useState(false);
   const rootRef=useRef(null);
@@ -610,7 +632,7 @@ function App(){
   useEffect(()=>{
     const onStorage=(e)=>{
       if(!e.key)return; // limpieza total del storage
-      if(e.key===CFC_PFX+"contactos"||e.key===CFC_PFX+"empresas")recargarCFC();
+      if(e.key===CFC_PFX+"contactos"||e.key===CFC_PFX+"empresas"||e.key===CFC_PFX+"oportunidades")recargarCFC();
     };
     window.addEventListener("storage",onStorage);
     return()=>window.removeEventListener("storage",onStorage);
@@ -776,6 +798,7 @@ function App(){
           <div style={{flex:esCom?1.6:2.4,minWidth:0}}>
             <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word"}}>{principal}</div>
             {esCom&&ctoObj?.nombreCompleto&&empObj?.nombre&&<div style={{fontSize:9,color:"#3b82f6",marginTop:1,wordBreak:"break-word"}}>{empObj.nombre}</div>}
+            {!esCom&&ctoObj&&(()=>{const opv=a.oportunidadId?(cfcOportunidades||[]).find(o=>o.id===a.oportunidadId):null;return <div style={{fontSize:9,color:"#3b82f6",marginTop:1,wordBreak:"break-word"}}>👤 {ctoObj.prefijo?ctoObj.prefijo+" ":""}{ctoObj.nombreCompleto}{opv?` · 🎯 ${(opv.etapa||"").replace("Oportunidad ","")}`:""}</div>;})()}
           </div>
           {esCom&&<div style={{flex:1,minWidth:0,color:"#94a3b8",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.tipoAccion||"—"}</div>}
           <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&a.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
@@ -919,7 +942,7 @@ function App(){
             {selMode&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:-2}}>
               <span style={{width:16,height:16,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel?"✓":""}</span>
             </div>}
-            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas}/>
+            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas}/>
           </div>;
         })}
         {modo==="rptContactar"&&<Reporte enfoque="Contactar"/>}
@@ -937,7 +960,7 @@ function App(){
       <button onClick={scrollBottom} style={{position:"fixed",bottom:140,right:14,width:36,height:36,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:15,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↓</button>
     </>}
     {/* Modal */}
-    {modal&&<ActividadModal init={modal.id?modal:null} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} onCreateContacto={addCfcContacto} catContactar={catContactar} catTareas={catTareas} catAcciones={catAcciones} catEtiquetas={catEtiquetas} actividades={actividades} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onClose={()=>setModal(null)}/>}
+    {modal&&<ActividadModal init={modal.id?modal:null} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onCreateContacto={addCfcContacto} catContactar={catContactar} catTareas={catTareas} catAcciones={catAcciones} catEtiquetas={catEtiquetas} actividades={actividades} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onClose={()=>setModal(null)}/>}
     {/* Edición múltiple */}
     {batch&&<div onClick={()=>setBatch(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:200}}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#0c0c16",border:"1px solid #1e293b",borderRadius:"16px 16px 0 0",padding:18,width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto"}}>

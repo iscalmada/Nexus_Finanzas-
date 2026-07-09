@@ -2226,6 +2226,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
               <div style={{flex:esCom?1.6:2.4,minWidth:0}}>
                 <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word"}}>{principal}</div>
                 {esCom&&empN&&<div style={{fontSize:9,color:"#7dd3fc",marginTop:1,wordBreak:"break-word"}}>{empN}</div>}
+                {!esCom&&a.contactoId&&(()=>{const ctv=ctById(a.contactoId);const opv=a.oportunidadId?opById(a.oportunidadId):null;return ctv?<div style={{fontSize:9,color:"#7dd3fc",marginTop:1,wordBreak:"break-word"}}>👤 {ctv.prefijo?ctv.prefijo+" ":""}{ctv.nombreCompleto}{opv?` · 🎯 ${opv.etapa.replace("Oportunidad ","")}`:""}</div>:null;})()}
               </div>
               {esCom&&<div style={{flex:1,minWidth:0,color:"#94a3b8",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.tipoAccion||"—"}</div>}
               <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&a.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
