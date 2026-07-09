@@ -1582,7 +1582,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         const compFecha=ds[0]||(f.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";
         const sts=(f.subtareas||[]).map(s=>s.estatus||"Programada");
         const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
-        onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null,fecha:compFecha,estatus:compEst});
+        onSave({...f,servicioSolucion:null,fecha:compFecha,estatus:compEst});
       } else {
         if(modo==="checklist"){
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
