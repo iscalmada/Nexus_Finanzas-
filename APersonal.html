@@ -308,7 +308,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
         </Field>
         {catEtiquetas.length>0&&<Field label="Orientación">
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catEtiquetas.map(et=>{const on=(f.etiquetas||[]).includes(et);return <span key={et} style={{...S.chip(on,"#f472b6"),fontSize:11,cursor:"pointer"}} onClick={()=>set("etiquetas",on?(f.etiquetas||[]).filter(x=>x!==et):[...(f.etiquetas||[]),et])}>🏷 {et}</span>;})}
+            {catEtiquetas.map((et,idx)=>{const on=(f.etiquetas||[]).includes(et);const isFt=idx===0;return <span key={et} style={{...S.chip(on,isFt?"#fbbf24":"#f472b6"),fontSize:11,cursor:"pointer"}} onClick={()=>set("etiquetas",on?(f.etiquetas||[]).filter(x=>x!==et):[...(f.etiquetas||[]),et])}>{isFt?"💰":"🏷"} {et}</span>;})}
           </div>
         </Field>}
         <Field label={LblVoz("Intención (al programar)",t=>set("intencion",((f.intencion||"")+" "+t).trim()))}><textarea style={S.ta} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="¿Para qué voy a contactar?"/></Field>
@@ -365,7 +365,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,onCreateContacto,catConta
         </Field>
         {catEtiquetas.length>0&&<Field label="Orientación">
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catEtiquetas.map(et=>{const on=(f.etiquetas||[]).includes(et);return <span key={et} style={{...S.chip(on,"#f472b6"),fontSize:11,cursor:"pointer"}} onClick={()=>set("etiquetas",on?(f.etiquetas||[]).filter(x=>x!==et):[...(f.etiquetas||[]),et])}>🏷 {et}</span>;})}
+            {catEtiquetas.map((et,idx)=>{const on=(f.etiquetas||[]).includes(et);const isFt=idx===0;return <span key={et} style={{...S.chip(on,isFt?"#fbbf24":"#f472b6"),fontSize:11,cursor:"pointer"}} onClick={()=>set("etiquetas",on?(f.etiquetas||[]).filter(x=>x!==et):[...(f.etiquetas||[]),et])}>{isFt?"💰":"🏷"} {et}</span>;})}
           </div>
         </Field>}
         <Field label={LblVoz("Descripción / objetivo",t=>set("intencion",((f.intencion||"")+" "+t).trim()))}><textarea style={S.ta} value={f.intencion||""} onChange={e=>set("intencion",e.target.value||null)} placeholder="Qué se va a hacer o revisar…"/></Field>
@@ -436,7 +436,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,onTap,expanded,onToggleExp,onPatch,
       {efPrio&&efPrio!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
       <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
       {a.tipoAccion&&<span style={{fontSize:8,color:enfC,background:enfC+"11",border:`1px solid ${enfC}33`,borderRadius:5,padding:"1px 6px",maxWidth:170,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"inline-block"}}>{a.tipoAccion}</span>}
-      {(a.etiquetas||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+      {(a.etiquetas||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag?"💰":"🏷"} {et}</span>)}
     </div>
     {/* Intención / acción / conclusión — colapsado por defecto */}
     {expanded&&a.intencion&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion}</div>}
@@ -633,7 +633,9 @@ function App(){
   // Filtros
   const[filtros,setFiltros]=useState(["Programada"]);
   const[fEnfoque,setFEnfoque]=useState("");
-  const[fEtiqueta,setFEtiqueta]=useState("");
+  const[fEtiqueta,setFEtiqueta]=useState([]);
+  const[fFeat,setFFeat]=useState(false);
+  const featTag=(catEtiquetas||[])[0];
   const[fPrioridad,setFPrioridad]=useState([]);
   const[fContacto,setFContacto]=useState("");
   const[fEmpresa,setFEmpresa]=useState("");
@@ -678,7 +680,8 @@ function App(){
     const rez=pend&&efFech&&efFech<hoy;
     if(filtros.length&&!filtros.includes(efEst))return false;
     if(fEnfoque&&a.enfoque!==fEnfoque)return false;
-    if(fEtiqueta&&!(a.etiquetas||[]).includes(fEtiqueta))return false;
+    if(fEtiqueta.length&&!fEtiqueta.some(et=>(a.etiquetas||[]).includes(et)))return false;
+    if(fFeat&&featTag&&!(a.etiquetas||[]).includes(featTag))return false;
     if(fPrioridad.length&&!fPrioridad.includes(proyPrioridad(a)))return false;
     if(fContacto&&a.contactoId!==fContacto)return false;
     if(fEmpresa&&a.empresaId!==fEmpresa)return false;
@@ -726,8 +729,8 @@ function App(){
     if(fc!==0)return fc;
     return horaCmp(a,b);
   });
-  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0)+(fSinFecha?1:0);
-  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta("");setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setFSinFecha(false);setQ("");setModoFecha("todas");};
+  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta.length?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0)+(fSinFecha?1:0)+(fFeat?1:0);
+  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta([]);setFFeat(false);setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setFSinFecha(false);setQ("");setModoFecha("todas");};
   const sinFechaCount=actividades.filter(a=>!(proyFecha(a)||a.fecha||"")).length;
   // Catálogo unificado de tipos de acción
   const todosTipos=fEnfoque==="Contactar"?catContactar:fEnfoque==="Tareas"?catTareas:fEnfoque==="Acciones"?catAcciones:[...new Set([...catContactar,...catTareas,...catAcciones])];
@@ -818,6 +821,7 @@ function App(){
           <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Etapa:</span>
           {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]),fontSize:9,padding:"3px 6px",flexShrink:0,cursor:"pointer"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
           {(filtros.length>0||fEnfoque)&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 7px",flexShrink:0,cursor:"pointer"}} onClick={()=>{setFiltros([]);setFEnfoque("");}}>✕</span>}
+          {featTag&&<span style={{marginLeft:"auto",flexShrink:0,cursor:"pointer",fontSize:16,filter:fFeat?"none":"grayscale(1) opacity(0.4)"}} title={featTag} onClick={()=>setFFeat(v=>!v)}>💰</span>}
         </div>
         {/* Fila 4: Búsqueda + ⚙ + ✕ */}
         <div style={{display:"flex",gap:5,alignItems:"center"}}>
@@ -861,10 +865,10 @@ function App(){
             </div>
           </div>
           {/* Orientación */}
-          {catEtiquetas.length>0&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          {catEtiquetas.length>1&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
             <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:5,textTransform:"uppercase"}}>Orientación</div>
             <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-              {catEtiquetas.map(et=><button key={et} style={{...S.pill(fEtiqueta===et,"#f472b6"),padding:"4px 10px",fontSize:10}} onClick={()=>setFEtiqueta(fEtiqueta===et?"":et)}>🏷 {et}</button>)}
+              {catEtiquetas.filter(et=>et!==featTag).map(et=><button key={et} style={{...S.pill(fEtiqueta.includes(et),"#f472b6"),padding:"4px 10px",fontSize:10}} onClick={()=>setFEtiqueta(p=>p.includes(et)?p.filter(x=>x!==et):[...p,et])}>🏷 {et}</button>)}
             </div>
           </div>}
           {/* Tipo de acción */}

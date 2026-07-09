@@ -1688,7 +1688,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
     </Field>
     {(catalogos.etiqAgenda||[]).length>0&&<Field label="Orientación">
       <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-        {(catalogos.etiqAgenda||[]).map(et=>{const on=(f.etiquetasAgenda||[]).includes(et.nombre);return <span key={et.id} style={{...S.tag(on?"#f472b6":"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>set("etiquetasAgenda",on?(f.etiquetasAgenda||[]).filter(x=>x!==et.nombre):[...(f.etiquetasAgenda||[]),et.nombre])}>🏷 {et.nombre}</span>;})}
+        {(catalogos.etiqAgenda||[]).map((et,idx)=>{const on=(f.etiquetasAgenda||[]).includes(et.nombre);const isFt=idx===0;return <span key={et.id} style={{...S.tag(on?(isFt?"#fbbf24":"#f472b6"):"#334155"),cursor:"pointer",fontSize:10}} onClick={()=>set("etiquetasAgenda",on?(f.etiquetasAgenda||[]).filter(x=>x!==et.nombre):[...(f.etiquetasAgenda||[]),et.nombre])}>{isFt?"💰":"🏷"} {et.nombre}</span>;})}
       </div>
     </Field>}
 
@@ -1827,7 +1827,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:8}}>{a.prioridad}</span>}
               {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:8}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
             </div>
             {/* R3: etapa contacto · etapa oportunidad · solución (formato chip) */}
             {(c||op||a.servicioSolucion)&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginTop:5}}>
@@ -1865,7 +1865,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
               {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
             </div>
             {/* R3: contacto vinculado (si aplica) */}
             {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {ct.prefijo?ct.prefijo+" ":""}{ct.nombreCompleto}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
@@ -1996,7 +1996,9 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[selMode,setSelMode]=useState(false);
   const[sel,setSel]=useState([]);
   const[fEnfoque,setFEnfoque]=useState("");
-  const[fEtiqAgenda,setFEtiqAgenda]=useState("");
+  const[fEtiqAgenda,setFEtiqAgenda]=useState([]);
+  const[fFeat,setFFeat]=useState(false);
+  const featTag=(catalogos.etiqAgenda||[])[0];
   const[batch,setBatch]=useState(null);
   const toggleSel=(id)=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
   const fmtF=(f)=>f?f.split("-").reverse().join("/"):"—";
@@ -2021,7 +2023,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(fServicio&&a.servicioSolucion!==fServicio)return false;
     if(fOportunidad&&a.oportunidadId!==fOportunidad)return false;
     if(fEnfoque&&(a.enfoque||"Contactar")!==fEnfoque)return false;
-    if(fEtiqAgenda&&!(a.etiquetasAgenda||[]).includes(fEtiqAgenda))return false;
+    if(fEtiqAgenda.length&&!fEtiqAgenda.some(et=>(a.etiquetasAgenda||[]).includes(et)))return false;
+    if(fFeat&&featTag&&!(a.etiquetasAgenda||[]).includes(featTag.nombre))return false;
     if(ql){const c=ctById(a.contactoId);const hay=normTxt([a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,a.asunto,c&&c.nombreCompleto].filter(Boolean).join(" "));if(!hay.includes(ql))return false;}
     return true;
   });
@@ -2066,8 +2069,8 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
   const enfRptActual=modo==="rptCom"?"Contactar":modo==="rptTar"?"Tareas":modo==="rptAcc"?"Acciones":null;
   const visibles=enfRptActual?ordenadas.filter(a=>(a.enfoque||"Contactar")===enfRptActual):ordenadas;
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fServicio?1:0)+(fOportunidad?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0)+(fEtiqAgenda?1:0)+(fSinFecha?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFServicio("");setFOportunidad("");setDesde("");setHasta("");setModoFecha("todas");setFSinFecha(false);setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFEtiqAgenda("");setFiltros([]);};
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fServicio?1:0)+(fOportunidad?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0)+(fEtiqAgenda.length?1:0)+(fSinFecha?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFServicio("");setFOportunidad("");setDesde("");setHasta("");setModoFecha("todas");setFSinFecha(false);setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFEtiqAgenda([]);setFFeat(false);setFiltros([]);};
   const sinFechaCount=actividades.filter(a=>!(proyFecha(a)||a.fecha||"")).length;
   return <div>
     <div style={S.hdr}>
@@ -2096,6 +2099,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         <span style={{fontSize:10,color:"#64748b",fontWeight:700,flexShrink:0}}>Etapa:</span>
         {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]||GOLD),fontSize:10,padding:"3px 8px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
         {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:10,padding:"3px 8px",opacity:.8}} onClick={()=>setFiltros([])}>✕</span>}
+        {featTag&&<span style={{marginLeft:"auto",flexShrink:0,cursor:"pointer",fontSize:16,filter:fFeat?"none":"grayscale(1) opacity(0.4)"}} title={featTag.nombre} onClick={()=>setFFeat(v=>!v)}>💰</span>}
       </div>
       {/* Fila 4: búsqueda + filtros */}
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -2135,10 +2139,10 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{PRIOR.map(p=><span key={p} style={{...S.chip(fPrioridad.includes(p),PRIOR_COLOR[p]),fontSize:10,cursor:"pointer"}} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
         </div>
         {/* 4 Orientación */}
-        {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+        {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>1&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
           <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:5,textTransform:"uppercase"}}>Orientación</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catalogos.etiqAgenda.map(et=><span key={et.id} style={{...S.chip(fEtiqAgenda===et.nombre,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et.nombre?"":et.nombre)}>🏷 {et.nombre}</span>)}
+            {catalogos.etiqAgenda.filter(et=>!featTag||et.id!==featTag.id).map(et=><span key={et.id} style={{...S.chip(fEtiqAgenda.includes(et.nombre),"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(p=>p.includes(et.nombre)?p.filter(x=>x!==et.nombre):[...p,et.nombre])}>🏷 {et.nombre}</span>)}
           </div>
         </div>}
         {/* 5 Tipo de acción — dinámico por enfoque */}
@@ -2391,14 +2395,18 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
+function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,featTag,onToggleFeat}){
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
   const op=contactos.find(x=>x.id===o.contactoOperativoId);
   const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
   const monto=o.comisionEstimada||o.montoEstimado;
+  const isFeat=featTag&&(o.etiquetas||[]).includes(featTag.nombre);
   return <div onClick={()=>onTap&&onTap(o)} style={{...S.cCard(col),borderLeft:sinAct?`3px solid #ef4444`:`3px solid ${col}44`}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-      <div style={{fontSize:14,fontWeight:700}}>{o.concepto}</div>
+      <div style={{display:"flex",alignItems:"flex-start",gap:6,minWidth:0,flex:1}}>
+        {featTag&&<span onClick={(ev)=>onToggleFeat&&onToggleFeat(o,ev)} title={featTag.nombre} style={{cursor:"pointer",fontSize:15,flexShrink:0,filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
+        <div style={{fontSize:14,fontWeight:700,wordBreak:"break-word"}}>{o.concepto}</div>
+      </div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
         {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
         {sinAct&&<span style={{fontSize:9,fontWeight:700,color:"#ef4444",background:"#ef444411",border:"1px solid #ef444433",borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap"}}>⚠ Sin seguimiento</span>}
@@ -2423,7 +2431,7 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
   </div>;
 }
 
-function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,openOpo}){
+function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,openOpo,onPatchOpo}){
   const[fEt,setFEt]=useState("");
   const[showFil,setShowFil]=useState(false);
   const[fSol,setFSol]=useState([]);
@@ -2436,8 +2444,11 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const[cHasta,setCHasta]=useState("");
   const[q,setQ]=useState("");
   const[fSinAct,setFSinAct]=useState(false);
+  const[fSoloMarcadas,setFSoloMarcadas]=useState(false);
   const[ordCampo,setOrdCampo]=useState("etapa");
   const[ordDir,setOrdDir]=useState("asc");
+  const featTag=(catalogos.etiqAgenda||[])[0];
+  const toggleFeat=(o,ev)=>{if(ev)ev.stopPropagation();if(!featTag||!onPatchOpo)return;const cur=o.etiquetas||[];const has=cur.includes(featTag.nombre);onPatchOpo(o.id,{etiquetas:has?cur.filter(x=>x!==featTag.nombre):[...cur,featTag.nombre]});};
   const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
   const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"";
   const en=(id)=>(empresas.find(e=>e.id===id)||{}).nombre||"";
@@ -2461,6 +2472,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const ql=normTxt(q);
   const list=oportunidades.filter(o=>{
     if(fSinAct&&tieneSeg(o))return false;
+    if(fSoloMarcadas&&featTag&&!((o.etiquetas||[]).includes(featTag.nombre)))return false;
     if(fSinAct&&!ABIERTA(o))return false;
     if(fEt&&o.etapa!==fEt)return false;
     if(fSol.length&&!fSol.includes(o.solucionId))return false;
@@ -2492,10 +2504,11 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     return 0;
   });
   const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0);
-  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);};
+  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFSoloMarcadas(false);};
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
   const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
+  const marcadas=featTag?oportunidades.filter(o=>(o.etiquetas||[]).includes(featTag.nombre)):[];
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div><div style={S.sub}>{oportunidades.length} en total · {abiertas.length} abiertas</div></div></div>
     <div style={S.line}/>
@@ -2515,6 +2528,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
         <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar concepto, contacto, empresa…" value={q} onChange={e=>setQ(e.target.value)}/>
         <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""} {showFil?"▲":"▾"}</button>
+        {featTag&&<span onClick={()=>setFSoloMarcadas(v=>!v)} title={featTag.nombre} style={{cursor:"pointer",fontSize:18,flexShrink:0,filter:fSoloMarcadas?"none":"grayscale(1) opacity(0.4)"}}>💰</span>}
         <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap"}}>Act: {list.length}</span>
       </div>
       {showFil&&<div style={{...S.card(),marginTop:10}}>
@@ -2555,7 +2569,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} sinAct={ABIERTA(o)&&!tieneSeg(o)} featTag={featTag} onToggleFeat={toggleFeat} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
@@ -2730,7 +2744,7 @@ function App(){
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
-    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} openOpo={openOpo}/>}
+    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} openOpo={openOpo} onPatchOpo={(id,patch)=>setOportunidades(prev=>prev.map(o=>o.id===id?{...o,...patch}:o))}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}

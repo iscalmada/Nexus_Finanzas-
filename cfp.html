@@ -3382,6 +3382,7 @@ function App(){
           const opos=lsCRM('oportunidades',[]);
           const cat=lsCRM('catalogos',{})||{};
           const sols=cat.solucion||[]; const etps=cat.etapaOportunidad||[];
+          const featTagCFP=(cat.etiqAgenda||[])[0];
           const conts=lsCRM('contactos',[]); const emps=lsCRM('empresas',[]);
           const solName=(id)=>(sols.find(s=>s.id===id)||{}).nombre||"";
           const contName=(id)=>(conts.find(c=>c.id===id)||{}).nombreCompleto||"";
@@ -3446,7 +3447,10 @@ function App(){
               {lista.map(o=>{ const monto=o.comisionEstimada||o.montoEstimado; return (
                 <div key={o.id} style={{...cardS,cursor:"pointer",borderColor:etColor(o.etapa)+"55"}} onClick={()=>setVerRef(o)}>
                   <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-                    <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{o.concepto}</div>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:6,minWidth:0,flex:1}}>
+                      {featTagCFP&&(o.etiquetas||[]).includes(featTagCFP.nombre)&&<span title={featTagCFP.nombre} style={{fontSize:15,flexShrink:0}}>💰</span>}
+                      <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",wordBreak:"break-word"}}>{o.concepto}</div>
+                    </div>
                     {monto?<div style={{fontSize:13,fontWeight:800,color:"#C9A84C",whiteSpace:"nowrap"}}>{fmt(monto)}</div>:null}
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
