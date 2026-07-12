@@ -1022,8 +1022,27 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
     if(val===""||val===null)delete metas[mes];else metas[mes]=val;
     return {...p,metas};
   }));
-  const cierreProd=(p,mes)=>(Number((p.metas||{})[mes])||0)*comResultProd(p);
-  const ingresoProd=(p,mes)=>{const com=comResultProd(p),metas=p.metas||{};if(p.recurrente){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}return (Number(metas[mes])||0)*com;};
+  const setLogrado=(pid,mes,val)=>setProductos(prev=>prev.map(p=>{
+    if(p.id!==pid)return p;
+    const logrado={...(p.logrado||{})};
+    if(val===""||val===null)delete logrado[mes];else logrado[mes]=val;
+    return {...p,logrado};
+  }));
+  // Restante = Meta fija − Logrado (nunca negativo). Es lo que aún no se ha concretado
+  // y por lo tanto lo único que debe seguir contando como proyección pendiente.
+  const restanteMes=(p,mes)=>Math.max(0,(Number((p.metas||{})[mes])||0)-(Number((p.logrado||{})[mes])||0));
+  const cierreProd=(p,mes)=>restanteMes(p,mes)*comResultProd(p);
+  const ingresoProd=(p,mes)=>{
+    const com=comResultProd(p);
+    if(p.recurrente){
+      const metas=p.metas||{},logrados=p.logrado||{};
+      let metaAcum=0,logAcum=0;
+      const claves=new Set([...Object.keys(metas),...Object.keys(logrados)]);
+      claves.forEach(k=>{if(k<=mes){metaAcum+=Number(metas[k])||0;logAcum+=Number(logrados[k])||0;}});
+      return Math.max(0,metaAcum-logAcum)*com;
+    }
+    return restanteMes(p,mes)*com;
+  };
   const sols=(catalogos.solucion||[]).map(s=>({s,prods:productos.filter(p=>p.solucionId===s.id)})).filter(g=>g.prods.length>0);
   const sumProds=(prods,mes,fn)=>prods.reduce((a,p)=>a+fn(p,mes),0);
   const WCOL=120,WMES=68;
@@ -1103,7 +1122,8 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
           <div style={{display:"flex",gap:5}}>{[3,6,12].map(n=><button key={n} style={{...S.pill(nMeses===n,GOLD),flex:1}} onClick={()=>setNMeses(n)}>{n}</button>)}</div>
         </div>
       </div>
-      <div style={{fontSize:9,color:"#475569",marginTop:8,lineHeight:1.4}}>Captura la meta en <b>unidades</b> (admite decimales) por producto y mes. La comisión y el acumulado se calculan solos. Editar una celda guarda directo en el producto.</div>
+      <div style={{fontSize:9,color:"#475569",marginTop:8,lineHeight:1.4}}>Por mes verás dos campos: <b style={{color:"#e2e8f0"}}>Meta</b> (lo propuesto, no la vuelvas a tocar una vez definida) y <b style={{color:"#4ade80"}}>Logrado</b> (ve actualizándola conforme cierres negocio). La proyección de ingreso siempre usa el <b>restante</b> (Meta − Logrado) para no duplicar lo que ya registraste como movimiento en el CFP.</div>
+      <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.4}}>Captura en <b>unidades</b> (admite decimales) por producto y mes. La comisión y el acumulado se calculan solos.</div>
     </div>}
     {modo==="matriz"&&(productos.length===0
       ? <div style={S.sec}><div style={{...S.card(),textAlign:"center",color:"#475569",fontSize:12,padding:"24px 12px"}}>No hay productos todavía. Créalos en <span style={{color:"#2dd4bf",fontWeight:700,cursor:"pointer"}} onClick={onProductos}>Catálogos → Productos</span> y aquí defines sus metas.</div></div>
@@ -1122,12 +1142,13 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
                   {p.categoria&&<div style={{fontSize:8,color:"#94a3b8",lineHeight:1.2,marginTop:1}}>{p.categoria}</div>}
                   <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{p.recurrente?" · recur.":" · único"}</div>
                 </div>
-                {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
-                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"5px 6px"}}/>
+                {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0",display:"flex",flexDirection:"column",gap:2}}>
+                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="meta" title="Meta propuesta" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:5,color:"#e2e8f0",fontSize:10,textAlign:"center",padding:"3px 4px"}}/>
+                  <input type="text" inputMode="decimal" value={(p.logrado||{})[m]??""} onChange={e=>setLogrado(p.id,m,e.target.value)} placeholder="logr." title="Logrado" style={{width:"100%",background:"#0d1f14",border:"1px solid #22c55e33",borderRadius:5,color:"#4ade80",fontSize:10,textAlign:"center",padding:"3px 4px"}}/>
                 </div>)}
               </div>)}
               <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14"}}>
-                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"5px 0"}}>Cierres $</div>
+                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"5px 0"}}>Cierres $ (restante)</div>
                 {meses.map(m=><div key={m} style={cellNum}>{money(sumProds(g.prods,m,cierreProd))}</div>)}
               </div>
               <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14",borderBottom:"1px solid #1e293b"}}>
@@ -1145,7 +1166,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
       </div>)}
     {modo==="reporte"&&(()=>{
       const shiftMes=(mk,d)=>{let a=mk.split("-").map(Number),y=a[0],m=a[1];m+=d;while(m<1){m+=12;y--;}while(m>12){m-=12;y++;}return y+"-"+String(m).padStart(2,"0");};
-      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0,ing:ingresoProd(p,mesRep)})).filter(x=>x.meta>0||x.ing>0);const sub=items.reduce((a,x)=>a+x.ing,0);return {s:g.s,items,sub};}).filter(g=>g.items.length>0);
+      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0,logrado:Number((p.logrado||{})[mesRep])||0,ing:ingresoProd(p,mesRep)})).filter(x=>x.meta>0||x.logrado>0||x.ing>0);const sub=items.reduce((a,x)=>a+x.ing,0);return {s:g.s,items,sub};}).filter(g=>g.items.length>0);
       const total=grupos.reduce((a,g)=>a+g.sub,0);
       return <div style={S.sec}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"8px 10px",marginBottom:12}}>
@@ -1167,17 +1188,23 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
                   <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.p.tipo}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>{it.meta>0?it.meta+" u. meta":(it.p.recurrente?"acumulado":"—")} · {money(comResultProd(it.p))}/u · {it.p.recurrente?"recurrente":"único"}</div>
+                  {it.p.categoria&&<div style={{fontSize:9,color:"#94a3b8",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.p.categoria}</div>}
+                  <div style={{fontSize:9,color:"#64748b"}}>
+                    {it.p.recurrente
+                      ? "acumulado"
+                      : <>Meta <b style={{color:"#e2e8f0"}}>{it.meta}</b> · Logr. <b style={{color:"#4ade80"}}>{it.logrado}</b> · Falta <b style={{color:"#fbbf24"}}>{Math.max(0,it.meta-it.logrado)}</b></>
+                    } · {money(comResultProd(it.p))}/u · {it.p.recurrente?"recurrente":"único"}
+                  </div>
                 </div>
                 <div style={{fontSize:13,fontWeight:700,color:"#2dd4bf",whiteSpace:"nowrap"}}>{money(it.ing)}</div>
               </div>)}
             </div>)}
-        <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Incluye productos con meta del mes y recurrentes con acumulado vivo. El total coincide con el Ingreso Nexus Proyectado que alimenta el presupuesto del CFP.</div>
+        <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>El Ingreso Nexus Proyectado usa siempre lo <b>restante</b> por lograr (Meta − Logrado), para no duplicar lo que ya capturaste como movimiento en el CFP. Coincide con lo que alimenta el presupuesto allá.</div>
       </div>;
     })()}
     {modo==="productos"&&(()=>{
       const shiftMes=(mk,d)=>{let a=mk.split("-").map(Number),y=a[0],m=a[1];m+=d;while(m<1){m+=12;y--;}while(m>12){m-=12;y++;}return y+"-"+String(m).padStart(2,"0");};
-      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
+      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0,logrado:Number((p.logrado||{})[mesRep])||0,restante:restanteMes(p,mesRep)})).filter(x=>x.restante>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
       return <div style={S.sec}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"8px 10px",marginBottom:12}}>
           <button onClick={()=>setMesRep(shiftMes(mesRep,-1))} style={{background:"transparent",border:"none",color:GOLD,fontSize:20,cursor:"pointer",padding:"0 12px"}}>‹</button>
@@ -1191,9 +1218,9 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
                   <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"pre-wrap"}}>{it.p.tipo}</div>
-                  <div style={{fontSize:10,color:"#94a3b8"}}>{[it.p.categoria,(it.p.montoNegocio?money(it.p.montoNegocio):null)].filter(Boolean).join(" · ")||"—"}</div>
+                  <div style={{fontSize:10,color:"#94a3b8"}}>{[it.p.categoria,(it.p.montoNegocio?money(it.p.montoNegocio):null),(it.logrado>0?`${it.logrado} de ${it.meta} logrado`:null)].filter(Boolean).join(" · ")||"—"}</div>
                 </div>
-                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:800,color:"#a78bfa"}}>{it.meta}</div><div style={{fontSize:8,color:"#64748b"}}>cantidad</div></div>
+                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:800,color:"#a78bfa"}}>{it.restante}</div><div style={{fontSize:8,color:"#64748b"}}>restante</div></div>
               </div>)}
             </div>)}
         <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Síntesis de venta del mes: producto, categoría, monto de producción y unidades meta. Sin comisiones ni proyección de ingreso.</div>
