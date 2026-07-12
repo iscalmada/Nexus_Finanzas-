@@ -1119,6 +1119,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               {g.prods.map(p=><div key={p.id} style={{display:"flex",alignItems:"center",padding:"0 0 0 10px",borderBottom:"1px solid #14141f"}}>
                 <div style={{width:WCOL,flexShrink:0,padding:"6px 6px 6px 0"}}>
                   <div style={{fontSize:11,fontWeight:600,lineHeight:1.2}}>{p.tipo}</div>
+                  {p.categoria&&<div style={{fontSize:8,color:"#94a3b8",lineHeight:1.2,marginTop:1}}>{p.categoria}</div>}
                   <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{p.recurrente?" · recur.":" · único"}</div>
                 </div>
                 {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
