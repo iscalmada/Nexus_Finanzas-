@@ -1092,7 +1092,13 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
     })()}
     {modo==="matriz"&&<div style={S.sec}>
       <div style={S.g2}>
-        <div><div style={S.fl}>Mes inicial</div><input type="month" style={S.inp} value={ini} onChange={e=>setIni(e.target.value||ini)}/></div>
+        <div><div style={S.fl}>Mes inicial</div>
+          <div style={{display:"flex",gap:5,alignItems:"center"}}>
+            <button style={{...S.pill(false,"#64748b"),padding:"8px 10px",flexShrink:0}} onClick={()=>{const[y,m]=ini.split("-").map(Number);const d=new Date(y,m-2,1);setIni(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));}}>◀</button>
+            <input type="month" style={{...S.inp,flex:1}} value={ini} onChange={e=>setIni(e.target.value||ini)}/>
+            <button style={{...S.pill(false,"#64748b"),padding:"8px 10px",flexShrink:0}} onClick={()=>{const[y,m]=ini.split("-").map(Number);const d=new Date(y,m,1);setIni(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"));}}>▶</button>
+          </div>
+        </div>
         <div><div style={S.fl}>Meses a proyectar</div>
           <div style={{display:"flex",gap:5}}>{[3,6,12].map(n=><button key={n} style={{...S.pill(nMeses===n,GOLD),flex:1}} onClick={()=>setNMeses(n)}>{n}</button>)}</div>
         </div>
