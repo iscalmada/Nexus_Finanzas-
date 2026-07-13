@@ -59,7 +59,18 @@ function huellaVerificar(id){if(!id)return Promise.resolve(false);return navigat
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX",{minimumFractionDigits:0,maximumFractionDigits:0});
 const comResultProd=(p)=>(p.comisionDirecta!=null&&p.comisionDirecta!=="")?Number(p.comisionDirecta):((Number(p.montoNegocio)||0)*(Number(p.indiceComision)||0)/100);
 const mesActual=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");};
-const ingresoProdMes=(p,mes)=>{const com=comResultProd(p),metas=p.metas||{};if(p.recurrente){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}return (Number(metas[mes])||0)*com;};
+const restanteMesProd=(p,mes)=>Math.max(0,(Number((p.metas||{})[mes])||0)-(Number((p.logrado||{})[mes])||0));
+const ingresoProdMes=(p,mes)=>{
+  const com=comResultProd(p);
+  if(p.recurrente){
+    const metas=p.metas||{},logrados=p.logrado||{};
+    let metaAcum=0,logAcum=0;
+    const claves=new Set([...Object.keys(metas),...Object.keys(logrados)]);
+    claves.forEach(k=>{if(k<=mes){metaAcum+=Number(metas[k])||0;logAcum+=Number(logrados[k])||0;}});
+    return Math.max(0,metaAcum-logAcum)*com;
+  }
+  return restanteMesProd(p,mes)*com;
+};
 
 function Tablero({onBackup}){
   const mes=mesActual();
@@ -82,7 +93,7 @@ function Tablero({onBackup}){
     });
     const solSet={}; Object.keys(metaBySol).forEach(s=>solSet[s]=1); Object.keys(vincBySol).forEach(s=>solSet[s]=1);
     Object.keys(solSet).forEach(s=>{const m=metaBySol[s]||0,v=vincBySol[s]||0;const mx=Math.max(m,v);ingresoNexus+=mx;if(v>=m)porMov+=mx;else porMeta+=mx;});
-    opAb=arr(lsCFC('oportunidades',[])).filter(o=>o&&o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada").length;
+    opAb=arr(lsCFC('oportunidades',[])).filter(o=>o&&o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad En Espera").length;
   }catch(e){ingresoNexus=0;porMov=0;porMeta=0;opAb=0;}
   const r=lsCFP('resumen',{})||{};
   const integrado=ingresoNexus+(Number(r.saldo)||0)+(Number(r.ingresoExtra)||0);
