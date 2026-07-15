@@ -92,7 +92,10 @@ function Tablero({onBackup}){
       const sid=o.solucionId||"_"; vincBySol[sid]=(vincBySol[sid]||0)+(Number(m.monto)||0);
     });
     const solSet={}; Object.keys(metaBySol).forEach(s=>solSet[s]=1); Object.keys(vincBySol).forEach(s=>solSet[s]=1);
-    Object.keys(solSet).forEach(s=>{const m=metaBySol[s]||0,v=vincBySol[s]||0;const mx=Math.max(m,v);ingresoNexus+=mx;if(v>=m)porMov+=mx;else porMeta+=mx;});
+    // Meta ya viene neta de Logrado (restante), así que no se traslapa con lo vinculado por movimientos:
+    // simplemente se suman. Antes se usaba el mayor de los dos, lo cual descartaba productos
+    // pendientes de una solución cuando otro producto de esa misma solución ya estaba cubierto.
+    Object.keys(solSet).forEach(s=>{const m=metaBySol[s]||0,v=vincBySol[s]||0;ingresoNexus+=m+v;porMov+=v;porMeta+=m;});
     opAb=arr(lsCFC('oportunidades',[])).filter(o=>o&&o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad En Espera").length;
   }catch(e){ingresoNexus=0;porMov=0;porMeta=0;opAb=0;}
   const r=lsCFP('resumen',{})||{};
