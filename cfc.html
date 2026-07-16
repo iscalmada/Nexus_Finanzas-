@@ -1220,7 +1220,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
                 <div style={{textAlign:"right",flexShrink:0}}>
                   <div style={{fontSize:16,fontWeight:800,color:"#a78bfa"}}>{it.restante}</div>
                   <div style={{fontSize:8,color:"#64748b"}}>restante</div>
-                  {it.logrado>0&&<div style={{fontSize:8,color:"#4ade80",marginTop:1,whiteSpace:"nowrap"}}>✓ {it.logrado} logrado</div>}
+                  <div style={{fontSize:8,color:it.logrado>0?"#4ade80":"#475569",marginTop:1,whiteSpace:"nowrap"}}>✓ {it.logrado} logrado</div>
                 </div>
               </div>)}
             </div>)}
