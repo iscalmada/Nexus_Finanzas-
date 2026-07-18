@@ -441,7 +441,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
         <Row k="Nivel económico" v={c.nivelEconomico}/>
         <Row k="Referidor" v={c.referidor}/>
         <Row k="Capacidad referidor" v={c.capacidadRef}/>
-        {c.notaRelacion&&<div style={{fontSize:12,color:"#94a3b8",marginTop:8,lineHeight:1.5}}>{c.notaRelacion}</div>}
+        {c.notaRelacion&&<div style={{fontSize:12,color:"#94a3b8",marginTop:8,lineHeight:1.5,whiteSpace:"pre-wrap"}}>{c.notaRelacion}</div>}
       </div>
 
       <div style={S.card()}>
@@ -1871,9 +1871,9 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               {a.servicioSolucion&&<span style={{...S.tag(GOLD),fontSize:8}}>{a.servicioSolucion}</span>}
             </div>}
             {/* R4: texto según estatus — colapsado por defecto */}
-            {isExp&&(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
-            {isExp&&a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
-            {isExp&&a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4}}>→ {a.resultado}</div>}
+            {isExp&&(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>{a.intencion||a.intencionResultado}</div>}
+            {isExp&&a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>▸ {a.accionProceso}</div>}
+            {isExp&&a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>→ {a.resultado}</div>}
           </div>
         : <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(modo!=="unica"?toggleExp(a.id):(onTap&&onTap(a)))}>
             {/* R1: asunto (hasta 2 líneas) ………… fecha + atraso */}
@@ -1905,9 +1905,9 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
             {/* R3: contacto vinculado (si aplica) */}
             {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {ct.prefijo?ct.prefijo+" ":""}{ct.nombreCompleto}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
             {/* R4: descripción — colapsada por defecto */}
-            {isExp&&(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
-            {isExp&&a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
-            {isExp&&a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4}}>→ {a.resultado}</div>}
+            {isExp&&(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>{a.intencion||a.intencionResultado}</div>}
+            {isExp&&a.accionProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>▸ {a.accionProceso}</div>}
+            {isExp&&a.resultado&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>→ {a.resultado}</div>}
           </div>
       }
       {/* Progress bar */}
@@ -1968,7 +1968,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
                 {st.fecha&&<span style={{fontSize:9,color:"#64748b"}}>{st.fecha.split("-").reverse().join("/")}</span>}
               </div>
               <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",lineHeight:1.3}}>{st.titulo||"Subtarea sin nombre"}</div>
-              {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,lineHeight:1.4}}>{st.descripcion}</div>}
+              {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,lineHeight:1.4,whiteSpace:"pre-wrap"}}>{st.descripcion}</div>}
             </div>
           </div>;
         })}

@@ -460,9 +460,9 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
       {(a.etiquetas||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag?"💰":"🏷"} {et}</span>)}
     </div>
     {/* Intención / acción / conclusión — colapsado por defecto */}
-    {expanded&&a.intencion&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion}</div>}
-    {expanded&&a.accionEnProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionEnProceso}</div>}
-    {expanded&&a.conclusion&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4}}>→ {a.conclusion}</div>}
+    {expanded&&a.intencion&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>{a.intencion}</div>}
+    {expanded&&a.accionEnProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>▸ {a.accionEnProceso}</div>}
+    {expanded&&a.conclusion&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4,whiteSpace:"pre-wrap"}}>→ {a.conclusion}</div>}
     {/* Barra de progreso */}
     {prog&&<div style={{marginTop:6}}>
       <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:2}}><span>{prog.done}/{prog.total}</span><span>{Math.round(prog.done/prog.total*100)}%</span></div>
@@ -499,7 +499,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
               {st.fecha&&<span style={{fontSize:9,color:"#64748b"}}>{fmtF(st.fecha)}</span>}
             </div>
             <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none"}}>{st.titulo||"Subtarea"}</div>
-            {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2}}>{st.descripcion}</div>}
+            {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,whiteSpace:"pre-wrap"}}>{st.descripcion}</div>}
           </div>
         </div>;
       })}
