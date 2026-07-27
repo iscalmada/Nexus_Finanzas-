@@ -154,8 +154,6 @@ self.addEventListener("fetch", function(e) {
   <script type="text/babel" data-presets="react">
 
 const { useState, useMemo, useRef, useCallback, memo, useEffect } = React;
-// Normaliza texto para búsquedas sin distinguir acentos/mayúsculas (José === Jose)
-function normTxt(s){return (s||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
 // Recharts: desestructurar después de que los scripts cargaron
 const _RC = window.Recharts || {};
 const PieChart = _RC.PieChart || 'div';
@@ -766,9 +764,9 @@ const ModalMov=memo(function ModalMov({
               )}
               {formMov.tipoOp==="Ingreso"&&(<>
                 {/* Paso 1: elegir tipo de vinculación */}
-                <div style={{display:"flex",gap:6,marginBottom:7,flexWrap:"wrap"}}>
-                  {[["deudores","🟢 Deudor"],["acreedores","🔴 Préstamo"],["ingresosExt","⭐ Ing. Ext."],["oportunidades","🚀 Oportunidad"]].map(([t,l])=>(
-                    <button key={t} style={{...S.prioB2(formMov.vinculoTipo===t,"#C9A84C"),flex:1,minWidth:70,padding:"7px 4px",fontSize:9}}
+                <div style={{display:"flex",gap:6,marginBottom:7}}>
+                  {[["deudores","🟢 Deudor"],["ingresosExt","⭐ Ing. Ext."],["oportunidades","🚀 Oportunidad"]].map(([t,l])=>(
+                    <button key={t} style={{...S.prioB2(formMov.vinculoTipo===t,"#C9A84C"),flex:1,padding:"7px 4px",fontSize:9}}
                       onClick={()=>{set("vinculoTipo",formMov.vinculoTipo===t?null:t);set("vinculoId",null);}}>
                       {l}
                     </button>
@@ -781,15 +779,6 @@ const ModalMov=memo(function ModalMov({
                     {deudores.map(x=><option key={x.id} value={x.id}>{x.nombre||x.concepto}</option>)}
                   </select>
                 )}
-                {formMov.vinculoTipo==="acreedores"&&(<>
-                  <select style={S.sel} value={formMov.vinculoId||""} onChange={e=>set("vinculoId",parseInt(e.target.value)||null)}>
-                    <option value="">— Seleccionar acreedor —</option>
-                    {acreedores.map(x=><option key={x.id} value={x.id}>{x.nombre||x.concepto}</option>)}
-                  </select>
-                  {formMov.vinculoId&&<div style={{...S.infoBx("#f87171"),marginTop:6}}><span>📈</span>
-                    <span>Este ingreso se registra como préstamo recibido: <strong>aumenta</strong> el capital que le debes a este acreedor, en vez de reducirlo.</span>
-                  </div>}
-                </>)}
                 {formMov.vinculoTipo==="ingresosExt"&&(
                   <select style={S.sel} value={formMov.vinculoId||""} onChange={e=>set("vinculoId",parseInt(e.target.value)||null)}>
                     <option value="">— Seleccionar Ing. Ext. —</option>
@@ -806,7 +795,7 @@ const ModalMov=memo(function ModalMov({
                 )}
               </>)}
               <div style={{fontSize:9,color:"#475569",marginTop:3}}>
-                {formMov.tipoOp==="Egreso"?"Vincula este pago a un acreedor para registrar el abono.":"Vincula este ingreso a un deudor (te está pagando), un acreedor (te está prestando), un ingreso extraordinario o una oportunidad."}
+                {formMov.tipoOp==="Egreso"?"Vincula este pago a un acreedor para registrar el abono.":"Vincula este ingreso a un deudor o ingreso extraordinario para registrar el cobro."}
               </div>
               {(()=>{
                 if(!formMov.vinculoTipo||!formMov.vinculoId||!movs) return null;
@@ -1446,7 +1435,6 @@ function App(){
   const[carteraTab,setCarteraTab]=useState("acreedores"); // acreedores|deudores|ingresosExt
   const[carteraOrigen,setCarteraOrigen]=useState("Todos");
   const[carteraNivel,setCarteraNivel]=useState("Todos");
-  const[carteraAvance,setCarteraAvance]=useState([]);
   const[showCarteraForm,setShowCarteraForm]=useState(false);
   const[editCarteraId,setEditCarteraId]=useState(null);
   const[formCartera,setFormCartera]=useState({});
@@ -1460,8 +1448,6 @@ function App(){
   const[opoOrden,setOpoOrden]=useState("fechaCierre"); // "fechaCierre"|"pctAvance"
   const[opoFiltroEtapa,setOpoFiltroEtapa]=useState(null);
   const[opoQ,setOpoQ]=useState("");
-  const[opoOrdCampo,setOpoOrdCampo]=useState("etapa");
-  const[opoOrdDir,setOpoOrdDir]=useState("asc");
   // ── Catálogos del Sistema ──
   const[catOrigenAcr,setCatOrigenAcrRaw]=useState(()=>loadLS('ncfp_catOrigenAcr',["Sicresa","Familia","Terceros"]));
   const[catOrigenDeu,setCatOrigenDeuRaw]=useState(()=>loadLS('ncfp_catOrigenDeu',["Sicresa","Terceros"]));
@@ -1558,7 +1544,7 @@ function App(){
     return [...pendientes, ...conSaldo]
       .filter(r=>filterTipo==="TODOS"||r.tipoOp===filterTipo)
       .filter(r=>filterEst==="TODOS"||r.estatus===filterEst)
-      .filter(r=>!search||normTxt(r.concepto).includes(normTxt(search))||normTxt(r.obs).includes(normTxt(search))||(r.monto+"").includes(search))
+      .filter(r=>!search||r.concepto.toLowerCase().includes(search.toLowerCase())||(r.obs||"").toLowerCase().includes(search.toLowerCase())||(r.monto+"").includes(search))
       .filter(r=>{
         const hasFiltCuenta=filterCuentas.size>0;
         const hasFiltTarjeta=filterTarjetasFiltro.size>0;
@@ -1646,11 +1632,11 @@ function App(){
   // Resultados de búsqueda global en cartera
   const globalSearchResults=useMemo(()=>{
     if(!search||search.length<2) return {acreedores:[],deudores:[],ingresosExt:[]};
-    const q=normTxt(search);
+    const q=search.toLowerCase();
     return {
-      acreedores: acreedores.filter(x=>normTxt(x.nombre).includes(q)||normTxt(x.concepto).includes(q)||normTxt(x.condiciones).includes(q)),
-      deudores:   deudores.filter(x=>normTxt(x.nombre).includes(q)||normTxt(x.concepto).includes(q)||normTxt(x.condiciones).includes(q)),
-      ingresosExt:ingresosExt.filter(x=>normTxt(x.concepto).includes(q)||normTxt(x.condiciones).includes(q)),
+      acreedores: acreedores.filter(x=>(x.nombre||"").toLowerCase().includes(q)||(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
+      deudores:   deudores.filter(x=>(x.nombre||"").toLowerCase().includes(q)||(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
+      ingresosExt:ingresosExt.filter(x=>(x.concepto||"").toLowerCase().includes(q)||(x.condiciones||"").toLowerCase().includes(q)),
     };
   },[search,acreedores,deudores,ingresosExt]);
 
@@ -1900,11 +1886,9 @@ function App(){
             return;
           }
         } else if(data.vinculoTipo==="acreedores"){
-          if(data.tipoOp==="Ingreso"){
-            // Préstamo recibido: aumenta la deuda, sin límite de monto que validar.
-          } else if(data.tipoAbono!=="interes_convencional"){
-          // Acreedor (Egreso): validar según tipo de abono
+          // Acreedor: validar según tipo de abono
           // "interes_convencional" = gasto puro, sin validación de saldo
+          if(data.tipoAbono!=="interes_convencional"){
             const desglose=saldoPendienteDesglose(regV,movsParaCalculo);
             if(data.tipoAbono==="interes_acumulado"||data.tipoAbono==="interes"){
               // Interés acumulado: validar contra montoInteres del acreedor
@@ -2130,16 +2114,12 @@ function App(){
     return movs.filter(m=>registro.movIdsVinculados.includes(m.id)&&m.estatus==="PROGRAMADO").reduce((s,m)=>s+m.monto,0);
   },[]);
 
-  // Signo de un movimiento vinculado: un Ingreso ligado a un Acreedor es un préstamo recibido
-  // (aumenta la deuda), a diferencia de un Egreso ligado a Acreedor (abono, reduce la deuda).
-  const signoVinc = useCallback((m)=>(m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso")?-1:1,[]);
-
   const saldoPendiente = useCallback((registro,movs)=>{
     const vinc=(registro.movIdsVinculados||[]);
     const ejecutados=movs.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
     // Solo capital e interés acumulado reducen el saldo ("interes_convencional" no)
-    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional")).reduce((s,m)=>s+m.monto*signoVinc(m),0);
-    const abonadoIntAcum=ejecutados.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto*signoVinc(m),0);
+    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional")).reduce((s,m)=>s+m.monto,0);
+    const abonadoIntAcum=ejecutados.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
     const tieneDesglose=(registro.montoCapital||0)>0||(registro.montoInteres||0)>0;
     if(tieneDesglose){
       const pendCapital=Math.max(0,(registro.montoCapital||0)-abonadoCapital);
@@ -2147,16 +2127,7 @@ function App(){
       return pendCapital+pendIntAcum;
     }
     return Math.max(0,(registro.montoActual||0)-abonadoCapital);
-  },[signoVinc]);
-
-  // Avance de pago derivado: Sin movimiento | En proceso | Concretado
-  const avancePago = useCallback((registro,movs)=>{
-    const vinc=(registro.movIdsVinculados||[]);
-    const ejecutados=movs.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-    if(ejecutados.length===0) return "Sin movimiento";
-    const sp=saldoPendiente(registro,movs);
-    return sp<=0.01?"Concretado":"En proceso";
-  },[saldoPendiente]);
+  },[]);
 
   // Saldo pendiente desglosado capital/interés acumulado
   // tipoAbono posibles: "capital" | "interes_acumulado" | "interes_convencional"
@@ -2164,30 +2135,13 @@ function App(){
   const saldoPendienteDesglose = useCallback((registro,movs)=>{
     const vinc=(registro.movIdsVinculados||[]);
     const ejecutados=movs.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-    const esCapital=(m)=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes"&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional");
-    const capitalMovs=ejecutados.filter(esCapital);
-    // Pagos reales (reducen deuda) y préstamos adicionales (aumentan deuda), siempre positivos por separado
-    const abonadoCapital=capitalMovs.filter(m=>signoVinc(m)>0).reduce((s,m)=>s+m.monto,0);
-    const prestamosCapital=capitalMovs.filter(m=>signoVinc(m)<0).reduce((s,m)=>s+m.monto,0);
-    const netoCapital=abonadoCapital-prestamosCapital;
+    const abonadoCapital=ejecutados.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes"&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional")).reduce((s,m)=>s+m.monto,0);
     // Retrocompatibilidad: "interes" antiguo equivale a "interes_acumulado"
-    const abonadoIntAcum=ejecutados.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto*signoVinc(m),0);
+    const abonadoIntAcum=ejecutados.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
     const abonadoIntConv=ejecutados.filter(m=>m.tipoAbono==="interes_convencional").reduce((s,m)=>s+m.monto,0);
-    const capitalBase=registro.montoCapital||registro.montoActual||0;
-    const pendCapital=Math.max(0,capitalBase-netoCapital);
+    const pendCapital=Math.max(0,(registro.montoCapital||registro.montoActual||0)-abonadoCapital);
     const pendIntAcum=Math.max(0,(registro.montoInteres||0)-abonadoIntAcum);
-    const deudaTotalVigente=capitalBase+prestamosCapital;
-    return{pendCapital,pendIntAcum,pendInteres:pendIntAcum,abonadoCapital,prestamosCapital,deudaTotalVigente,abonadoInteres:abonadoIntAcum,abonadoIntAcum,abonadoIntConv};
-  },[signoVinc]);
-
-  // Desglose de movimientos aún programados de un acreedor: pagos que reducirán la deuda
-  // vs préstamos que la aumentarán, para no sumarlos como si fueran lo mismo.
-  const programadoDesglose = useCallback((registro,movs)=>{
-    const vinc=(registro.movIdsVinculados||[]);
-    const prog=movs.filter(m=>vinc.includes(m.id)&&m.estatus==="PROGRAMADO");
-    const prestamos=prog.filter(m=>m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso").reduce((s,m)=>s+m.monto,0);
-    const pagos=prog.filter(m=>!(m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso")).reduce((s,m)=>s+m.monto,0);
-    return{pagos,prestamos};
+    return{pendCapital,pendIntAcum,pendInteres:pendIntAcum,abonadoCapital,abonadoInteres:abonadoIntAcum,abonadoIntAcum,abonadoIntConv};
   },[]);
 
   // Estatus derivado para Ingresos Extraordinarios
@@ -3212,6 +3166,46 @@ function App(){
                 </div>
               );
             })}
+            {/* ── Totales ── */}
+            {(()=>{
+              const gastos=budgetTab==="eg"?budgetData.gastosEg:budgetData.gastosIng;
+              const cats=budgetTab==="eg"?catEg:catIng;
+              const totalPres=cats.reduce((s,cat)=>{
+                const hasSubs=cat.subs.length>0;
+                return s+(hasSubs?cat.subs.reduce((ss,sub)=>ss+budgetData.getPres(sub.id),0):budgetData.getPres(cat.id));
+              },0);
+              const totalGasto=cats.reduce((s,cat)=>{
+                const hasSubs=cat.subs.length>0;
+                return s+(hasSubs?cat.subs.reduce((ss,sub)=>ss+(gastos[sub.id]||0),0):(gastos[cat.id]||0));
+              },0);
+              const isIng=budgetTab==="ing";
+              const over=totalPres>0&&totalGasto>totalPres;
+              const pct=totalPres>0?Math.min(100,Math.round(totalGasto/totalPres*100)):0;
+              return <div style={{background:"#13131f",border:`2px solid ${isIng?"#22c55e44":"#f8717144"}`,borderRadius:11,padding:"12px 14px",marginTop:4}}>
+                <div style={{fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:1,textTransform:"uppercase",marginBottom:8}}>
+                  Total {isIng?"Ingresos":"Egresos"} del mes
+                </div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:8}}>
+                  <div>
+                    <div style={{fontSize:9,color:"#475569",marginBottom:2}}>Presupuesto</div>
+                    <div style={{fontSize:16,fontWeight:800,color:"#C9A84C"}}>{totalPres?fmt(totalPres):"—"}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:9,color:"#475569",marginBottom:2}}>Ejercido</div>
+                    <div style={{fontSize:16,fontWeight:800,color:over?"#f87171":isIng?"#22c55e":"#e2e8f0"}}>{fmt(totalGasto)}</div>
+                  </div>
+                </div>
+                {totalPres>0&&<>
+                  <div style={{background:"#1e293b",borderRadius:4,height:7,overflow:"hidden",marginBottom:5}}>
+                    <div style={{height:"100%",borderRadius:4,background:over?"#f87171":isIng?"#22c55e":"#C9A84C",width:pct+"%",transition:"width .4s"}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:9}}>
+                    <span style={{color:over?"#f87171":"#64748b"}}>{over?"⚠ Excedido en "+fmt(totalGasto-totalPres):`${fmt(totalPres-totalGasto)} disponible`}</span>
+                    <span style={{color:"#64748b",fontWeight:700}}>{pct}%</span>
+                  </div>
+                </>}
+              </div>;
+            })()}
             <div style={{height:18}}/>
           </div>
         )}
@@ -3382,12 +3376,11 @@ function App(){
           const opos=lsCRM('oportunidades',[]);
           const cat=lsCRM('catalogos',{})||{};
           const sols=cat.solucion||[]; const etps=cat.etapaOportunidad||[];
-          const featTagCFP=(cat.etiqAgenda||[])[0];
           const conts=lsCRM('contactos',[]); const emps=lsCRM('empresas',[]);
           const solName=(id)=>(sols.find(s=>s.id===id)||{}).nombre||"";
           const contName=(id)=>(conts.find(c=>c.id===id)||{}).nombreCompleto||"";
           const empName=(id)=>(emps.find(e=>e.id===id)||{}).nombre||"";
-          const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad En Espera";
+          const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
           const etColor=(et)=>et==="Oportunidad Concretada"?"#C9A84C":et==="Oportunidad Rechazada"?"#475569":"#22c55e";
           const abiertas=opos.filter(ABIERTA);
           const concret=opos.filter(o=>o.etapa==="Oportunidad Concretada");
@@ -3399,24 +3392,7 @@ function App(){
             if(opoFiltroEtapa&&o.etapa!==opoFiltroEtapa)return false;
             if(ql){const hay=[o.concepto,solName(o.solucionId),contName(o.contactoPrincipalId||o.contactoId),empName(o.empresaId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
             return true;
-          }).slice().sort((a,b)=>{
-            const ETAPA_RANK={"Oportunidad Identificada":0,"Oportunidad en Preparación":1,"Propuesta Presentada":2,"Oportunidad Aceptada":3,"Oportunidad Concretada":4,"Oportunidad En Espera":5,"Oportunidad Rechazada":6};
-            const PROB_RANK={Alta:0,Media:1,Baja:2};
-            const cmpEtapa=(x,y)=>(ETAPA_RANK[x.etapa]??9)-(ETAPA_RANK[y.etapa]??9);
-            const cmpFecha=(x,y)=>(x.fechaEstimadaCierre||"9999").localeCompare(y.fechaEstimadaCierre||"9999");
-            const cmpProb=(x,y)=>(PROB_RANK[x.probabilidad]??9)-(PROB_RANK[y.probabilidad]??9);
-            const cmpMonto=(x,y)=>(Number(x.montoEstimado)||0)-(Number(y.montoEstimado)||0);
-            const cmps={etapa:cmpEtapa,fecha:cmpFecha,probabilidad:cmpProb,monto:cmpMonto};
-            const orden=["etapa","fecha","probabilidad","monto"];
-            const secuencia=[opoOrdCampo,...orden.filter(k=>k!==opoOrdCampo)];
-            for(let i=0;i<secuencia.length;i++){
-              const k=secuencia[i];
-              let r=cmps[k](a,b);
-              if(k===opoOrdCampo)r=opoOrdDir==="asc"?r:-r;
-              if(r!==0)return r;
-            }
-            return 0;
-          });
+          }).slice().sort((a,b)=>(b.id||"").localeCompare(a.id||""));
           const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
           const cardS={background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8};
           return (
@@ -3435,34 +3411,20 @@ function App(){
                   <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
                   {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
                 </div>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8,alignItems:"center"}}>
-                  <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Orden</span>
-                  <button style={S.chip(opoOrdCampo==="etapa","#C9A84C")} onClick={()=>setOpoOrdCampo("etapa")}>Etapa</button>
-                  <button style={S.chip(opoOrdCampo==="fecha","#C9A84C")} onClick={()=>setOpoOrdCampo("fecha")}>Fecha cierre</button>
-                  <button style={S.chip(opoOrdCampo==="probabilidad","#C9A84C")} onClick={()=>setOpoOrdCampo("probabilidad")}>Probabilidad</button>
-                  <button style={S.chip(opoOrdCampo==="monto","#C9A84C")} onClick={()=>setOpoOrdCampo("monto")}>Monto</button>
-                  <button style={S.chip(false,"#60a5fa")} onClick={()=>setOpoOrdDir(d=>d==="asc"?"desc":"asc")}>{opoOrdDir==="asc"?"↑ Asc":"↓ Desc"}</button>
-                </div>
               </div>
               {lista.map(o=>{ const monto=o.comisionEstimada||o.montoEstimado; return (
                 <div key={o.id} style={{...cardS,cursor:"pointer",borderColor:etColor(o.etapa)+"55"}} onClick={()=>setVerRef(o)}>
                   <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:6,minWidth:0,flex:1}}>
-                      {featTagCFP&&(o.etiquetas||[]).includes(featTagCFP.nombre)&&<span title={featTagCFP.nombre} style={{fontSize:15,flexShrink:0}}>💰</span>}
-                      <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",wordBreak:"break-word"}}>{o.concepto}</div>
-                    </div>
+                    <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0"}}>{o.concepto}</div>
                     {monto?<div style={{fontSize:13,fontWeight:800,color:"#C9A84C",whiteSpace:"nowrap"}}>{fmt(monto)}</div>:null}
                   </div>
                   <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
                     <span style={tag(etColor(o.etapa))}>{(o.etapa||"").replace("Oportunidad ","")}</span>
-                    {o.fechaEstimadaCierre&&<span style={tag("#60a5fa")}>📅 {fmtDate(o.fechaEstimadaCierre)}</span>}
                     {o.probabilidad&&<span style={tag(o.probabilidad==="Alta"?"#22c55e":o.probabilidad==="Media"?"#fbbf24":"#f87171")}>◎ {o.probabilidad}</span>}
                     {o.recurrencia&&<span style={tag("#a78bfa")}>↺ {o.recurrencia}</span>}
                     {o.solucionId&&<span style={tag("#C9A84C")}>◈ {solName(o.solucionId)}</span>}
                     {(o.contactoPrincipalId||o.contactoId)&&<span style={tag("#94a3b8")}>{contName(o.contactoPrincipalId||o.contactoId)}</span>}
                     {o.empresaId&&<span style={tag("#3b82f6")}>{empName(o.empresaId)}</span>}
-                    {o.aliadoEstrategicoId&&<span style={tag("#2dd4bf")}>🤝 Estrat: {contName(o.aliadoEstrategicoId)}</span>}
-                    {o.aliadoComercialId&&<span style={tag("#2dd4bf")}>🤝 Comercial: {contName(o.aliadoComercialId)}</span>}
                   </div>
                 </div>
               );})}
@@ -3486,8 +3448,6 @@ function App(){
                         {row("Monto estimado",o.montoEstimado?fmt(o.montoEstimado):null)}
                         {row("Comisión estimada",o.comisionEstimada?fmt(o.comisionEstimada):null)}
                         {row("Cierre estimado",o.fechaEstimadaCierre?fmtDate(o.fechaEstimadaCierre):null)}
-                        {row("Aliado Estratégico",o.aliadoEstrategicoId?contName(o.aliadoEstrategicoId):null)}
-                        {row("Aliado Comercial",o.aliadoComercialId?contName(o.aliadoComercialId):null)}
                         {row("Concretada",o.fechaConcretada?fmtDate(o.fechaConcretada):null)}
                       </div>
                       {(()=>{
@@ -3588,7 +3548,7 @@ function App(){
                 {[["acreedores","🔴 Acreedores"],["deudores","🟢 Deudores"],["ingresosExt","⭐ Ing. Ext."]].map(([k,l])=>(
                   <button key={k} style={{flex:1,padding:"10px 4px",fontSize:9,fontWeight:700,cursor:"pointer",border:"none",background:"none",
                     color:carteraTab===k?"#C9A84C":"#334155",borderBottom:carteraTab===k?"2px solid #C9A84C":"2px solid transparent"}}
-                    onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");setCarteraAvance([]);}}>{l}</button>
+                    onClick={()=>{setCarteraTab(k);setCarteraOrigen("Todos");}}>{l}</button>
                 ))}
               </div>
               {/* Origen por tab */}
@@ -3600,25 +3560,16 @@ function App(){
                 })}
               </div>
               {/* Prioridad de pago — solo Acreedores */}
-              {carteraTab==="acreedores"&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:6}}>
+              {carteraTab==="acreedores"&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
                 <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Pago</span>
                 {["Todos",...catPrioPago].map(n=><button key={n} style={{...S.prioB2(carteraNivel===n,n==="Todos"?"#64748b":NIV_COL[n]||"#64748b"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraNivel(n)}>{n}</button>)}
-              </div>}
-              {/* Avance de pago — Acreedores y Deudores */}
-              {(carteraTab==="acreedores"||carteraTab==="deudores")&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Avance</span>
-                {["Sin movimiento","En proceso","Concretado"].map(av=>{
-                  const on=carteraAvance.includes(av);
-                  return <button key={av} style={{...S.prioB2(on,av==="Concretado"?"#22c55e":av==="En proceso"?"#fbbf24":"#64748b"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraAvance(p=>on?p.filter(x=>x!==av):[...p,av])}>{av}</button>;
-                })}
-                {carteraAvance.length>0&&<button style={{...S.prioB2(false,"#f87171"),flex:"none",padding:"4px 9px",fontSize:9}} onClick={()=>setCarteraAvance([])}>✕</button>}
               </div>}
             </div>
 
             {/* ── ACREEDORES ── */}
             {carteraTab==="acreedores"&&(()=>{
               const origenes=["Todos",...ORIG_ACREEDOR];
-              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>carteraAvance.length===0||carteraAvance.includes(avancePago(x,movs)));
+              const acrFiltrados=(carteraOrigen==="Todos"?acreedores:acreedores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
               const total=acrFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector origen y prioridad ya en sticky arriba */}
@@ -3687,7 +3638,7 @@ function App(){
             {/* ── DEUDORES ── */}
             {carteraTab==="deudores"&&(()=>{
               const origenes=["Todos",...ORIG_DEUDOR];
-              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel).filter(x=>carteraAvance.length===0||carteraAvance.includes(avancePago(x,movs)));
+              const deuFiltrados=(carteraOrigen==="Todos"?deudores:deudores.filter(x=>x.origen===carteraOrigen)).filter(x=>carteraNivel==="Todos"||(x.nivel||"Media")===carteraNivel);
               const total=deuFiltrados.reduce((s,x)=>s+saldoPendiente(x,movs),0);
               return(<>
                 {/* Selector origen ya en sticky */}
@@ -3886,10 +3837,6 @@ function App(){
                             <span style={{fontSize:9,color:"#64748b"}}>Inicial</span>
                             <span style={{fontSize:11,fontWeight:800,color:"#22c55e88"}}>{fmt(registroActual.montoCapital||0)}</span>
                           </div>
-                          {desglose.prestamosCapital>0&&<div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
-                            <span style={{fontSize:9,color:"#fb923c"}}>📈 Préstamos adicionales</span>
-                            <span style={{fontSize:11,fontWeight:700,color:"#fb923c"}}>{fmt(desglose.prestamosCapital)}</span>
-                          </div>}
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:3}}>
                             <span style={{fontSize:9,color:"#64748b"}}>Abonado</span>
                             <span style={{fontSize:11,fontWeight:700,color:"#22c55e"}}>{fmt(desglose.abonadoCapital)}</span>
@@ -3899,7 +3846,7 @@ function App(){
                             <span style={{fontSize:13,fontWeight:800,color:desglose.pendCapital>0?"#f87171":"#22c55e"}}>{fmt(desglose.pendCapital)}</span>
                           </div>
                           <div style={{marginTop:5,height:3,borderRadius:2,background:"#1e293b",overflow:"hidden"}}>
-                            <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${desglose.deudaTotalVigente>0?Math.max(0,Math.min(100,(desglose.abonadoCapital/desglose.deudaTotalVigente)*100)):0}%`}}/>
+                            <div style={{height:"100%",borderRadius:2,background:"#22c55e",width:`${registroActual.montoCapital>0?Math.min(100,(desglose.abonadoCapital/(registroActual.montoCapital))*100):0}%`}}/>
                           </div>
                         </div>
                         <div style={{background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:9,padding:"9px 8px"}}>
@@ -3926,19 +3873,12 @@ function App(){
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:11}}>
                       <div style={{background:"rgba(248,113,113,0.08)",border:"1px solid #f8717133",borderRadius:9,padding:"8px 6px",textAlign:"center"}}>
                         <div style={{fontSize:8,color:"#f87171",fontWeight:700,marginBottom:3}}>Deuda total</div>
-                        <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(desglose.deudaTotalVigente)}</div>
+                        <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(registroActual.montoActual)}</div>
                       </div>
                       <div style={{background:carteraDetalleModo==="programados"?"rgba(167,139,250,0.2)":"rgba(167,139,250,0.08)",border:`1px solid ${carteraDetalleModo==="programados"?"#a78bfa":"#a78bfa33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
                         onClick={()=>setCarteraDetalleModo(carteraDetalleModo==="programados"?"ejecutados":"programados")}>
                         <div style={{fontSize:8,color:"#a78bfa",fontWeight:700,marginBottom:3}}>Programado {carteraDetalleModo==="programados"?"▲":"▼"}</div>
-                        {(()=>{const pd=programadoDesglose(registroActual,movs);
-                          if(pd.prestamos>0&&pd.pagos>0)return(<>
-                            <div style={{fontSize:9,fontWeight:700,color:"#a78bfa"}}>📉{fmt(pd.pagos)}</div>
-                            <div style={{fontSize:9,fontWeight:700,color:"#fb923c"}}>📈{fmt(pd.prestamos)}</div>
-                          </>);
-                          if(pd.prestamos>0)return <div style={{fontSize:11,fontWeight:800,color:"#fb923c"}}>📈{fmt(pd.prestamos)}</div>;
-                          return <div style={{fontSize:11,fontWeight:800,color:"#a78bfa"}}>{fmt(pd.pagos)}</div>;
-                        })()}
+                        <div style={{fontSize:11,fontWeight:800,color:"#a78bfa"}}>{fmt(prog)}</div>
                       </div>
                       <div style={{background:carteraDetalleModo==="ejecutados"?`${sp>0?"#f87171":"#22c55e"}22`:`${sp>0?"#f87171":"#22c55e"}08`,border:`1px solid ${sp>0?"#f87171":"#22c55e"}${carteraDetalleModo==="ejecutados"?"66":"33"}`,borderRadius:9,padding:"8px 6px",textAlign:"center",cursor:"pointer"}}
                         onClick={()=>setCarteraDetalleModo("ejecutados")}>
