@@ -1747,7 +1747,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   </div></div>;
 }
 
-function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct}){
+function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct}){
   const[expandidos,setExpandidos]=useState(new Set());  // mecanismo 2: subtareas Proyecto/Checklist
   const[expandDesc,setExpandDesc]=useState(new Set());  // mecanismo 1: descripción en TODAS las tarjetas
   const[selSub,setSelSub]=useState({});     // {actId: Set<subId>}
@@ -1842,8 +1842,9 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
       }
       {/* Historial de contacto / oportunidad */}
       {esContactarA&&a.contactoId&&(()=>{
-        const histCto=(acts||[]).filter(x=>x.id!==a.id&&x.contactoId===a.contactoId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||""));
-        const histOpo=a.oportunidadId?(acts||[]).filter(x=>x.id!==a.id&&x.oportunidadId===a.oportunidadId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||"")):[];
+        const _src=allActs||acts||[];
+        const histCto=_src.filter(x=>x.id!==a.id&&x.contactoId===a.contactoId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||""));
+        const histOpo=a.oportunidadId?_src.filter(x=>x.id!==a.id&&x.oportunidadId===a.oportunidadId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||"")):[];
         if(histCto.length===0&&histOpo.length===0)return null;
         const nivel=historial[a.id];
         const histActivo=nivel==="oportunidad"?histOpo:histCto;
@@ -2142,7 +2143,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     </div>
     {/* ── CONTENIDO ── */}
     <div id="ag-top" style={{...S.sec,paddingTop:4}}>
-      {modo==="lista"&&<ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)}/>}
+      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)}/>}
       {(modo==="rptCom"||modo==="rptTar"||modo==="rptAcc")&&(()=>{
         const esCom=modo==="rptCom";
         const enfRpt=modo==="rptCom"?"Contactar":modo==="rptTar"?"Tareas":"Acciones";
