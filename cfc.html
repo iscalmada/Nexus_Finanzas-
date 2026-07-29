@@ -1984,9 +1984,9 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
 }
 
 function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
-  const[filtros,setFiltros]=useState([]);
+  const[filtros,setFiltros]=useState(["Programada"]);
   const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
-  const[modo,setModo]=useState("lista");
+  const[modo,setModo]=useState("rptCom");
   const[desde,setDesde]=useState("");
   const[hasta,setHasta]=useState("");
   const[showFil,setShowFil]=useState(false);
@@ -2003,6 +2003,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[selMode,setSelMode]=useState(false);
   const[sel,setSel]=useState([]);
   const[fEnfoque,setFEnfoque]=useState("");
+  const[fSinFecha,setFSinFecha]=useState(false);
   const[fEtiqAgenda,setFEtiqAgenda]=useState("");
   const[batch,setBatch]=useState(null);
   const toggleSel=(id)=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
@@ -2024,6 +2025,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(fTipos.length&&!fTipos.includes(a.tipoAccion))return false;
     if(fEtC){const c=ctById(a.contactoId);if(!c||c.etapaEspecifica!==fEtC)return false;}
     if(fEtO){const o=opById(a.oportunidadId);if(!o||o.etapa!==fEtO)return false;}
+    if(fSinFecha){if(efFech)return false;}
     if(fEnfoque&&(a.enfoque||"Contactar")!==fEnfoque)return false;
     if(fEtiqAgenda&&!(a.etiquetasAgenda||[]).includes(fEtiqAgenda))return false;
     if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,a.asunto,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
@@ -2038,29 +2040,31 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     return ordDir==="asc"?r:-r;
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(filtros.length?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFiltros([]);};
+  const sinFechaCount=(actividades||[]).filter(a=>!(proyFecha(a)||a.fecha||"")).length;
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(filtros.length?1:0)+(fSinFecha?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFSinFecha(false);setFiltros([]);};
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
+    <div style={S.hdr}><div><div style={S.logo}>Agenda de Trabajo</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div><div style={{display:"flex",alignItems:"center"}}>{sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setDesde("");setHasta("");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}</div></div>
     <div style={S.line}/>
     {/* ── BARRA STICKY COMPACTA ── */}
     <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"8px 12px 8px"}}>
       {/* Fila 1: tabs */}
       <div style={{display:"flex",gap:5,marginBottom:7}}>
-        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:12}} onClick={()=>setModo("lista")}>Lista</button>
-        <button style={{...S.pill(modo==="rptCom","#60a5fa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptCom")}>📞 Contactar</button>
-        <button style={{...S.pill(modo==="rptTar","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptTar")}>📋 Tareas</button>
-        <button style={{...S.pill(modo==="rptAcc","#2dd4bf"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptAcc")}>⚡ Acciones</button>
+        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("lista")}>Vista General</button>
+        <button style={{...S.pill(modo==="rptCom","#60a5fa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptCom")}>📞 Seguimiento</button>
+        <button style={{...S.pill(modo==="rptTar","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptTar")}>📋 Mis Tareas</button>
+        <button style={{...S.pill(modo==="rptAcc","#2dd4bf"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptAcc")}>⚡ Mis Acciones</button>
       </div>
       {/* Fila 2: Enfoque — siempre visible, igual que APersonal */}
       <div style={{display:"flex",gap:4,marginBottom:6,alignItems:"center",flexWrap:"nowrap"}}>
         <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Enfoque:</span>
         {[["","Todos","#64748b"],["Contactar","📞","#60a5fa"],["Tareas","📋","#a78bfa"],["Acciones","⚡","#2dd4bf"]].map(([v,ic,c])=>(
-          <span key={v} style={{...S.chip(fEnfoque===v,c),fontSize:10,padding:"3px 8px",whiteSpace:"nowrap"}} onClick={()=>setFEnfoque(fEnfoque===v&&v!==""?"":v)}>{ic}{v?(" "+v):" Todos"}</span>
+          <span key={v} style={{...S.chip(fEnfoque===v,c),fontSize:10,padding:"3px 8px",whiteSpace:"nowrap"}} onClick={()=>setFEnfoque(fEnfoque===v&&v!==""?"":v)}>{v?`${ic} ${v}`:ic}</span>
         ))}
       </div>
       {/* Fila 3: chips estatus */}
-      <div style={{display:"flex",gap:5,flexWrap:"nowrap",marginBottom:7}}>
+      <div style={{display:"flex",gap:4,marginBottom:7,alignItems:"center",flexWrap:"nowrap"}}>
+        <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Etapa:</span>
         {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]||GOLD),fontSize:10,padding:"3px 8px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
         {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:10,padding:"3px 8px",opacity:.8}} onClick={()=>setFiltros([])}>✕</span>}
       </div>
