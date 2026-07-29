@@ -2037,7 +2037,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     return ordDir==="asc"?r:-r;
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0);
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(filtros.length?1:0);
   const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFiltros([]);};
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
@@ -2051,7 +2051,14 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         <button style={{...S.pill(modo==="rptTar","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptTar")}>📋 Tareas</button>
         <button style={{...S.pill(modo==="rptAcc","#2dd4bf"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptAcc")}>⚡ Acciones</button>
       </div>
-      {/* Fila 2: chips estatus */}
+      {/* Fila 2: Enfoque — siempre visible, igual que APersonal */}
+      <div style={{display:"flex",gap:4,marginBottom:6,alignItems:"center",flexWrap:"nowrap"}}>
+        <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Enfoque:</span>
+        {[["","Todos","#64748b"],["Contactar","📞","#60a5fa"],["Tareas","📋","#a78bfa"],["Acciones","⚡","#2dd4bf"]].map(([v,ic,c])=>(
+          <span key={v} style={{...S.chip(fEnfoque===v,c),fontSize:10,padding:"3px 8px",whiteSpace:"nowrap"}} onClick={()=>setFEnfoque(fEnfoque===v&&v!==""?"":v)}>{ic}{v?(" "+v):" Todos"}</span>
+        ))}
+      </div>
+      {/* Fila 3: chips estatus */}
       <div style={{display:"flex",gap:5,flexWrap:"nowrap",marginBottom:7}}>
         {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]||GOLD),fontSize:10,padding:"3px 8px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
         {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:10,padding:"3px 8px",opacity:.8}} onClick={()=>setFiltros([])}>✕</span>}
@@ -2065,12 +2072,6 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     {/* ── PANEL DE FILTROS ── */}
     <div style={{...S.sec,paddingTop:4}}>
       {showFil&&<div style={{...S.card(),marginTop:6,padding:"10px 12px"}}>
-        {/* 1 Enfoque */}
-        <div style={{display:"flex",gap:5,marginBottom:8}}>
-          {[["","Todos","#64748b"],["Contactar","📞 Contactar","#60a5fa"],["Tareas","📋 Tareas","#a78bfa"],["Acciones","⚡ Acciones","#2dd4bf"]].map(([v,l,c])=>(
-            <button key={v} style={{...S.pill(fEnfoque===v,c),flex:1,padding:"5px 0",fontWeight:700,fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
-          ))}
-        </div>
         {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{marginBottom:8}}>
           <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orientación</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
