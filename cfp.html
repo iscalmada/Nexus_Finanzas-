@@ -4044,7 +4044,7 @@ function App(){
                 {!isIngExt&&(()=>{
                   const tieneInteres=registroActual.condicionPago==="con_interes";
                   const movEjec=movVinc.filter(m=>["PAGADO","INGRESADO"].includes(m.estatus)).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
-                  const movProg=movVinc.filter(m=>m.estatus==="PROGRAMADO").sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+                  const movProg=movVinc.filter(m=>m.estatus==="PROGRAMADO").sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
                   const totalEjec=movEjec.reduce((s,m)=>s+m.monto,0);
                   const totalProg=movProg.reduce((s,m)=>s+m.monto,0);
                   return(<>
