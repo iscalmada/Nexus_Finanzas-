@@ -1986,6 +1986,22 @@ function App(){
     }
 
     // Vincular a cartera/oportunidades — incluir TODOS los IDs generados (series incluidas)
+    // 1) Si el movimiento tenía un vínculo anterior DIFERENTE, removerlo de ese registro
+    if(editMovId!==null){
+      const orig=movs.find(r=>r.id===editMovId);
+      if(orig?.vinculoTipo&&orig?.vinculoId){
+        const vinculoCambio=orig.vinculoTipo!==data.vinculoTipo||orig.vinculoId!==data.vinculoId;
+        if(vinculoCambio){
+          const removerDe=(setter)=>setter(p=>p.map(x=>
+            x.id===orig.vinculoId?{...x,movIdsVinculados:(x.movIdsVinculados||[]).filter(id=>id!==editMovId)}:x
+          ));
+          if(orig.vinculoTipo==="acreedores")    removerDe(setAcreedores);
+          else if(orig.vinculoTipo==="deudores") removerDe(setDeudores);
+          else if(orig.vinculoTipo==="ingresosExt") removerDe(setIngresosExt);
+        }
+      }
+    }
+    // 2) Si el nuevo vínculo existe, añadir ID al nuevo registro
     if(data.vinculoTipo&&data.vinculoId){
       // Calcular todos los IDs que se acaban de crear
       const idsGenerados=recForm.activo
