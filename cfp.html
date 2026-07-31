@@ -840,8 +840,10 @@ const ModalMov=memo(function ModalMov({
                   if(formMov.tipoAbono==="interes_convencional") return null;
                   const vinc=(rv.movIdsVinculados||[]);
                   const ejec=movsCalc.filter(m=>vinc.includes(m.id)&&["PAGADO","INGRESADO"].includes(m.estatus));
-                  const abonadoCap=ejec.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional"&&m.tipoAbono!=="interes")).reduce((s,m)=>s+m.monto,0);
-                  const abonadoIntAcum=ejec.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto,0);
+                  // sv: Ingreso+Acreedor aumenta la deuda (signo -1), igual que signoVinc global
+                  const sv=(m)=>(m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso")?-1:1;
+                  const abonadoCap=ejec.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional"&&m.tipoAbono!=="interes")).reduce((s,m)=>s+m.monto*sv(m),0);
+                  const abonadoIntAcum=ejec.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes").reduce((s,m)=>s+m.monto*sv(m),0);
                   if(formMov.tipoAbono==="capital"){
                     const pendCap=Math.max(0,(rv.montoCapital||rv.montoActual||0)-abonadoCap);
                     if(mm>pendCap+0.01) return(
