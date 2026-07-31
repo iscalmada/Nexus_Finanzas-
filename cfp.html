@@ -4048,17 +4048,24 @@ function App(){
                   const totalEjec=movEjec.reduce((s,m)=>s+m.monto,0);
                   const totalProg=movProg.reduce((s,m)=>s+m.monto,0);
                   return(<>
-                    <div style={{...S.sTit,marginBottom:9}}>ABONOS VÍA MOVIMIENTOS</div>
+                    <div style={{...S.sTit,marginBottom:9}}>MOVIMIENTOS A CAPITAL</div>
                     {movEjec.length>0&&(()=>{
+                      const sv=(m)=>(m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso")?-1:(m.vinculoTipo==="deudores"&&m.tipoOp==="Egreso")?-1:1;
                       const capital=movEjec.filter(m=>m.tipoAbono==="capital"||(!m.tipoAbono&&m.tipoAbono!=="interes_acumulado"&&m.tipoAbono!=="interes_convencional"&&m.tipoAbono!=="interes"));
                       const intAcum=movEjec.filter(m=>m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes");
                       const intConv=movEjec.filter(m=>m.tipoAbono==="interes_convencional");
+                      const capAbonos=capital.filter(m=>sv(m)>0);
+                      const capPrestamos=capital.filter(m=>sv(m)<0);
                       return(
                         <div style={{display:"flex",gap:5,marginBottom:9,flexWrap:"wrap"}}>
-                          <div style={{flex:1,minWidth:70,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
-                            <div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>💰 CAPITAL</div>
-                            <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(capital.reduce((s,m)=>s+m.monto,0))}</div>
-                          </div>
+                          {capAbonos.length>0&&<div style={{flex:1,minWidth:70,background:"rgba(34,197,94,0.1)",border:"1px solid #22c55e33",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
+                            <div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>💰 ABONOS</div>
+                            <div style={{fontSize:11,fontWeight:800,color:"#22c55e"}}>{fmt(capAbonos.reduce((s,m)=>s+m.monto,0))}</div>
+                          </div>}
+                          {capPrestamos.length>0&&<div style={{flex:1,minWidth:70,background:"rgba(249,115,22,0.1)",border:"1px solid #f9731633",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
+                            <div style={{fontSize:7,color:"#f97316",fontWeight:700}}>📈 PRÉSTAMOS</div>
+                            <div style={{fontSize:11,fontWeight:800,color:"#f97316"}}>{fmt(capPrestamos.reduce((s,m)=>s+m.monto,0))}</div>
+                          </div>}
                           {intAcum.length>0&&<div style={{flex:1,minWidth:70,background:"rgba(248,113,113,0.1)",border:"1px solid #f8717133",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
                             <div style={{fontSize:7,color:"#f87171",fontWeight:700}}>📌 INT. ACUM.</div>
                             <div style={{fontSize:11,fontWeight:800,color:"#f87171"}}>{fmt(intAcum.reduce((s,m)=>s+m.monto,0))}</div>
@@ -4078,12 +4085,14 @@ function App(){
                     )}
                     {/* Lista según modo seleccionado */}
                     {(carteraDetalleModo==="ejecutados"?movEjec:movProg).map(m=>{
+                      const sv=(m)=>(m.vinculoTipo==="acreedores"&&m.tipoOp==="Ingreso")?-1:(m.vinculoTipo==="deudores"&&m.tipoOp==="Egreso")?-1:1;
                       const esIntAcum=m.tipoAbono==="interes_acumulado"||m.tipoAbono==="interes";
                       const esIntConv=m.tipoAbono==="interes_convencional";
                       const esCap=!esIntAcum&&!esIntConv;
-                      const badgeColor=esIntConv?"#fbbf24":esIntAcum?"#f87171":"#22c55e";
-                      const badgeBg=esIntConv?"rgba(251,191,36,0.18)":esIntAcum?"rgba(248,113,113,0.18)":"rgba(34,197,94,0.18)";
-                      const badgeLabel=esIntConv?"💸 INT. CONV.":esIntAcum?"📌 INT. ACUM.":"💰 CAPITAL";
+                      const esPrestamo=esCap&&sv(m)<0;
+                      const badgeColor=esIntConv?"#fbbf24":esIntAcum?"#f87171":esPrestamo?"#f97316":"#22c55e";
+                      const badgeBg=esIntConv?"rgba(251,191,36,0.18)":esIntAcum?"rgba(248,113,113,0.18)":esPrestamo?"rgba(249,115,22,0.18)":"rgba(34,197,94,0.18)";
+                      const badgeLabel=esIntConv?"💸 INT. CONV.":esIntAcum?"📌 INT. ACUM.":esPrestamo?"📈 PRÉSTAMO":"💰 CAPITAL";
                       return(
                         <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1e293b"}}>
                           <div style={{flex:1}}>
@@ -4102,7 +4111,7 @@ function App(){
                     })}
                     {(carteraDetalleModo==="ejecutados"?movEjec:movProg).length===0&&movVinc.length>0&&(
                       <div style={{fontSize:10,color:"#334155",textAlign:"center",padding:"12px 0"}}>
-                        {carteraDetalleModo==="programados"?"Sin abonos programados":"Sin abonos ejecutados aún"}
+                        {carteraDetalleModo==="programados"?"Sin movimientos programados":"Sin movimientos ejecutados aún"}
                       </div>
                     )}
                     <div style={{marginTop:9}}/>
