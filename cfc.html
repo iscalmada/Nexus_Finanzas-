@@ -2405,6 +2405,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const[cHasta,setCHasta]=useState("");
   const[q,setQ]=useState("");
   const[fSinAct,setFSinAct]=useState(false);
+  const[ord,setOrd]=useState("etapa");
+  const[ordDir,setOrdDir]=useState("asc");
   const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
   const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"";
   const en=(id)=>(empresas.find(e=>e.id===id)||{}).nombre||"";
@@ -2440,7 +2442,16 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     if(cHasta&&(o.fechaEstimadaCierre||"")>cHasta)return false;
     if(ql){const hay=[o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
-  }).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
+  }).sort((a,b)=>{
+    const PROB_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
+    const etapas=(catalogos.etapaOportunidad||[]).map(e=>e.nombre);
+    let r=0;
+    if(ord==="etapa")     r=(etapas.indexOf(a.etapa)>-1?etapas.indexOf(a.etapa):99)-(etapas.indexOf(b.etapa)>-1?etapas.indexOf(b.etapa):99);
+    else if(ord==="cierre") r=(a.fechaEstimadaCierre||"9999").localeCompare(b.fechaEstimadaCierre||"9999");
+    else if(ord==="prob")   r=((PROB_RANK[a.probabilidad]??9)-(PROB_RANK[b.probabilidad]??9));
+    else if(ord==="monto")  r=(Number(b.montoEstimado)||0)-(Number(a.montoEstimado)||0);
+    return ordDir==="asc"?r:-r;
+  });
   const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0);
   const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);};
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
@@ -2466,6 +2477,14 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar concepto, contacto, empresa…" value={q} onChange={e=>setQ(e.target.value)}/>
         <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""} {showFil?"▲":"▾"}</button>
         <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap"}}>Act: {list.length}</span>
+      </div>
+      {/* Fila de orden — igual que CFP */}
+      <div style={{display:"flex",gap:4,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0,marginRight:2}}>ORDEN</span>
+        {[["etapa","Etapa"],["cierre","Fecha cierre"],["prob","Probabilidad"],["monto","Monto"]].map(([v,l])=>(
+          <span key={v} style={{...S.chip(ord===v,GOLD),fontSize:9,padding:"3px 8px",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>setOrd(v)}>{l}</span>
+        ))}
+        <span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 8px",flexShrink:0,cursor:"pointer"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</span>
       </div>
       {showFil&&<div style={{...S.card(),marginTop:10}}>
         <div style={S.fl}>Etapa</div>
