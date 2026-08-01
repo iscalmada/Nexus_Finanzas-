@@ -896,8 +896,9 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,on
 /* ════════ PRODUCTOS POR SOLUCIÓN ════════ */
 function comResultProd(p){return (p.comisionDirecta!==undefined&&p.comisionDirecta!==null&&p.comisionDirecta!=="")?Number(p.comisionDirecta):((Number(p.montoNegocio)||0)*(Number(p.indiceComision)||0)/100);}
 function ProductoModal({init,catalogos,onSave,onClose,onDelete}){
-  const[f,setF]=useState(()=>({recurrente:true,...init}));
+  const[f,setF]=useState(()=>({recurrencia:"mensual",...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const fRec=f.recurrencia||(f.recurrente===true?"mensual":"único"); // backward compat lectura
   const calc=(Number(f.montoNegocio)||0)*(Number(f.indiceComision)||0)/100;
   const comResult=comResultProd(f);
   const save=()=>{ if(!f.solucionId){alert("Elige la solución");return;} if(!f.tipo){alert("Captura el tipo");return;} onSave({...f}); };
@@ -917,10 +918,11 @@ function ProductoModal({init,catalogos,onSave,onClose,onDelete}){
     </div>
     <Field label="Comisión directa (opcional, sobrescribe el cálculo)"><input type="number" inputMode="decimal" style={S.inp} value={f.comisionDirecta??""} onChange={e=>set("comisionDirecta",e.target.value===""?null:Number(e.target.value))} placeholder={"Calculada: "+money(calc)}/></Field>
     <div style={{fontSize:12,color:"#2dd4bf",fontWeight:800,margin:"2px 0 12px"}}>Comisión resultante: {money(comResult)}</div>
-    <Field label="¿Ingreso recurrente mensual?">
+    <Field label="Recurrencia">
       <div style={{display:"flex",gap:6}}>
-        <button style={{...S.pill(f.recurrente===true,"#2dd4bf"),flex:1}} onClick={()=>set("recurrente",true)}>Recurrente mensual</button>
-        <button style={{...S.pill(f.recurrente===false,"#fbbf24"),flex:1}} onClick={()=>set("recurrente",false)}>Único</button>
+        <button style={{...S.pill(fRec==="mensual","#2dd4bf"),flex:1,fontSize:10}} onClick={()=>set("recurrencia","mensual")}>🔄 Mensual</button>
+        <button style={{...S.pill(fRec==="anual","#a78bfa"),flex:1,fontSize:10}} onClick={()=>set("recurrencia","anual")}>📅 Anual</button>
+        <button style={{...S.pill(fRec==="único","#fbbf24"),flex:1,fontSize:10}} onClick={()=>set("recurrencia","único")}>1️⃣ Único</button>
       </div>
     </Field>
     <Field label="Notas"><textarea style={{...S.inp,minHeight:54,resize:"vertical",fontFamily:"inherit"}} value={f.notas||""} onChange={e=>set("notas",e.target.value||null)} placeholder="Notas abiertas sobre el producto…"/></Field>
@@ -965,7 +967,7 @@ function Productos({productos,setProductos,catalogos,onBack}){
               </div>
               <div style={{textAlign:"right",flexShrink:0}}>
                 <div style={{fontSize:13,fontWeight:800,color:"#fbbf24"}}>{money(comResultProd(p))}</div>
-                <span style={S.tag(p.recurrente?"#2dd4bf":"#64748b")}>{p.recurrente?"Recurrente":"Único"}</span>
+                <span style={S.tag({mensual:"#2dd4bf",anual:"#a78bfa",único:"#64748b"}[p.recurrencia||(p.recurrente===true?"mensual":"único")]||"#64748b")}>{({mensual:"Mensual",anual:"Anual",único:"Único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||"Único"}</span>
               </div>
             </div>
           </div>)}
@@ -980,7 +982,7 @@ function Productos({productos,setProductos,catalogos,onBack}){
       </div>}
       {productos.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Aún no hay productos. Toca + para crear el primero por solución.</div>}
     </div>
-    <button style={S.fab} onClick={()=>setModal({recurrente:true})}>+</button>
+    <button style={S.fab} onClick={()=>setModal({recurrencia:"mensual"})}>+</button>
     {modal&&<ProductoModal init={modal} catalogos={catalogos} onSave={save} onClose={()=>setModal(null)} onDelete={del}/>}
   </div>;
 }
@@ -1004,8 +1006,14 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
     if(val===""||val===null)delete metas[mes];else metas[mes]=val;
     return {...p,metas};
   }));
+  const pRec=(p)=>p.recurrencia||(p.recurrente===true?"mensual":"único"); // backward compat
   const cierreProd=(p,mes)=>(Number((p.metas||{})[mes])||0)*comResultProd(p);
-  const ingresoProd=(p,mes)=>{const com=comResultProd(p),metas=p.metas||{};if(p.recurrente){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}return (Number(metas[mes])||0)*com;};
+  const ingresoProd=(p,mes)=>{
+    const com=comResultProd(p),metas=p.metas||{},rec=pRec(p);
+    if(rec==="mensual"){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}
+    if(rec==="anual"){const mesM=mes.slice(5),mesY=mes.slice(0,4);let u=0;for(const k in metas){if(k.slice(5)===mesM&&k.slice(0,4)<=mesY)u+=Number(metas[k])||0;}return u*com;}
+    return (Number(metas[mes])||0)*com; // único
+  };
   const sols=(catalogos.solucion||[]).map(s=>({s,prods:productos.filter(p=>p.solucionId===s.id)})).filter(g=>g.prods.length>0);
   const sumProds=(prods,mes,fn)=>prods.reduce((a,p)=>a+fn(p,mes),0);
   const WCOL=120,WMES=68;
@@ -1095,7 +1103,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               {g.prods.map(p=><div key={p.id} style={{display:"flex",alignItems:"center",padding:"0 0 0 10px",borderBottom:"1px solid #14141f"}}>
                 <div style={{width:WCOL,flexShrink:0,padding:"6px 6px 6px 0"}}>
                   <div style={{fontSize:11,fontWeight:600,lineHeight:1.2}}>{p.tipo}</div>
-                  <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{p.recurrente?" · recur.":" · único"}</div>
+                  <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{({mensual:" · mensual",anual:" · anual",único:" · único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||" · único"}</div>
                 </div>
                 {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
                   <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"5px 6px"}}/>
@@ -1142,7 +1150,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
                   <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.p.tipo}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>{it.meta>0?it.meta+" u. meta":(it.p.recurrente?"acumulado":"—")} · {money(comResultProd(it.p))}/u · {it.p.recurrente?"recurrente":"único"}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>{it.meta>0?it.meta+" u. meta":(({mensual:"acumulado",anual:"renovación anual"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||"—")} · {money(comResultProd(it.p))}/u · {({mensual:"mensual",anual:"anual",único:"único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||"único"}</div>
                 </div>
                 <div style={{fontSize:13,fontWeight:700,color:"#2dd4bf",whiteSpace:"nowrap"}}>{money(it.ing)}</div>
               </div>)}
