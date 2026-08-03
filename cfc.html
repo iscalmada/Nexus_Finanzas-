@@ -419,7 +419,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
       </div>
     </div>
     <div style={S.sec}>
-      <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{c.nombreCompleto}</div>
+      <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{nombreDisplay(c)}</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
         {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}{c.etapaEspecifica?` · ${c.etapaEspecifica}`:""}</span>}
         {(c.tiposContacto||[c.tipoContacto].filter(Boolean)).map(t=><span key={t} style={S.tag("#7dd3fc")}>{t}</span>)}
@@ -772,7 +772,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
           return <div key={sol.id} style={{...S.card(),marginBottom:8}}>
             <div style={{fontSize:13,fontWeight:800,color:"#2dd4bf",marginBottom:6}}>{sol.nombre} <span style={{color:"#475569",fontWeight:600}}>· {al.length}</span></div>
             {al.map(c=><div key={c.id} onClick={()=>setSel(c.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"7px 0",borderTop:"1px solid #1e293b",cursor:"pointer"}}>
-              <span style={{fontSize:13,fontWeight:600}}>{c.nombreCompleto}</span>
+              <span style={{fontSize:13,fontWeight:600}}>{nombreDisplay(c)}</span>
               <span style={{display:"flex",gap:5,flexShrink:0}}>
                 {(c.tiposAliado||[]).map(t=><span key={t} style={S.tag("#2dd4bf")}>{t}</span>)}
                 {c.estatusAliado&&<span style={S.tag("#64748b")}>{c.estatusAliado}</span>}
@@ -788,7 +788,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
             <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
               {bulkMode&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isBulkSel?"none":"1.5px solid #475569",background:isBulkSel?"#22c55e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#0c0c16",fontWeight:900}}>{isBulkSel?"✓":""}</span>}
-              <div style={{fontSize:14,fontWeight:700,minWidth:0}}>{c.nombreCompleto}</div>
+              <div style={{fontSize:14,fontWeight:700,minWidth:0}}>{nombreDisplay(c)}</div>
             </div>
             {c.potencial&&<span style={S.tag(POT_COLOR[c.potencial]||"#475569")}>{c.potencial}</span>}
           </div>
@@ -862,7 +862,7 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
         <div style={S.card()}>
           <div style={S.sTit}>Contactos vinculados ({vinc.length})</div>
           {vinc.map(c=><div key={c.id} onClick={()=>goContacto(c.id)} style={{...S.detRow,cursor:"pointer"}}>
-            <span style={{fontWeight:600}}>{c.nombreCompleto}</span><span style={{...S.detK}}>{(cEmpresas(c).find(x=>x.empresaId===e.id)||{}).rol||""}</span></div>)}
+            <span style={{fontWeight:600}}>{nombreDisplay(c)}</span><span style={{...S.detK}}>{(cEmpresas(c).find(x=>x.empresaId===e.id)||{}).rol||""}</span></div>)}
           {vinc.length===0&&<div style={{fontSize:11,color:"#475569"}}>Aún sin contactos vinculados.</div>}
         </div>
         <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>del(e)}>Eliminar empresa</button>
@@ -1437,18 +1437,9 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
   const[expandTag,setExpandTag]=useState({}); // {solId_tipo: bool}
   const toggleTag=(key)=>setExpandTag(p=>({...p,[key]:!p[key]}));
   // Funnel global
-  const candTotal=contactos.filter(c=>c.etapaPrincipal==="Candidato").length;
-  const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso").length;
-  const candIdent=contactos.filter(c=>c.etapaEspecifica==="Candidato Identificado").length;
-  const ctosActivos=contactos.filter(c=>c.etapaPrincipal==="Contacto").length;
-  const prospectos=contactos.filter(c=>c.etapaPrincipal==="Prospecto").length;
-  const clientes=contactos.filter(c=>c.etapaPrincipal==="Cliente"&&["Cliente Activo","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)).length;
-  const FUNNEL=[
-    {label:"Candidatos",n:candTotal,color:"#475569",prin:"Candidato"},
-    {label:"Contactos Activos",n:ctosActivos,color:"#a78bfa",prin:"Contacto"},
-    {label:"Prospectos (Opp Activa)",n:prospectos,color:"#fbbf24",prin:"Prospecto"},
-    {label:"Clientes Activos",n:clientes,color:"#22c55e",prin:"Cliente"},
-  ];
+  const FUNNEL=["Candidato","Contacto","Prospecto","Cliente"].map(et=>({
+    label:et, n:contactos.filter(c=>c.etapaPrincipal===et).length, color:ec(et), prin:et
+  }));
   const maxF=Math.max(...FUNNEL.map(f=>f.n),1);
   // Filas por solución según modo
   const allRows=(catalogos.solucion||[]).map(s=>{
@@ -1972,7 +1963,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         <div style={{fontSize:11,fontWeight:700,color:"#7dd3fc",marginBottom:8}}>🔗 Vincular a contacto / oportunidad</div>
         {ctoVinc
           ? <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:f.oportunidadId||opsDelCto.length>0?8:0}}>
-              <div style={{...S.inp,flex:1,fontSize:12}}>{ctoVinc.nombreCompleto}</div>
+              <div style={{...S.inp,flex:1,fontSize:12}}>{nombreDisplay(ctoVinc)}</div>
               <button style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px 10px",cursor:"pointer",fontSize:12}} onClick={()=>{set("contactoId",null);set("oportunidadId",null);}}>✕</button>
             </div>
           : <BuscaCtoEmpCFC contactos={contactos||[]} empresas={empresas||[]} value={null} onChange={v=>set("contactoId",v||null)} placeholder="🔍 Buscar contacto a vincular…"/>
@@ -2567,13 +2558,13 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
           <Field label="Aliado estratégico">
             <select style={S.sel} value={f.aliadoEstrategicoId||""} onChange={e=>set("aliadoEstrategicoId",e.target.value||null)}>
               <option value="">— Ninguno —</option>
-              {est.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+              {est.map(c=><option key={c.id} value={c.id}>{nombreDisplay(c)}</option>)}
             </select>
           </Field>
           <Field label="Aliado comercial">
             <select style={S.sel} value={f.aliadoComercialId||""} onChange={e=>set("aliadoComercialId",e.target.value||null)}>
               <option value="">— Ninguno —</option>
-              {com.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+              {com.map(c=><option key={c.id} value={c.id}>{nombreDisplay(c)}</option>)}
             </select>
           </Field>
         </div>
@@ -2625,7 +2616,7 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades}){
       <span style={S.tag(col)}>{(o.etapa||"").replace("Oportunidad ","")}</span>
       {o.recurrencia&&<span style={S.tag("#a78bfa")}>{o.recurrencia}</span>}
       {o.probabilidad&&<span style={S.tag(PROB_COLOR[o.probabilidad])}>{o.probabilidad}</span>}
-      {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
+      {c&&<span style={S.tag("#94a3b8")}>{nombreDisplay(c)}</span>}
       {(()=>{const ops=(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).map(id=>contactos.find(x=>x.id===id)).filter(Boolean);
         if(ops.length===0)return null;
         if(ops.length===1)return <span style={S.tag("#64748b")}>op: {nombreDisplay(ops[0])}</span>;
