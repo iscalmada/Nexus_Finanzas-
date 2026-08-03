@@ -2585,9 +2585,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         <div style={S.big("#fbbf24")}>{money(list.filter(ABIERTA).reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0))}</div>
         <div style={{fontSize:9,color:"#64748b",marginTop:4}}>{list.filter(ABIERTA).length} oportunidades activas en vista</div>
       </div>
-      {/* Objetivo del mes */}
-      <ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>
-      {/* Chip Alineadas al Objetivo */}
+      {/* Filtros rápidos — chips con label en una sola fila */}
       {/* Comisión esperada — una sola línea compacta */}
       <div style={{...S.card(),padding:"8px 12px",marginBottom:8}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -2611,12 +2609,12 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         ))}
         <span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"2px 7px",cursor:"pointer"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑":"↓"}</span>
       </div>
-      {/* Filtros rápidos — chips pequeños con ícono */}
-      <div style={{display:"flex",gap:5,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
-        {destacadasCount>0&&<span style={{...S.chip(fDestacadas,GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setFDestacadas(v=>!v)}>⭐ {destacadasCount}</span>}
-        <span style={{...S.chip(fAlineado,"#22c55e"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setFAlineado(v=>!v)}>🎯 {fAlineado&&alineadasCount>0?alineadasCount:"Obj."}</span>
-        <input type="month" style={{background:"#13131f",border:`1px solid ${fAlineado?"#22c55e":"#1e293b"}`,borderRadius:8,padding:"2px 6px",color:"#e2e8f0",fontSize:9,outline:"none",width:110,flexShrink:0}} value={mesAlineado} onChange={e=>setMesAlineado(e.target.value)}/>
-        {sinSeguimiento.length>0&&<span style={{...S.chip(fSinAct,"#ef4444"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setFSinAct(v=>!v)}>⚠ {sinSeguimiento.length}</span>}
+      {/* Filtros rápidos — chips con labels descriptivos en una sola línea */}
+      <div style={{display:"flex",gap:5,marginBottom:8,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
+        {destacadasCount>0&&<span style={{...S.chip(fDestacadas,GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFDestacadas(v=>!v)}>⭐ Destacadas{fDestacadas?` (${destacadasCount})`:""}</span>}
+        <span style={{...S.chip(fAlineado,"#22c55e"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFAlineado(v=>!v)}>🎯 Objetivo{fAlineado&&alineadasCount>0?` (${alineadasCount})`:""}</span>
+        <input type="month" style={{background:"#13131f",border:`1px solid ${fAlineado?"#22c55e":"#1e293b"}`,borderRadius:8,padding:"2px 5px",color:"#e2e8f0",fontSize:9,outline:"none",width:100,flexShrink:0}} value={mesAlineado} onChange={e=>setMesAlineado(e.target.value)}/>
+        {sinSeguimiento.length>0&&<span style={{...S.chip(fSinAct,"#ef4444"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFSinAct(v=>!v)}>⚠ Sin actividad{fSinAct?` (${sinSeguimiento.length})`:""}</span>}
       </div>
       {/* Objetivo del Mes — colapsable */}
       <div style={{marginBottom:8}}>
