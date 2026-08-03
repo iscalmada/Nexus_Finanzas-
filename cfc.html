@@ -1810,7 +1810,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
               </div>
               <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
                 {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech||"sin fecha"}</span>
+                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
                 {hasDesc&&!selectable&&<span style={{fontSize:12,color:isDescExp?"#94a3b8":"#475569",lineHeight:1,padding:"2px 3px",cursor:"pointer"}} onClick={e=>{e.stopPropagation();toggleDesc(a.id);}}>{isDescExp?"▲":"▾"}</span>}
               </div>
             </div>
@@ -1845,7 +1845,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
               </div>
               <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
                 {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech||"sin fecha"}</span>
+                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
                 {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569"}}>{isExp?"▲":"▾"}</span>}
               </div>
             </div>
@@ -1958,12 +1958,11 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
           const isSel=(selSub[a.id]||new Set()).has(st.id);
           return <div key={st.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 8px",marginBottom:4,background:isSel?"#1e1b4b":"#0f172a",borderRadius:7,border:`1px solid ${isSel?"#a78bfa":(EST_COLOR[st.estatus||"Programada"]||"#64748b")}33`}}>
             <input type="checkbox" checked={isSel} onChange={()=>toggleSubSel(a.id,st.id)} style={{width:15,height:15,flexShrink:0,accentColor:"#a78bfa",marginTop:2,cursor:"pointer"}}/>
-            <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{if(!onPatchAct)return;const nst=(a.subtareas||[]).map((x,j)=>j===origIdx?{...x,estatus:MODO_NEXT_EST[x.estatus||"Programada"]}:x);const sts=nst.map(s=>s.estatus||"Programada");const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=nst.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatchAct(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});}}>
+            <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:2}}>
                 <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]||"#64748b"),fontSize:8}}>{st.estatus||"Programada"}</span>
                 {st.prioridad&&st.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[st.prioridad]||"#64748b"),fontSize:7}}>{st.prioridad}</span>}
                 {st.fecha&&<span style={{fontSize:9,color:"#64748b"}}>{st.fecha.split("-").reverse().join("/")}</span>}
-                <span style={{fontSize:9,color:"#475569"}}>tap→cicla</span>
               </div>
               <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",lineHeight:1.3}}>{st.titulo||"Subtarea sin nombre"}</div>
               {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,lineHeight:1.4}}>{st.descripcion}</div>}
@@ -2257,7 +2256,7 @@ const ENF_CFC_COLOR={Contactar:"#60a5fa",Tareas:"#a78bfa",Acciones:"#2dd4bf"};
 const ENF_CFC_ICON={Contactar:"📞",Tareas:"📋",Acciones:"⚡"};
 const PRIOR_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
 const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
-const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
+const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&!((o.etapa||"").toLowerCase().includes("espera"));
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
 
 function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
@@ -2370,12 +2369,15 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
+function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades}){
+  const[showActs,setShowActs]=useState(false);
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
   const op=contactos.find(x=>x.id===o.contactoOperativoId);
   const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
   const monto=o.comisionEstimada||o.montoEstimado;
-  return <div onClick={()=>onTap&&onTap(o)} style={{...S.cCard(col),borderLeft:sinAct?`3px solid #ef4444`:`3px solid ${col}44`}}>
+  const actsOpo=(actividades||[]).filter(a=>a.oportunidadId===o.id).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  return <div style={{...S.cCard(col),borderLeft:sinAct?`3px solid #ef4444`:`3px solid ${col}44`}}>
+    <div onClick={()=>onTap&&onTap(o)} style={{cursor:"pointer"}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
       <div style={{fontSize:14,fontWeight:700}}>{o.concepto}</div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
@@ -2397,11 +2399,25 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
       {(()=>{const nm=(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===o.solucionId)||{}).nombre||o.solucionNexus;return nm?<span style={S.tag(GOLD)}>{nm.length>22?nm.slice(0,22)+"…":nm}</span>:null;})()}
       {o.aliadoEstrategicoId&&(()=>{const ae=contactos.find(x=>x.id===o.aliadoEstrategicoId);return ae?<span style={S.tag("#2dd4bf")}>🤝 {ae.nombreCompleto}</span>:null;})()}
     </div>
+    </div>
+    {actsOpo.length>0&&<button style={{...S.pill(showActs,"#a78bfa"),padding:"3px 10px",fontSize:10,fontWeight:700,marginTop:8,width:"100%"}} onClick={e=>{e.stopPropagation();setShowActs(v=>!v);}}>📋 {actsOpo.length} actividad{actsOpo.length!==1?"es":""} {showActs?"▲":"▾"}</button>}
+    {showActs&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
+      {actsOpo.map(a=>{const col2=EST_COLOR[a.estatus||"Programada"]||"#64748b";return<div key={a.id} style={{padding:"6px 0",borderBottom:"1px solid #0f172a"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{a.asunto||a.tipoAccion||"Actividad"}</div>
+            <div style={{fontSize:9,color:"#64748b",marginTop:1}}>{a.fecha?a.fecha.split("-").reverse().join("/"):"sin fecha"}{a.hora?" · "+a.hora:""}</div>
+          </div>
+          <span style={{...S.tag(col2),fontSize:8,flexShrink:0}}>{a.estatus||"Programada"}</span>
+        </div>
+      </div>;})}
+    </div>}
   </div>;
 }
 
 function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,openOpo}){
-  const[fEt,setFEt]=useState("");
+  const[fEts,setFEts]=useState([]);
+  const toggleEt=(v)=>setFEts(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
   const[showFil,setShowFil]=useState(false);
   const[fSol,setFSol]=useState([]);
   const[fContacto,setFContacto]=useState("");
@@ -2413,6 +2429,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const[cHasta,setCHasta]=useState("");
   const[q,setQ]=useState("");
   const[fSinAct,setFSinAct]=useState(false);
+  const[fDestacadas,setFDestacadas]=useState(false);
   const[ord,setOrd]=useState("etapa");
   const[ordDir,setOrdDir]=useState("asc");
   const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
@@ -2439,7 +2456,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const list=oportunidades.filter(o=>{
     if(fSinAct&&tieneSeg(o))return false;
     if(fSinAct&&!ABIERTA(o))return false;
-    if(fEt&&o.etapa!==fEt)return false;
+    if(fDestacadas){const sol=(catalogos.solucion||[]).find(s=>s.id===o.solucionId);if(!sol?.ancla||!ABIERTA(o))return false;}
+    if(fEts.length>0&&!fEts.includes(o.etapa||""))return false;
     if(fSol.length&&!fSol.includes(o.solucionId))return false;
     if(fContacto&&(o.contactoPrincipalId||o.contactoId)!==fContacto&&o.contactoOperativoId!==fContacto)return false;
     if(fEmpresa&&o.empresaId!==fEmpresa)return false;
@@ -2460,8 +2478,9 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     else if(ord==="monto")  r=(Number(b.montoEstimado)||0)-(Number(a.montoEstimado)||0);
     return ordDir==="asc"?r:-r;
   });
-  const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0);
-  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);};
+  const nFil=(fEts.length?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0)+(fDestacadas?1:0);
+  const limpiar=()=>{setFEts([]);setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFDestacadas(false);};
+  const destacadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&(catalogos.solucion||[]).find(s=>s.id===o.solucionId)?.ancla).length;
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
   const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
@@ -2473,6 +2492,12 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         <div style={S.card()}><div style={S.lbl}>Monto abierto</div><div style={S.big()}>{money(totalAb)}</div></div>
         <div style={S.card()}><div style={S.lbl}>Comisión abierta</div><div style={S.big("#22c55e")}>{money(totalCom)}</div></div>
       </div>
+      {destacadasCount>0&&<button
+        style={{...S.pill(fDestacadas,GOLD),width:"100%",padding:"8px 0",fontWeight:700,fontSize:12,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
+        onClick={()=>setFDestacadas(v=>!v)}>
+        <span>⭐</span>
+        <span>{destacadasCount} Destacadas (soluciones ancla activas)</span>
+      </button>}
       {/* Chip sin seguimiento */}
       {sinSeguimiento.length>0&&<button
         style={{...S.pill(fSinAct,"#ef4444"),width:"100%",padding:"8px 0",fontWeight:700,fontSize:12,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
@@ -2497,8 +2522,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       {showFil&&<div style={{...S.card(),marginTop:10}}>
         <div style={S.fl}>Etapa</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
-          <span style={S.chip(!fEt)} onClick={()=>setFEt("")}>Todas</span>
-          {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEt===o.nombre,oc(o.nombre))} onClick={()=>setFEt(fEt===o.nombre?"":o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
+          {fEts.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 8px"}} onClick={()=>setFEts([])}>✕ Todas</span>}
+          {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEts.includes(o.nombre),oc(o.nombre))} onClick={()=>toggleEt(o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
         </div>
         <div style={{...S.fl,marginTop:10}}>Probabilidad</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
@@ -2524,7 +2549,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} actividades={actividades} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
