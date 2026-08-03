@@ -2405,7 +2405,7 @@ function App(){
 
   const PrioILabel=prioI===3?"Todas":PRIO_LBL[prioI];
   const PrioELabel=prioE===3?"Todas":PRIO_LBL[prioE];
-  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","catalogosSistema","configuracion","cartera","oportunidades"];
+  const inMenuViews=["estadisticas","presupuestos","proyeccion","cuentas","catalogos","catalogosSistema","configuracion","cartera"];
 
   // Semáforo color
   const semColor=s=>s==="verde"?"#22c55e":s==="amarillo"?"#fbbf24":"#f87171";
@@ -3416,155 +3416,6 @@ function App(){
 
 
         {/* ── OPORTUNIDADES NEXUS ── */}
-        {view==="oportunidades"&&(()=>{
-          const opos=lsCRM('oportunidades',[]);
-          const cat=lsCRM('catalogos',{})||{};
-          const sols=cat.solucion||[]; const etps=cat.etapaOportunidad||[];
-          const featTagCFP=(cat.etiqAgenda||[])[0];
-          const conts=lsCRM('contactos',[]); const emps=lsCRM('empresas',[]);
-          const solName=(id)=>(sols.find(s=>s.id===id)||{}).nombre||"";
-          const contName=(id)=>(conts.find(c=>c.id===id)||{}).nombreCompleto||"";
-          const empName=(id)=>(emps.find(e=>e.id===id)||{}).nombre||"";
-          const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad En Espera";
-          const etColor=(et)=>et==="Oportunidad Concretada"?"#C9A84C":et==="Oportunidad Rechazada"?"#475569":"#22c55e";
-          const abiertas=opos.filter(ABIERTA);
-          const concret=opos.filter(o=>o.etapa==="Oportunidad Concretada");
-          const comAb=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
-          const prodAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
-          const comCon=concret.reduce((s,o)=>s+(Number(o.comisionEstimada)||Number(o.montoEstimado)||0),0);
-          const ql=opoQ.trim().toLowerCase();
-          const lista=opos.filter(o=>{
-            if(opoFiltroEtapa&&o.etapa!==opoFiltroEtapa)return false;
-            if(ql){const hay=[o.concepto,solName(o.solucionId),contName(o.contactoPrincipalId||o.contactoId),empName(o.empresaId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
-            return true;
-          }).slice().sort((a,b)=>{
-            const ETAPA_RANK={"Oportunidad Identificada":0,"Oportunidad en Preparación":1,"Propuesta Presentada":2,"Oportunidad Aceptada":3,"Oportunidad Concretada":4,"Oportunidad En Espera":5,"Oportunidad Rechazada":6};
-            const PROB_RANK={Alta:0,Media:1,Baja:2};
-            const cmpEtapa=(x,y)=>(ETAPA_RANK[x.etapa]??9)-(ETAPA_RANK[y.etapa]??9);
-            const cmpFecha=(x,y)=>(x.fechaEstimadaCierre||"9999").localeCompare(y.fechaEstimadaCierre||"9999");
-            const cmpProb=(x,y)=>(PROB_RANK[x.probabilidad]??9)-(PROB_RANK[y.probabilidad]??9);
-            const cmpMonto=(x,y)=>(Number(x.montoEstimado)||0)-(Number(y.montoEstimado)||0);
-            const cmps={etapa:cmpEtapa,fecha:cmpFecha,probabilidad:cmpProb,monto:cmpMonto};
-            const orden=["etapa","fecha","probabilidad","monto"];
-            const secuencia=[opoOrdCampo,...orden.filter(k=>k!==opoOrdCampo)];
-            for(let i=0;i<secuencia.length;i++){
-              const k=secuencia[i];
-              let r=cmps[k](a,b);
-              if(k===opoOrdCampo)r=opoOrdDir==="asc"?r:-r;
-              if(r!==0)return r;
-            }
-            return 0;
-          });
-          const tag=(c)=>({display:"inline-block",fontSize:9,fontWeight:700,padding:"2px 7px",borderRadius:6,background:c+"22",color:c,border:"1px solid "+c+"55"});
-          const cardS={background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:12,padding:"12px 14px",marginBottom:8};
-          return (
-            <div style={{padding:"0 14px 90px"}}>
-              {/* ── STICKY: totales + filtro etapa ── */}
-              <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",paddingBottom:8,marginLeft:-14,marginRight:-14,paddingLeft:14,paddingRight:14,marginBottom:8}}>
-                <div style={{display:"flex",gap:8,marginBottom:8}}>
-                  <div style={{flex:1,background:"#10101e",border:"1px solid #22c55e33",borderRadius:9,padding:"7px 11px"}}><div style={{fontSize:8,color:"#475569"}}>Producción Proyectada</div><div style={{fontSize:15,fontWeight:800,color:"#22c55e"}}>{fmt(prodAb)}</div></div>
-                  <div style={{flex:1,background:"#10101e",border:"1px solid #C9A84C33",borderRadius:9,padding:"7px 11px"}}><div style={{fontSize:8,color:"#475569"}}>Participación Proyectada</div><div style={{fontSize:15,fontWeight:800,color:"#C9A84C"}}>{fmt(comAb)}</div></div>
-                </div>
-                <div style={{display:"flex",gap:5,alignItems:"center",marginBottom:8,marginTop:6}}>
-                  <input style={{...S.srch,margin:0,flex:1}} value={opoQ} onChange={e=>setOpoQ(e.target.value)} placeholder="🔍 Buscar oportunidad…"/>
-                  {(opoQ||opoFiltroEtapa)&&<button style={{flexShrink:0,background:"#f8717111",border:"1px solid #f87171",color:"#f87171",borderRadius:8,padding:"5px 9px",fontSize:11,cursor:"pointer",fontWeight:700}} onClick={()=>{setOpoQ("");setOpoFiltroEtapa(null);}}>✕</button>}
-                </div>
-                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                  <button style={S.chip(!opoFiltroEtapa)} onClick={()=>setOpoFiltroEtapa(null)}>Todas</button>
-                  {etps.map(e=><button key={e.id} style={S.chip(opoFiltroEtapa===e.nombre,etColor(e.nombre))} onClick={()=>setOpoFiltroEtapa(opoFiltroEtapa===e.nombre?null:e.nombre)}>{(e.nombre||"").replace("Oportunidad ","")}</button>)}
-                </div>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8,alignItems:"center"}}>
-                  <span style={{fontSize:8,color:"#475569",textTransform:"uppercase",letterSpacing:1,marginRight:2}}>Orden</span>
-                  <button style={S.chip(opoOrdCampo==="etapa","#C9A84C")} onClick={()=>setOpoOrdCampo("etapa")}>Etapa</button>
-                  <button style={S.chip(opoOrdCampo==="fecha","#C9A84C")} onClick={()=>setOpoOrdCampo("fecha")}>Fecha cierre</button>
-                  <button style={S.chip(opoOrdCampo==="probabilidad","#C9A84C")} onClick={()=>setOpoOrdCampo("probabilidad")}>Probabilidad</button>
-                  <button style={S.chip(opoOrdCampo==="monto","#C9A84C")} onClick={()=>setOpoOrdCampo("monto")}>Monto</button>
-                  <button style={S.chip(false,"#60a5fa")} onClick={()=>setOpoOrdDir(d=>d==="asc"?"desc":"asc")}>{opoOrdDir==="asc"?"↑ Asc":"↓ Desc"}</button>
-                </div>
-              </div>
-              {lista.map(o=>{ const monto=o.comisionEstimada||o.montoEstimado; return (
-                <div key={o.id} style={{...cardS,cursor:"pointer",borderColor:etColor(o.etapa)+"55"}} onClick={()=>setVerRef(o)}>
-                  <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-                    <div style={{display:"flex",alignItems:"flex-start",gap:6,minWidth:0,flex:1}}>
-                      {featTagCFP&&(o.etiquetas||[]).includes(featTagCFP.nombre)&&<span title={featTagCFP.nombre} style={{fontSize:15,flexShrink:0}}>💰</span>}
-                      <div style={{fontSize:14,fontWeight:700,color:"#e2e8f0",wordBreak:"break-word"}}>{o.concepto}</div>
-                    </div>
-                    {monto?<div style={{fontSize:13,fontWeight:800,color:"#C9A84C",whiteSpace:"nowrap"}}>{fmt(monto)}</div>:null}
-                  </div>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:7}}>
-                    <span style={tag(etColor(o.etapa))}>{(o.etapa||"").replace("Oportunidad ","")}</span>
-                    {o.fechaEstimadaCierre&&<span style={tag("#60a5fa")}>📅 {fmtDate(o.fechaEstimadaCierre)}</span>}
-                    {o.probabilidad&&<span style={tag(o.probabilidad==="Alta"?"#22c55e":o.probabilidad==="Media"?"#fbbf24":"#f87171")}>◎ {o.probabilidad}</span>}
-                    {o.recurrencia&&<span style={tag("#a78bfa")}>↺ {o.recurrencia}</span>}
-                    {o.solucionId&&<span style={tag("#C9A84C")}>◈ {solName(o.solucionId)}</span>}
-                    {(o.contactoPrincipalId||o.contactoId)&&<span style={tag("#94a3b8")}>{contName(o.contactoPrincipalId||o.contactoId)}</span>}
-                    {o.empresaId&&<span style={tag("#3b82f6")}>{empName(o.empresaId)}</span>}
-                    {o.aliadoEstrategicoId&&<span style={tag("#2dd4bf")}>🤝 Estrat: {contName(o.aliadoEstrategicoId)}</span>}
-                    {o.aliadoComercialId&&<span style={tag("#2dd4bf")}>🤝 Comercial: {contName(o.aliadoComercialId)}</span>}
-                  </div>
-                </div>
-              );})}
-              {lista.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>No hay oportunidades en el CFC.</div>}
-              <div style={{fontSize:10,color:"#475569",textAlign:"center",marginTop:6}}>Las oportunidades se crean y editan en el CFC.</div>
-              {verRef&&(()=>{
-                const o=opos.find(x=>x.id===verRef.id)||verRef;
-                const row=(l,v)=>v?<div style={{display:"flex",justifyContent:"space-between",gap:10,padding:"7px 0",borderBottom:"1px solid #14141f"}}><span style={{fontSize:11,color:"#64748b"}}>{l}</span><span style={{fontSize:12,color:"#e2e8f0",textAlign:"right"}}>{v}</span></div>:null;
-                return (
-                  <div style={{position:"fixed",inset:0,background:"rgba(8,8,16,0.7)",zIndex:400,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setVerRef(null)}>
-                    <div style={{width:"100%",maxWidth:480,background:"#0b0b16",borderTop:"2px solid #C9A84C",borderRadius:"16px 16px 0 0",padding:"18px 18px 28px",maxHeight:"82vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                        <div style={{fontSize:16,fontWeight:800,color:"#e2e8f0"}}>{o.concepto}</div>
-                        <button onClick={()=>setVerRef(null)} style={{background:"transparent",border:"none",color:"#64748b",fontSize:20,cursor:"pointer"}}>✕</button>
-                      </div>
-                      <span style={tag(etColor(o.etapa))}>{(o.etapa||"").replace("Oportunidad ","")}</span>
-                      <div style={{marginTop:12}}>
-                        {row("Solución",solName(o.solucionId))}
-                        {row("Contacto",contName(o.contactoPrincipalId||o.contactoId))}
-                        {row("Empresa",empName(o.empresaId))}
-                        {row("Monto estimado",o.montoEstimado?fmt(o.montoEstimado):null)}
-                        {row("Comisión estimada",o.comisionEstimada?fmt(o.comisionEstimada):null)}
-                        {row("Cierre estimado",o.fechaEstimadaCierre?fmtDate(o.fechaEstimadaCierre):null)}
-                        {row("Aliado Estratégico",o.aliadoEstrategicoId?contName(o.aliadoEstrategicoId):null)}
-                        {row("Aliado Comercial",o.aliadoComercialId?contName(o.aliadoComercialId):null)}
-                        {row("Concretada",o.fechaConcretada?fmtDate(o.fechaConcretada):null)}
-                      </div>
-                      {(()=>{
-                        const vinc=movs.filter(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id);
-                        const ingresado=vinc.filter(m=>m.estatus==="INGRESADO").reduce((s,m)=>s+(Number(m.monto)||0),0);
-                        const programado=vinc.filter(m=>["PROGRAMADO","PROYECTADO"].includes(m.estatus)).reduce((s,m)=>s+(Number(m.monto)||0),0);
-                        const estim=Number(o.comisionEstimada)||Number(o.montoEstimado)||0;
-                        const pend=Math.max(0,estim-ingresado);
-                        return (
-                          <div style={{marginTop:16}}>
-                            <div style={{fontSize:10,color:"#64748b",letterSpacing:1,textTransform:"uppercase",fontWeight:700,marginBottom:8}}>Movimientos vinculados</div>
-                            <div style={{display:"flex",gap:6,marginBottom:10}}>
-                              <div style={{flex:1,background:"rgba(34,197,94,0.08)",border:"1px solid #22c55e33",borderRadius:8,padding:"6px 4px",textAlign:"center"}}><div style={{fontSize:7,color:"#22c55e",fontWeight:700}}>INGRESADO</div><div style={{fontSize:12,fontWeight:800,color:"#22c55e"}}>{fmt(ingresado)}</div></div>
-                              <div style={{flex:1,background:"rgba(96,165,250,0.08)",border:"1px solid #60a5fa33",borderRadius:8,padding:"6px 4px",textAlign:"center"}}><div style={{fontSize:7,color:"#60a5fa",fontWeight:700}}>PROGRAMADO</div><div style={{fontSize:12,fontWeight:800,color:"#60a5fa"}}>{fmt(programado)}</div></div>
-                              <div style={{flex:1,background:"rgba(201,168,76,0.08)",border:"1px solid #C9A84C33",borderRadius:8,padding:"6px 4px",textAlign:"center"}}><div style={{fontSize:7,color:"#C9A84C",fontWeight:700}}>PENDIENTE</div><div style={{fontSize:12,fontWeight:800,color:"#C9A84C"}}>{fmt(pend)}</div></div>
-                            </div>
-                            {vinc.length===0
-                              ? <div style={{fontSize:10,color:"#475569",padding:"4px 0"}}>Sin movimientos vinculados. Para vincular un ingreso, créalo o edítalo y selecciona esta oportunidad en "Vínculo".</div>
-                              : vinc.map(m=>(
-                                  <div key={m.id} onClick={()=>{setVerRef(null);setViewMov(m);}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 10px",background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:9,marginBottom:6,cursor:"pointer"}}>
-                                    <div style={{minWidth:0,flex:1}}>
-                                      <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{m.concepto||"(sin concepto)"}</div>
-                                      <div style={{fontSize:9,color:"#64748b"}}>{m.fecha?fmtDate(m.fecha):"sin fecha"} · {m.estatus}</div>
-                                    </div>
-                                    <div style={{fontSize:13,fontWeight:800,color:"#C9A84C",whiteSpace:"nowrap"}}>{fmt(m.monto)}</div>
-                                  </div>
-                                ))}
-                            {vinc.length>0&&<div style={{fontSize:9,color:"#475569",marginTop:2}}>Toca un movimiento para ver o editarlo.</div>}
-                          </div>
-                        );
-                      })()}
-                      <div style={{fontSize:10,color:"#475569",textAlign:"center",marginTop:16}}>Reflejo del CFC · solo lectura</div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          );
-        })()}
 
 
         {/* ── MENÚ ── */}
@@ -5254,7 +5105,6 @@ function App(){
           {[
             {id:"dashboard",icon:"🏠",label:"Inicio",act:view==="dashboard"},
             {id:"movimientos",icon:"💸",label:"Movim.",act:view==="movimientos"},
-            {id:"oportunidades",icon:"🚀",label:"Oport.",act:view==="oportunidades"},
             {id:"cartera",icon:"🤝",label:"Cartera",act:view==="cartera"},
             {id:"menu",sec:"analisis",icon:"📊",label:"Análisis",act:(view==="menu"&&menuSec==="analisis")||["estadisticas","presupuestos","proyeccion"].includes(view)},
             {id:"menu",sec:"config",icon:"⚙",label:"Config",act:(view==="menu"&&menuSec==="config")||["cuentas","catalogos","configuracion"].includes(view)},
