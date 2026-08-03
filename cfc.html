@@ -409,6 +409,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
   const emp=empresas.find(e=>e.id===c.empresaId);
   const[showOpps,setShowOpps]=useState(false);
   const[showActs,setShowActs]=useState(false);
+  const[showActsNAP,setShowActsNAP]=useState(false);
   const Row=({k,v})=> v?<div style={S.detRow}><span style={S.detK}>{k}</span><span style={S.detV}>{v}</span></div>:null;
   return <div>
     <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -510,7 +511,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
       <div style={S.card()}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <button style={{...S.pill(showActs,GOLD),fontWeight:700,fontSize:10}} onClick={()=>setShowActs(v=>!v)}>
-            📋 Actividades ({(actividades||[]).filter(a=>a.contactoId===c.id).length}) {showActs?"▲":"▾"}
+            📋 Agenda CFC ({(actividades||[]).filter(a=>a.contactoId===c.id).length}) {showActs?"▲":"▾"}
           </button>
           <button style={S.pill(true,GOLD)} onClick={()=>onAddAct(c.id)}>+ Registrar</button>
         </div>
@@ -518,6 +519,26 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
           <ActividadesList acts={(actividades||[]).filter(a=>a.contactoId===c.id)} contactos={[c]} showContacto={false} onTap={(a)=>onEditAct(a)}/>
         </div>}
       </div>
+      {(()=>{
+        try{
+          const napActs=JSON.parse(localStorage.getItem("nap_actividades")||"[]");
+          const napCto=napActs.filter(a=>a.contactoId===c.id);
+          if(!napCto.length)return null;
+          return <div style={{...S.card(),borderColor:"#a78bfa44"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <button style={{...S.pill(showActsNAP,"#a78bfa"),fontWeight:700,fontSize:10}} onClick={()=>setShowActsNAP(v=>!v)}>
+                📋 Agenda Personal ({napCto.length}) {showActsNAP?"▲":"▾"}
+              </button>
+            </div>
+            {showActsNAP&&<div style={{marginTop:10}}>
+              {napCto.sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(a=><div key={a.id} style={{padding:"7px 0",borderBottom:"1px solid #0f172a"}}>
+                <div style={{fontSize:11,fontWeight:600,color:"#a78bfa"}}>{a.asunto||a.tipoAccion||"Actividad"}</div>
+                <div style={{fontSize:9,color:"#64748b"}}>{a.fecha?a.fecha.split("-").reverse().join("/"):"sin fecha"}{a.hora?" · "+a.hora:""} · {a.estatus||"Programada"}</div>
+              </div>)}
+            </div>}
+          </div>;
+        }catch(e){return null;}
+      })()}
 
       <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={onDelete}>Eliminar contacto</button>
     </div>
@@ -566,7 +587,9 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
       if((c.alias||"").toLowerCase().includes(ql))return true;
       if((c.prefijo||"").toLowerCase().includes(ql))return true;
       if((c.actividad||"").toLowerCase().includes(ql))return true;
-      if(empresas.some(e=>(c.empresas||[]).some(r=>r.empresaId===e.id)&&(e.nombre||"").toLowerCase().includes(ql)))return true;
+      // empresa: revisar tanto array de empresas como empresaId directo
+      const empIds=[...((c.empresas||[]).map(r=>r.empresaId)),c.empresaId].filter(Boolean);
+      if(empIds.some(eid=>{const e=empresas.find(x=>x.id===eid);return e&&(e.nombre||"").toLowerCase().includes(ql);}))return true;
       return false;
     };if(!match(c))return false;}
     if(fEtapa.length&&!fEtapa.includes(c.etapaPrincipal))return false;
@@ -1231,7 +1254,7 @@ function BienesInmuebles({bienes,setBienes,catalogos,contactos,onBack}){
   const TIPO=["Venta directa","Coinversión"];
   const EST_COL={"Disponible":"#22c55e","En proceso":"#fbbf24","Vinculado":"#60a5fa","Cerrado":"#94a3b8","No disponible":"#64748b"};
   const money=n=>"$"+Math.round(n||0).toLocaleString("es-MX");
-  const aliadosOpts=contactos.filter(c=>(c.tiposAliado||[]).length>0).map(c=>({id:c.id,label:c.nombreCompleto})).sort((a,b)=>(a.label||"").localeCompare(b.label||""));
+  const aliadosOpts=contactos.filter(c=>(c.tiposAliado||[]).length>0).map(c=>({id:c.id,label:nombreDisplay(c)})).sort((a,b)=>(a.label||"").localeCompare(b.label||""));
   const nomAliado=(id)=>{const c=contactos.find(x=>x.id===id);return c?c.nombreCompleto:"";};
   const calcCom=(f)=>((parseFloat(f.valorPropiedad)||0)*(parseFloat(f.comProp)||0)/100)+((parseFloat(f.valorInversion)||0)*(parseFloat(f.comInv)||0)/100);
   const[modal,setModal]=useState(null);
@@ -1414,14 +1437,14 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
   const[expandTag,setExpandTag]=useState({}); // {solId_tipo: bool}
   const toggleTag=(key)=>setExpandTag(p=>({...p,[key]:!p[key]}));
   // Funnel global
+  const candTotal=contactos.filter(c=>c.etapaPrincipal==="Candidato").length;
   const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso").length;
   const candIdent=contactos.filter(c=>c.etapaEspecifica==="Candidato Identificado").length;
   const ctosActivos=contactos.filter(c=>c.etapaPrincipal==="Contacto").length;
   const prospectos=contactos.filter(c=>c.etapaPrincipal==="Prospecto").length;
   const clientes=contactos.filter(c=>c.etapaPrincipal==="Cliente"&&["Cliente Activo","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)).length;
   const FUNNEL=[
-    {label:"Candidatos Identificados",n:candIdent,color:"#475569",esp:"Candidato Identificado"},
-    {label:"Candidatos en Proceso",n:candProceso,color:"#60a5fa",esp:"Candidato en Proceso"},
+    {label:"Candidatos",n:candTotal,color:"#475569",prin:"Candidato"},
     {label:"Contactos Activos",n:ctosActivos,color:"#a78bfa",prin:"Contacto"},
     {label:"Prospectos (Opp Activa)",n:prospectos,color:"#fbbf24",prin:"Prospecto"},
     {label:"Clientes Activos",n:clientes,color:"#22c55e",prin:"Cliente"},
@@ -1438,7 +1461,7 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
     return{s,metaUnid,opps,ctosAnc,candAnc,esAnclada,hasMeta:prods.length>0};
   });
   const pipeRows=allRows.filter(r=>{
-    if(modo==="meta")return r.hasMeta||r.opps.length>0||r.ctosAnc.length>0||r.candAnc.length>0;
+    if(modo==="meta")return r.hasMeta;
     if(modo==="ancladas")return r.esAnclada;
     return true;
   });
@@ -1450,9 +1473,9 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
       </div>
       {/* Embudo interactivo igual que Dashboard */}
       <div style={{marginBottom:12}}>
-        {FUNNEL.map(({label,n,color,esp,prin})=>{
-          const key=esp||prin;const isExp=etapaExpP===key;
-          const subEtapas=esp?[]:(catalogos.etapaEspecifica||[]).filter(e=>e.principal===prin);
+        {FUNNEL.map(({label,n,color,prin})=>{
+          const key=prin;const isExp=etapaExpP===key;
+          const subEtapas=(catalogos.etapaEspecifica||[]).filter(e=>e.principal===prin);
           return <div key={key} style={{marginBottom:8}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2,cursor:subEtapas.length?"pointer":"default"}} onClick={()=>subEtapas.length&&setEtapaExpP(isExp?null:key)}>
               <span style={{color:"#94a3b8"}}>{label}{subEtapas.length?<span style={{color:"#475569",fontSize:9}}> {isExp?"▲":"▾"}</span>:""}</span>
@@ -1707,12 +1730,12 @@ function BuscaCtoEmpCFC({contactos,empresas,value,onChange,placeholder,onAdd}){
   const results=useMemo(()=>{
     if(q.trim().length<2)return[];
     const ql=q.toLowerCase();const items=[];const addedEmp=new Set();
-    contactos.forEach(c=>{if((c.nombreCompleto||"").toLowerCase().includes(ql)){items.push({kind:"cto",id:c.id,label:c.nombreCompleto,sub:empName(c)});}});
+    contactos.forEach(c=>{if((c.nombreCompleto||"").toLowerCase().includes(ql)){items.push({kind:"cto",id:c.id,label:nombreDisplay(c),sub:empName(c)});}});
     empresas.forEach(emp=>{
       if((emp.nombre||"").toLowerCase().includes(ql)&&!addedEmp.has(emp.id)){
         const linked=contactos.filter(c=>getEmpIds(c).includes(emp.id));
         if(linked.length===0){items.push({kind:"emp",id:null,empId:emp.id,label:emp.nombre,sub:"(sin contacto)"});}
-        else{linked.forEach(c=>items.push({kind:"cto_emp",id:c.id,label:c.nombreCompleto,sub:emp.nombre}));}
+        else{linked.forEach(c=>items.push({kind:"cto_emp",id:c.id,label:nombreDisplay(c),sub:emp.nombre}));}
         addedEmp.add(emp.id);
       }
     });
@@ -2351,7 +2374,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         {/* 6 Contacto */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
           <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>CONTACTO</div>
-          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:nombreDisplay(c)}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         </div>
         {/* 7 Empresa */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
@@ -2505,7 +2528,7 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
     <div style={S.mTit}>{init&&init.id?"Editar oportunidad":"Nueva oportunidad"}</div>
     <Field label="Concepto"><input style={S.inp} value={f.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Ej. Fianza de cumplimiento…"/></Field>
     <Field label="Contacto principal">
-      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={(nombre)=>{setNuevoCto({field:"contactoPrincipalId",nombre:nombre||null});}}/>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:nombreDisplay(c)}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={(nombre)=>{setNuevoCto({field:"contactoPrincipalId",nombre:nombre||null});}}/>
     </Field>
     <Field label="Contactos operativos (opcionales)">
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
@@ -2514,7 +2537,7 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
           <button style={{background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:11,padding:0,lineHeight:1}} onClick={()=>set("contactosOperativosIds",(f.contactosOperativosIds||[]).filter(x=>x!==id))}>✕</button>
         </span>:null;})}
       </div>
-      <BuscaSelect opciones={csort.filter(c=>!(f.contactosOperativosIds||[]).includes(c.id)).map(c=>({id:c.id,label:c.nombreCompleto}))} value="" onChange={v=>{if(v)set("contactosOperativosIds",[...(f.contactosOperativosIds||[]),v]);}} placeholder="+ Agregar operativo" vacioLabel="+ Agregar operativo"/>
+      <BuscaSelect opciones={csort.filter(c=>!(f.contactosOperativosIds||[]).includes(c.id)).map(c=>({id:c.id,label:nombreDisplay(c)}))} value="" onChange={v=>{if(v)set("contactosOperativosIds",[...(f.contactosOperativosIds||[]),v]);}} placeholder="+ Agregar operativo" vacioLabel="+ Agregar operativo"/>
     </Field>
     <Field label="Empresa (opcional)">
       <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —" onAdd={(nombre)=>{setNuevaEmp({nombre:nombre||null});}} addLabel="empresa"/>
@@ -2743,7 +2766,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const limpiar=()=>{setFEts([]);setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFDestacadas(false);setFAlineado(false);};
   const alineadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&solIdsConMeta.has(o.solucionId)&&(o.fechaEstimadaCierre||"").slice(0,7)===mesAlineado).length;
   const destacadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&(catalogos.solucion||[]).find(s=>s.id===o.solucionId)?.ancla).length;
-  const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
+  const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:nombreDisplay(a)}));
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div></div></div>
     <div style={S.line}/>
@@ -2801,7 +2824,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         <div style={{...S.fl,marginTop:10}}>Solución</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.solucion||[]).map(s=><span key={s.id} style={S.chip(fSol.includes(s.id),GOLD)} onClick={()=>toggleSol(s.id)}>{s.nombre}</span>)}</div>
         <div style={{...S.fl,marginTop:10}}>Contacto</div>
-        <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:nombreDisplay(c)}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={{...S.fl,marginTop:10}}>Empresa</div>
         <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={{...S.fl,marginTop:10}}>Aliado</div>
