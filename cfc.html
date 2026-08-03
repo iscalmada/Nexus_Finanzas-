@@ -522,6 +522,14 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   const[vistaAliados,setVistaAliados]=useState("aliado");
   const solName=(id)=>((catalogos.solucion||[]).find(s=>s.id===id)||{}).nombre||"";
   const[modal,setModal]=useState(null);
+  const[bulkMode,setBulkMode]=useState(false);
+  const[bulkSel,setBulkSel]=useState(new Set());
+  const[bulkPanel,setBulkPanel]=useState(null); // objeto con los campos a editar
+  const toggleBulk=(id)=>setBulkSel(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  const applyBulk=(patch)=>{
+    setContactos(prev=>prev.map(c=>bulkSel.has(c.id)?{...c,...patch}:c));
+    setBulkSel(new Set());setBulkMode(false);setBulkPanel(null);
+  };
   const createEmpresa=(d)=>{const nid="e"+(Math.max(0,...empresas.map(e=>parseInt((e.id||"e0").slice(1))||0))+1);setEmpresas(prev=>[...prev,{...d,id:nid}]);return nid;};
   useEffect(()=>{ if(fEsp.length&&fEtapa.length) setFEsp(prev=>prev.filter(n=>(catalogos.etapaEspecifica||[]).some(e=>e.nombre===n&&fEtapa.includes(e.principal)))); },[fEtapa]);
 
@@ -590,7 +598,55 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
         <button style={{...S.pill(panel||activos>0,GOLD),padding:"9px 12px",fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}} onClick={()=>setPanel(p=>!p)}>⚙{activos>0?` (${activos})`:""} {panel?"▲":"▾"}</button>
         {activos>0&&<button style={{...S.pill(false,"#f87171"),flexShrink:0}} onClick={limpiar}>✕</button>}
         <span style={{fontSize:9,color:"#475569",flexShrink:0,whiteSpace:"nowrap"}}>Act: {list.length}</span>
+        {!aliadosOnly&&<button style={{...S.pill(bulkMode,"#a78bfa"),flexShrink:0,padding:"9px 10px",fontWeight:700,fontSize:10}} onClick={()=>{setBulkMode(v=>!v);setBulkSel(new Set());setBulkPanel(null);}}>☑</button>}
       </div>
+      {bulkMode&&<div style={{...S.card(),marginBottom:8,padding:"10px 12px"}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <span style={{fontSize:10,color:"#94a3b8"}}>{bulkSel.size} seleccionado{bulkSel.size!==1?"s":""}</span>
+          <button style={{...S.pill(false,"#60a5fa"),fontSize:9,padding:"3px 8px"}} onClick={()=>setBulkSel(new Set(list.map(c=>c.id)))}>Todos los visibles ({list.length})</button>
+          {bulkSel.size>0&&<button style={{...S.pill(false,"#64748b"),fontSize:9,padding:"3px 8px"}} onClick={()=>setBulkSel(new Set())}>Deseleccionar</button>}
+          {bulkSel.size>0&&<button style={{...S.pill(true,"#22c55e"),fontSize:9,padding:"3px 10px",fontWeight:700}} onClick={()=>setBulkPanel({})}>✎ Editar {bulkSel.size}</button>}
+        </div>
+      </div>}
+      {bulkPanel!==null&&bulkSel.size>0&&(()=>{
+        const bp=bulkPanel;
+        const set=(k,v)=>setBulkPanel(p=>({...p,[k]:v}));
+        const espOk=(catalogos.etapaEspecifica||[]).filter(e=>!bp.etapaPrincipal||e.principal===bp.etapaPrincipal);
+        return <div style={{...S.card(),marginBottom:8,padding:"12px 14px",border:"1px solid #22c55e44"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#22c55e",marginBottom:10}}>✎ Editar {bulkSel.size} contactos seleccionados</div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>TIPO DE CONTACTO</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {["Cliente","Prospecto","Referido","Colaborador","Otro"].map(t=><span key={t} style={{...S.chip((bp.tiposContacto||[]).includes(t),"#7dd3fc"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.tiposContacto||[];set("tiposContacto",a.includes(t)?a.filter(x=>x!==t):[...a,t]);}}>{t}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>ETIQUETA</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.etiquetas||[]).map(et=><span key={et.id} style={{...S.chip((bp.etiquetas||[]).includes(et.id),"#a78bfa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.etiquetas||[];set("etiquetas",a.includes(et.id)?a.filter(x=>x!==et.id):[...a,et.id]);}}>{et.nombre}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>GIRO</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.giro||[]).map(g=><span key={g.id} style={{...S.chip((bp.giros||[]).includes(g.nombre),"#fbbf24"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.giros||[];set("giros",a.includes(g.nombre)?a.filter(x=>x!==g.nombre):[...a,g.nombre]);}}>{g.nombre}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>SOLUCIONES ANCLA</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.solucion||[]).map(s=><span key={s.id} style={{...S.chip((bp.solucionesAncla||[]).includes(s.id),GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.solucionesAncla||[];set("solucionesAncla",a.includes(s.id)?a.filter(x=>x!==s.id):[...a,s.id]);}}>{s.nombre.length>18?s.nombre.slice(0,18)+"…":s.nombre}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>ETAPA PRINCIPAL</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.etapaPrincipal||[]).map(e=><span key={e.id} style={{...S.chip(bp.etapaPrincipal===e.nombre,ec(e.nombre)),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>set("etapaPrincipal",bp.etapaPrincipal===e.nombre?undefined:e.nombre)}>{e.nombre}</span>)}
+          </div>
+          {bp.etapaPrincipal&&<>
+            <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>ETAPA ESPECÍFICA</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+              {espOk.map(e=><span key={e.id} style={{...S.chip(bp.etapaEspecifica===e.nombre,"#94a3b8"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>set("etapaEspecifica",bp.etapaEspecifica===e.nombre?undefined:e.nombre)}>{e.nombre}</span>)}
+            </div>
+          </>}
+          <div style={{fontSize:9,color:"#f87171",marginBottom:10}}>⚠ Los campos seleccionados se REEMPLAZARÁN en los {bulkSel.size} contactos.</div>
+          <div style={{display:"flex",gap:6}}>
+            <button style={{...S.saveB,flex:1,padding:"10px 0"}} onClick={()=>{const patch={};if(bp.tiposContacto?.length)patch.tiposContacto=bp.tiposContacto;if(bp.etiquetas?.length)patch.etiquetas=bp.etiquetas;if(bp.giros?.length)patch.giros=bp.giros;if(bp.solucionesAncla?.length)patch.solucionesAncla=bp.solucionesAncla;if(bp.etapaPrincipal)patch.etapaPrincipal=bp.etapaPrincipal;if(bp.etapaEspecifica)patch.etapaEspecifica=bp.etapaEspecifica;if(Object.keys(patch).length)applyBulk(patch);}}>Aplicar a {bulkSel.size}</button>
+            <button style={{...S.cancB,flex:1}} onClick={()=>setBulkPanel(null)}>Cancelar</button>
+          </div>
+        </div>;
+      })()}
       {panel&&<div style={{...S.card(),marginTop:10}}>
         {aliadosOnly ? (<>
           <div style={S.fl}>Tipo de aliado</div>
@@ -672,10 +728,13 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
         {(catalogos.solucion||[]).every(sol=>list.filter(c=>(c.solucionesAliado||[]).includes(sol.id)).length===0)&&
           <div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Ningún aliado tiene soluciones asignadas todavía. Ábrelos en "Por aliado" y asígnaselas.</div>}
       </>) : (<>
-      {list.map(c=>{const emp=empresas.find(e=>e.id===c.empresaId);return (
-        <div key={c.id} style={S.cCard(ec(c.etapaPrincipal))} onClick={()=>setSel(c.id)}>
+      {list.map(c=>{const emp=empresas.find(e=>e.id===c.empresaId);const isBulkSel=bulkSel.has(c.id);return (
+        <div key={c.id} style={{...S.cCard(ec(c.etapaPrincipal)),background:isBulkSel?"#16213a":"#10101e"}} onClick={()=>bulkMode?toggleBulk(c.id):setSel(c.id)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-            <div style={{fontSize:14,fontWeight:700}}>{c.nombreCompleto}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+              {bulkMode&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isBulkSel?"none":"1.5px solid #475569",background:isBulkSel?"#22c55e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#0c0c16",fontWeight:900}}>{isBulkSel?"✓":""}</span>}
+              <div style={{fontSize:14,fontWeight:700,minWidth:0}}>{c.nombreCompleto}</div>
+            </div>
             {c.potencial&&<span style={S.tag(POT_COLOR[c.potencial]||"#475569")}>{c.potencial}</span>}
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
@@ -1028,58 +1087,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
       <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos</button>
       <button style={{...S.pill(modo==="prospeccion","#2dd4bf"),flex:1,fontSize:10,padding:"8px 4px"}} onClick={()=>setModo("prospeccion")}>Prospección</button>
     </div></div>
-    {modo==="prospeccion"&&(()=>{
-      const NOPROS=["Oportunidad Concretada","Oportunidad Rechazada"];
-      const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso");
-      const enContacto=contactos.filter(c=>c.etapaPrincipal==="Contacto");
-      const prospBySol={};
-      (oportunidades||[]).forEach(o=>{if(NOPROS.indexOf(o.etapa)>-1)return;const sid=o.solucionId;const cid=o.contactoPrincipalId||o.contactoId;if(!sid||!cid)return;(prospBySol[sid]=prospBySol[sid]||{})[cid]=1;});
-      const solList=(catalogos.solucion||[]);
-      const cById=(id)=>contactos.find(c=>c.id===id);
-      const prospContactosSol=(sid)=>Object.keys(prospBySol[sid]||{}).map(cById).filter(Boolean);
-      const totalProsp=solList.reduce((a,s)=>a+Object.keys(prospBySol[s.id]||{}).length,0);
-      const totalMeta=solList.reduce((a,s)=>a+(Number(s.metaProspeccion)||0),0);
-      const setMetaProsp=(sid,val)=>setCatalogos(p=>({...p,solucion:p.solucion.map(s=>s.id===sid?{...s,metaProspeccion:val===""?null:(Number(val)||0)}:s)}));
-      const barra=(val,meta,color)=>{const pct=meta>0?Math.min(100,Math.round(val/meta*100)):0;return <div style={{height:6,background:"#1e293b",borderRadius:4,overflow:"hidden",marginTop:6}}><div style={{height:"100%",width:pct+"%",background:color}}/></div>;};
-      const Lista=({titulo,items})=><div style={{...S.card(),marginTop:10}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><div style={{fontSize:13,fontWeight:800,color:GOLD}}>{titulo} ({items.length})</div><button style={S.pill(false,"#64748b")} onClick={()=>setVer(null)}>Cerrar</button></div>
-          {items.length===0?<div style={{fontSize:11,color:"#475569"}}>Sin contactos.</div>:items.map(c=><div key={c.id} style={{padding:"7px 0",borderTop:"1px solid #14141f"}}><div style={{fontSize:12,fontWeight:700}}>{c.nombreCompleto}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>{c.etapaEspecifica||c.etapaPrincipal||"—"}{c.fechaUltimoContacto?" · últ. "+c.fechaUltimoContacto:""}</div></div>)}
-        </div>;
-      return <div style={S.sec}>
-        <div style={{...S.card(),cursor:"pointer",borderColor:"#a78bfa44"}} onClick={()=>setVer({t:"cand"})}>
-          <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Candidatos en Proceso</div>
-          <div style={{fontSize:26,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#a78bfa",lineHeight:1.1}}>{candProceso.length}</div>
-          <div style={{fontSize:10,color:"#475569"}}>En la mira para lograr contacto · toca para ver</div>
-        </div>
-        <div style={{...S.card(),marginTop:10,borderColor:GOLD+"33"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:10}}>
-            <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Contactos (trabajando)</div>
-              <div onClick={()=>setVer({t:"cont"})} style={{fontSize:26,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD,cursor:"pointer",lineHeight:1.1}}>{enContacto.length}<span style={{fontSize:13,color:"#64748b"}}> / {Number(metaContactos)||0}</span></div></div>
-            <div style={{width:96}}><div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Meta global</div><input type="number" style={{...S.inp,fontSize:13,padding:"6px 8px"}} value={metaContactos||""} onChange={e=>{const v=e.target.value===""?0:(Number(e.target.value)||0);setMetaContactos(v);saveLS("metaProspContactos",v);}}/></div>
-          </div>
-          {barra(enContacto.length,Number(metaContactos)||0,GOLD)}
-        </div>
-        <div style={{...S.sTit,marginTop:16}}>Prospectos por solución</div>
-        <div style={{fontSize:10,color:"#64748b",marginBottom:8}}>Contactos con oportunidad activa (excluye Concretada/Rechazada). Toca el número para ver quiénes.</div>
-        {solList.length===0&&<div style={{fontSize:11,color:"#475569"}}>No hay soluciones en el catálogo.</div>}
-        {solList.map(s=>{const val=Object.keys(prospBySol[s.id]||{}).length;const meta=Number(s.metaProspeccion)||0;return (
-          <div key={s.id} style={{...S.card(),marginBottom:8,padding:"10px 12px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-              <div style={{fontSize:12,fontWeight:700,flex:1,minWidth:0}}>{s.nombre}</div>
-              <div onClick={()=>setVer({t:"sol",sid:s.id,nom:s.nombre})} style={{fontSize:19,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#2dd4bf",cursor:"pointer",minWidth:24,textAlign:"right"}}>{val}</div>
-              <div style={{width:66}}><input type="number" placeholder="meta" style={{...S.inp,fontSize:12,padding:"5px 7px"}} value={s.metaProspeccion!=null?s.metaProspeccion:""} onChange={e=>setMetaProsp(s.id,e.target.value)}/></div>
-            </div>
-            {meta>0&&barra(val,meta,"#2dd4bf")}
-          </div>);})}
-        {solList.length>0&&<div style={{...S.card(),marginTop:2,borderColor:GOLD+"44",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:13,fontWeight:800}}>Total prospectos</div>
-          <div style={{fontSize:19,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD}}>{totalProsp}<span style={{fontSize:12,color:"#64748b"}}> / {totalMeta}</span></div>
-        </div>}
-        {ver&&ver.t==="cand"&&<Lista titulo="Candidatos en Proceso" items={candProceso}/>}
-        {ver&&ver.t==="cont"&&<Lista titulo="Contactos (trabajando)" items={enContacto}/>}
-        {ver&&ver.t==="sol"&&<Lista titulo={"Prospectos · "+ver.nom} items={prospContactosSol(ver.sid)}/>}
-      </div>;
-    })()}
+    {modo==="prospeccion"&&<PipelineProspeccion contactos={contactos} oportunidades={oportunidades} catalogos={catalogos} productos={productos}/>}
     {modo==="matriz"&&<div style={S.sec}>
       <div style={S.g2}>
         <div><div style={S.fl}>Mes inicial</div><input type="month" style={S.inp} value={ini} onChange={e=>setIni(e.target.value||ini)}/></div>
@@ -1367,6 +1375,61 @@ function Configuracion({data,onRestore,onExcel,go}){
 }
 
 /* ════════ INICIO (shell) ════════ */
+function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
+  const[mes,setMes]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso").length;
+  const candIdent=contactos.filter(c=>c.etapaEspecifica==="Candidato Identificado").length;
+  const ctosActivos=contactos.filter(c=>c.etapaPrincipal==="Contacto").length;
+  const prospectos=contactos.filter(c=>c.etapaPrincipal==="Prospecto").length;
+  const clientes=contactos.filter(c=>c.etapaPrincipal==="Cliente"&&["Cliente Activo","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)).length;
+  const pipeRows=(catalogos.solucion||[]).map(s=>{
+    const prods=(productos||[]).filter(p=>p.solucionId===s.id&&Number((p.metas||{})[mes])>0);
+    const metaUnid=prods.reduce((t,p)=>t+Number((p.metas||{})[mes]),0);
+    const opps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id);
+    const ctosAnc=contactos.filter(c=>["Contacto","Prospecto"].includes(c.etapaPrincipal)&&(c.solucionesAncla||[]).includes(s.id));
+    const candAnc=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso"&&(c.solucionesAncla||[]).includes(s.id));
+    if(!prods.length&&!opps.length&&!ctosAnc.length&&!candAnc.length)return null;
+    return{s,metaUnid,opps,ctosAnc,candAnc};
+  }).filter(Boolean);
+  const FUNNEL=[
+    {label:"Candidatos Identificados",n:candIdent,color:"#475569"},
+    {label:"Candidatos en Proceso",n:candProceso,color:"#60a5fa"},
+    {label:"Contactos Activos",n:ctosActivos,color:"#a78bfa"},
+    {label:"Prospectos (Opp Activa)",n:prospectos,color:"#fbbf24"},
+    {label:"Clientes Activos",n:clientes,color:"#22c55e"},
+  ];
+  const maxF=Math.max(...FUNNEL.map(f=>f.n),1);
+  return <div style={S.sec}>
+    <div style={S.card()}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={S.sTit}>Embudo de Prospección</div>
+        <input type="month" value={mes} onChange={e=>setMes(e.target.value)} style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"3px 7px",color:"#e2e8f0",fontSize:10,outline:"none"}}/>
+      </div>
+      <div style={{marginBottom:12}}>
+        {FUNNEL.map(({label,n,color})=><div key={label} style={{marginBottom:7}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
+            <span style={{color:"#94a3b8"}}>{label}</span>
+            <span style={{color,fontWeight:700}}>{n}</span>
+          </div>
+          <div style={{height:4,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:Math.round(n/maxF*100)+"%",background:color,borderRadius:3}}/></div>
+        </div>)}
+      </div>
+      {pipeRows.length>0&&<>
+        <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Por Solución — {mes.split("-").reverse().join("/")}</div>
+        {pipeRows.map(({s,metaUnid,opps,ctosAnc,candAnc})=><div key={s.id} style={{padding:"8px 0",borderTop:"1px solid #1e293b"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",marginBottom:5}}>{s.nombre}</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {metaUnid>0&&<span style={{...S.tag(GOLD),fontSize:9}}>🎯 Meta: {metaUnid} u.</span>}
+            <span style={{...S.tag(opps.length>=metaUnid&&metaUnid>0?"#22c55e":"#60a5fa"),fontSize:9}}>🚀 {opps.length} opp{opps.length!==1?"s":""}</span>
+            {ctosAnc.length>0&&<span style={{...S.tag("#a78bfa"),fontSize:9}}>👤 {ctosAnc.length} contacto{ctosAnc.length!==1?"s":""}</span>}
+            {candAnc.length>0&&<span style={{...S.tag("#60a5fa"),fontSize:9}}>⏳ {candAnc.length} en proceso</span>}
+            {metaUnid>0&&opps.length<metaUnid&&<span style={{...S.tag("#f87171"),fontSize:9}}>⚠ Faltan {metaUnid-opps.length}</span>}
+          </div>
+        </div>)}
+      </>}
+    </div>
+  </div>;
+}
 function ObjetivoMes({productos,oportunidades,catalogos}){
   const[mes,setMes]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
   const rows=(catalogos.solucion||[]).map(s=>{
@@ -1413,6 +1476,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   const[proxOpen,setProxOpen]=useState(false);
   const[etapaExp,setEtapaExp]=useState(null);
   const[mesPipe,setMesPipe]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const[showObjetivoInicio,setShowObjetivoInicio]=useState(false);
   const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>{const hK=(h)=>h||"99:99";let r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));return r;});
   const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&!((o.etapa||"").toLowerCase().includes("espera")));
   const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
@@ -1474,65 +1538,9 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
       </div>
     </div>
     <div style={S.sec}>
-      <ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>
+      <button style={{...S.chip(showObjetivoInicio,"#a78bfa"),fontSize:9,padding:"3px 10px",width:"100%",cursor:"pointer",textAlign:"center",marginBottom:showObjetivoInicio?8:0}} onClick={()=>setShowObjetivoInicio(v=>!v)}>🎯 Objetivo del Mes {showObjetivoInicio?"▲":"▾"}</button>
+      {showObjetivoInicio&&<ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>}
     </div>
-    {/* Pipeline de Prospección */}
-    <div style={S.sec}>{(()=>{
-      // Funnel global de etapas
-      const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso").length;
-      const candIdent=contactos.filter(c=>c.etapaEspecifica==="Candidato Identificado").length;
-      const ctosActivos=contactos.filter(c=>c.etapaPrincipal==="Contacto").length;
-      const prospectos=contactos.filter(c=>c.etapaPrincipal==="Prospecto").length;
-      const clientes=contactos.filter(c=>c.etapaPrincipal==="Cliente"&&["Cliente Activo","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)).length;
-      // Por solución: oportunidades activas vs contactos ancla
-      const pipeRows=(catalogos.solucion||[]).map(s=>{
-        const prods=(productos||[]).filter(p=>p.solucionId===s.id&&Number((p.metas||{})[mesPipe])>0);
-        const metaUnid=prods.reduce((t,p)=>t+Number((p.metas||{})[mesPipe]),0);
-        const opps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id);
-        const ctosAnc=contactos.filter(c=>["Contacto","Prospecto"].includes(c.etapaPrincipal)&&(c.solucionesAncla||[]).includes(s.id));
-        const candAnc=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso"&&(c.solucionesAncla||[]).includes(s.id));
-        if(!prods.length&&!opps.length&&!ctosAnc.length&&!candAnc.length)return null;
-        return{s,metaUnid,opps,ctosAnc,candAnc};
-      }).filter(Boolean);
-      const FUNNEL=[
-        {label:"Candidatos Identificados",n:candIdent,color:"#475569"},
-        {label:"Candidatos en Proceso",n:candProceso,color:"#60a5fa"},
-        {label:"Contactos Activos",n:ctosActivos,color:"#a78bfa"},
-        {label:"Prospectos (Opp Activa)",n:prospectos,color:"#fbbf24"},
-        {label:"Clientes Activos",n:clientes,color:"#22c55e"},
-      ];
-      const maxF=Math.max(...FUNNEL.map(f=>f.n),1);
-      return <div style={S.card()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-          <div style={S.sTit}>Embudo de Prospección</div>
-          <input type="month" value={mesPipe} onChange={e=>setMesPipe(e.target.value)} style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"3px 7px",color:"#e2e8f0",fontSize:10,outline:"none"}}/>
-        </div>
-        {/* Funnel global */}
-        <div style={{marginBottom:12}}>
-          {FUNNEL.map(({label,n,color})=><div key={label} style={{marginBottom:7}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
-              <span style={{color:"#94a3b8"}}>{label}</span>
-              <span style={{color,fontWeight:700}}>{n}</span>
-            </div>
-            <div style={{height:4,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:Math.round(n/maxF*100)+"%",background:color,borderRadius:3}}/></div>
-          </div>)}
-        </div>
-        {/* Por solución con meta o contactos ancla */}
-        {pipeRows.length>0&&<>
-          <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Por Solución — {mesPipe.split("-").reverse().join("/")}</div>
-          {pipeRows.map(({s,metaUnid,opps,ctosAnc,candAnc})=><div key={s.id} style={{padding:"8px 0",borderTop:"1px solid #1e293b"}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",marginBottom:5}}>{s.nombre}</div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {metaUnid>0&&<span style={{...S.tag(GOLD),fontSize:9}}>🎯 Meta: {metaUnid} u.</span>}
-              <span style={{...S.tag(opps.length>=metaUnid&&metaUnid>0?"#22c55e":"#60a5fa"),fontSize:9}}>🚀 {opps.length} opp{opps.length!==1?"s":""} activa{opps.length!==1?"s":""}</span>
-              {ctosAnc.length>0&&<span style={{...S.tag("#a78bfa"),fontSize:9}}>👤 {ctosAnc.length} contacto{ctosAnc.length!==1?"s":""}</span>}
-              {candAnc.length>0&&<span style={{...S.tag("#60a5fa"),fontSize:9}}>⏳ {candAnc.length} en proceso</span>}
-              {metaUnid>0&&opps.length<metaUnid&&<span style={{...S.tag("#f87171"),fontSize:9}}>⚠ Faltan {metaUnid-opps.length} opp</span>}
-            </div>
-          </div>)}
-        </>}
-      </div>;
-    })()}</div>
     <div style={S.sec}>
       <div onClick={()=>setProxOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:proxOpen?8:0}}>
         <div style={S.sTit}>{proxOpen?"\u25BE ":"\u25B8 "}Próximas actividades{prox.length?` (${prox.length})`:""}</div>
@@ -2763,6 +2771,10 @@ function App(){
     if(!localStorage.getItem(PFX+"migAliadoTipo")){
       cs=cs.map(c=>{ if(c.tipoAliado&&!c.tiposAliado){const{tipoAliado,...rest}=c;return {...rest,tiposAliado:[tipoAliado]};} return c; });
       try{localStorage.setItem(PFX+"migAliadoTipo","1");}catch(e){}
+    }
+    if(!localStorage.getItem(PFX+"migCandProc")){
+      cs=cs.map(c=>c.etapaEspecifica==="Candidato en Proceso"?{...c,etapaEspecifica:"Candidato Identificado"}:c);
+      try{localStorage.setItem(PFX+"migCandProc","1");}catch(e){}
     }
     return cs;
   });
