@@ -1411,6 +1411,8 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   const[limite,setLimite]=useState("");
   const[proxOpen,setProxOpen]=useState(false);
+  const[etapaExp,setEtapaExp]=useState(null);
+  const[mesPipe,setMesPipe]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
   const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>{const hK=(h)=>h||"99:99";let r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));return r;});
   const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&!((o.etapa||"").toLowerCase().includes("espera")));
   const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
@@ -1441,16 +1443,96 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
       </div>
       <div style={S.card()}>
         <div style={S.sTit}>Por etapa</div>
-        {["Candidato","Contacto","Prospecto","Cliente"].map(et=>{const n=stat(et);const pct=contactos.length?Math.round(n/contactos.length*100):0;
-          return <div key={et} style={{marginBottom:8}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}><span style={{color:"#94a3b8"}}>{et}</span><span style={{color:ec(et),fontWeight:700}}>{n}</span></div>
+        {["Candidato","Contacto","Prospecto","Cliente"].map(et=>{
+          const n=stat(et);const pct=contactos.length?Math.round(n/contactos.length*100):0;
+          const isExp=etapaExp===et;
+          const subEtapas=(catalogos.etapaEspecifica||[]).filter(e=>e.principal===et);
+          return <div key={et} style={{marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3,cursor:"pointer"}} onClick={()=>setEtapaExp(isExp?null:et)}>
+              <span style={{color:"#94a3b8"}}>{et}{subEtapas.length?<span style={{color:"#475569",fontSize:9}}> {isExp?"▲":"▾"}</span>:""}</span>
+              <span style={{color:ec(et),fontWeight:700}}>{n}</span>
+            </div>
             <div style={{height:5,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:pct+"%",background:ec(et),borderRadius:3}}/></div>
-          </div>;})}
+            {isExp&&<div style={{marginTop:7,paddingLeft:10,borderLeft:`2px solid ${ec(et)}44`}}>
+              {subEtapas.map(se=>{
+                const ns=contactos.filter(c=>c.etapaEspecifica===se.nombre).length;
+                if(ns===0)return null;
+                const pcts=n?Math.round(ns/n*100):0;
+                return <div key={se.id} style={{marginBottom:6}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
+                    <span style={{color:"#64748b"}}>{se.nombre}</span>
+                    <span style={{color:ec(et),fontWeight:600}}>{ns}</span>
+                  </div>
+                  <div style={{height:3,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:pcts+"%",background:ec(et)+"99",borderRadius:3}}/></div>
+                </div>;
+              })}
+              {subEtapas.every(se=>contactos.filter(c=>c.etapaEspecifica===se.nombre).length===0)&&
+                <div style={{fontSize:9,color:"#475569"}}>Sin etapas específicas asignadas</div>}
+            </div>}
+          </div>;
+        })}
       </div>
     </div>
     <div style={S.sec}>
       <ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>
     </div>
+    {/* Pipeline de Prospección */}
+    <div style={S.sec}>{(()=>{
+      // Funnel global de etapas
+      const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso").length;
+      const candIdent=contactos.filter(c=>c.etapaEspecifica==="Candidato Identificado").length;
+      const ctosActivos=contactos.filter(c=>c.etapaPrincipal==="Contacto").length;
+      const prospectos=contactos.filter(c=>c.etapaPrincipal==="Prospecto").length;
+      const clientes=contactos.filter(c=>c.etapaPrincipal==="Cliente"&&["Cliente Activo","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)).length;
+      // Por solución: oportunidades activas vs contactos ancla
+      const pipeRows=(catalogos.solucion||[]).map(s=>{
+        const prods=(productos||[]).filter(p=>p.solucionId===s.id&&Number((p.metas||{})[mesPipe])>0);
+        const metaUnid=prods.reduce((t,p)=>t+Number((p.metas||{})[mesPipe]),0);
+        const opps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id);
+        const ctosAnc=contactos.filter(c=>["Contacto","Prospecto"].includes(c.etapaPrincipal)&&(c.solucionesAncla||[]).includes(s.id));
+        const candAnc=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso"&&(c.solucionesAncla||[]).includes(s.id));
+        if(!prods.length&&!opps.length&&!ctosAnc.length&&!candAnc.length)return null;
+        return{s,metaUnid,opps,ctosAnc,candAnc};
+      }).filter(Boolean);
+      const FUNNEL=[
+        {label:"Candidatos Identificados",n:candIdent,color:"#475569"},
+        {label:"Candidatos en Proceso",n:candProceso,color:"#60a5fa"},
+        {label:"Contactos Activos",n:ctosActivos,color:"#a78bfa"},
+        {label:"Prospectos (Opp Activa)",n:prospectos,color:"#fbbf24"},
+        {label:"Clientes Activos",n:clientes,color:"#22c55e"},
+      ];
+      const maxF=Math.max(...FUNNEL.map(f=>f.n),1);
+      return <div style={S.card()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div style={S.sTit}>Embudo de Prospección</div>
+          <input type="month" value={mesPipe} onChange={e=>setMesPipe(e.target.value)} style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"3px 7px",color:"#e2e8f0",fontSize:10,outline:"none"}}/>
+        </div>
+        {/* Funnel global */}
+        <div style={{marginBottom:12}}>
+          {FUNNEL.map(({label,n,color})=><div key={label} style={{marginBottom:7}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
+              <span style={{color:"#94a3b8"}}>{label}</span>
+              <span style={{color,fontWeight:700}}>{n}</span>
+            </div>
+            <div style={{height:4,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:Math.round(n/maxF*100)+"%",background:color,borderRadius:3}}/></div>
+          </div>)}
+        </div>
+        {/* Por solución con meta o contactos ancla */}
+        {pipeRows.length>0&&<>
+          <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Por Solución — {mesPipe.split("-").reverse().join("/")}</div>
+          {pipeRows.map(({s,metaUnid,opps,ctosAnc,candAnc})=><div key={s.id} style={{padding:"8px 0",borderTop:"1px solid #1e293b"}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",marginBottom:5}}>{s.nombre}</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {metaUnid>0&&<span style={{...S.tag(GOLD),fontSize:9}}>🎯 Meta: {metaUnid} u.</span>}
+              <span style={{...S.tag(opps.length>=metaUnid&&metaUnid>0?"#22c55e":"#60a5fa"),fontSize:9}}>🚀 {opps.length} opp{opps.length!==1?"s":""} activa{opps.length!==1?"s":""}</span>
+              {ctosAnc.length>0&&<span style={{...S.tag("#a78bfa"),fontSize:9}}>👤 {ctosAnc.length} contacto{ctosAnc.length!==1?"s":""}</span>}
+              {candAnc.length>0&&<span style={{...S.tag("#60a5fa"),fontSize:9}}>⏳ {candAnc.length} en proceso</span>}
+              {metaUnid>0&&opps.length<metaUnid&&<span style={{...S.tag("#f87171"),fontSize:9}}>⚠ Faltan {metaUnid-opps.length} opp</span>}
+            </div>
+          </div>)}
+        </>}
+      </div>;
+    })()}</div>
     <div style={S.sec}>
       <div onClick={()=>setProxOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:proxOpen?8:0}}>
         <div style={S.sTit}>{proxOpen?"\u25BE ":"\u25B8 "}Próximas actividades{prox.length?` (${prox.length})`:""}</div>
