@@ -2497,6 +2497,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   };
   const abiertas=oportunidades.filter(ABIERTA);
   const sinSeguimiento=abiertas.filter(o=>!tieneSeg(o));
+  // solIdsConMeta debe declararse ANTES del filter de list
+  const solIdsConMeta=new Set((productos||[]).filter(p=>Number((p.metas||{})[mesAlineado])>0).map(p=>p.solucionId));
   const ql=q.trim().toLowerCase();
   const list=oportunidades.filter(o=>{
     if(fSinAct&&tieneSeg(o))return false;
@@ -2526,8 +2528,6 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   });
   const nFil=(fEts.length?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0)+(fDestacadas?1:0)+(fAlineado?1:0);
   const limpiar=()=>{setFEts([]);setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFDestacadas(false);setFAlineado(false);};
-  // Soluciones con producto que tiene meta en mesAlineado
-  const solIdsConMeta=new Set((productos||[]).filter(p=>Number((p.metas||{})[mesAlineado])>0).map(p=>p.solucionId));
   const alineadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&solIdsConMeta.has(o.solucionId)&&(o.fechaEstimadaCierre||"").slice(0,7)===mesAlineado).length;
   const destacadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&(catalogos.solucion||[]).find(s=>s.id===o.solucionId)?.ancla).length;
   const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
