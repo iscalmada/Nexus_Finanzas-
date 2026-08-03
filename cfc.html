@@ -1412,7 +1412,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
   const[limite,setLimite]=useState("");
   const[proxOpen,setProxOpen]=useState(false);
   const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>{const hK=(h)=>h||"99:99";let r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));return r;});
-  const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada");
+  const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&!((o.etapa||"").toLowerCase().includes("espera")));
   const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   const opCuant=opAb.filter(o=>(Number(o.comisionEstimada)||0)>0);
   const opPorCuant=opAb.length-opCuant.length;
@@ -1426,15 +1426,15 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
     <div style={S.sec}>
       <div style={S.sTit}>Resumen comercial</div>
       <div style={S.g2}>
-        <div style={S.card()}><div style={S.lbl}>Contactos</div><div style={S.big()}>{contactos.length}</div></div>
-        <div style={S.card()}><div style={S.lbl}>Empresas</div><div style={S.big("#3b82f6")}>{empresas.length}</div></div>
+        <div style={S.card()}><div style={S.lbl}>Contactos</div><div style={{fontSize:18,fontWeight:800,color:GOLD}}>{contactos.length}</div></div>
+        <div style={S.card()}><div style={S.lbl}>Empresas</div><div style={{fontSize:18,fontWeight:800,color:"#3b82f6"}}>{empresas.length}</div></div>
       </div>
       <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setView("oportunidades")}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-          <div><div style={S.lbl}>Comisión estimada</div><div style={S.big("#fbbf24")}>{money(opComision)}</div></div>
-          <div style={{textAlign:"right"}}><div style={S.lbl}>Oportunidades</div><div style={{fontSize:18,fontWeight:800,color:"#e2e8f0"}}>{opAb.length}</div></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div><div style={S.lbl}>Comisión estimada (activas)</div><div style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{money(opComision)}</div></div>
+          <div style={{textAlign:"right"}}><div style={S.lbl}>Oportunidades</div><div style={{fontSize:16,fontWeight:800,color:"#e2e8f0"}}>{opAb.length}</div></div>
         </div>
-        <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
           <span style={S.tag("#fbbf24")}>{opCuant.length} cuantificada{opCuant.length===1?"":"s"}</span>
           {opPorCuant>0&&<span style={S.tag("#64748b")}>{opPorCuant} por cuantificar</span>}
         </div>
@@ -2518,6 +2518,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const[fDestacadas,setFDestacadas]=useState(false);
   const[fAlineado,setFAlineado]=useState(false);
   const[mesAlineado,setMesAlineado]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const[showObjetivo,setShowObjetivo]=useState(false);
   const[ord,setOrd]=useState("etapa");
   const[ordDir,setOrdDir]=useState("asc");
   const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
@@ -2587,41 +2588,43 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       {/* Objetivo del mes */}
       <ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>
       {/* Chip Alineadas al Objetivo */}
-      <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
-        <button style={{...S.pill(fAlineado,"#22c55e"),flex:1,padding:"7px 0",fontWeight:700,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",gap:5}} onClick={()=>setFAlineado(v=>!v)}>
-          <span>🎯</span>
-          <span>Alineadas al Objetivo {fAlineado&&alineadasCount>0?`(${alineadasCount})`:""}</span>
-        </button>
-        <input type="month" style={{...S.inp,width:130,fontSize:11,padding:"6px 8px",flexShrink:0}} value={mesAlineado} onChange={e=>setMesAlineado(e.target.value)}/>
+      {/* Comisión esperada — una sola línea compacta */}
+      <div style={{...S.card(),padding:"8px 12px",marginBottom:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:.5}}>COMISIÓN ESPERADA{(fAlineado||fDestacadas||fEts.length||fSol.length||fSinAct)?" · FILTRADO":""}</div>
+            <div style={{fontSize:18,fontWeight:800,color:GOLD}}>{money(list.filter(ABIERTA).reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0))}</div>
+          </div>
+          <div style={{textAlign:"right",fontSize:9,color:"#475569"}}>{list.filter(ABIERTA).length} activas<br/>{list.length} en vista</div>
+        </div>
       </div>
-      {destacadasCount>0&&<button
-        style={{...S.pill(fDestacadas,GOLD),width:"100%",padding:"8px 0",fontWeight:700,fontSize:12,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
-        onClick={()=>setFDestacadas(v=>!v)}>
-        <span>⭐</span>
-        <span>{destacadasCount} Destacadas (soluciones ancla activas)</span>
-      </button>}
-      {/* Chip sin seguimiento */}
-      {sinSeguimiento.length>0&&<button
-        style={{...S.pill(fSinAct,"#ef4444"),width:"100%",padding:"8px 0",fontWeight:700,fontSize:12,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
-        onClick={()=>setFSinAct(v=>!v)}>
-        <span>⚠</span>
-        <span>{sinSeguimiento.length} oportunidad{sinSeguimiento.length!==1?"es":""} sin actividad de seguimiento</span>
-        {fSinAct&&<span style={{fontSize:10,opacity:.8}}>· Toca para ver todas</span>}
-      </button>}
-      <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
+      {/* Búsqueda + filtros elaborados */}
+      <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
         <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar concepto, contacto, empresa…" value={q} onChange={e=>setQ(e.target.value)}/>
-        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""} {showFil?"▲":"▾"}</button>
-        <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap"}}>Act: {list.length}</span>
+        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 12px",fontWeight:700,whiteSpace:"nowrap",fontSize:11}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""}</button>
       </div>
-      {/* Fila de orden — igual que CFP */}
-      <div style={{display:"flex",gap:4,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
-        <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0,marginRight:2}}>ORDEN</span>
-        {[["etapa","Etapa"],["cierre","Fecha cierre"],["prob","Probabilidad"],["monto","Monto"]].map(([v,l])=>(
-          <span key={v} style={{...S.chip(ord===v,GOLD),fontSize:9,padding:"3px 8px",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>setOrd(v)}>{l}</span>
+      {/* Orden — chips pequeños */}
+      <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+        <span style={{fontSize:8,color:"#64748b",fontWeight:700,flexShrink:0}}>ORDEN</span>
+        {[["etapa","Etapa"],["cierre","Cierre"],["prob","Prob."],["monto","Monto"]].map(([v,l])=>(
+          <span key={v} style={{...S.chip(ord===v,GOLD),fontSize:9,padding:"2px 7px",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>setOrd(v)}>{l}</span>
         ))}
-        <span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 8px",flexShrink:0,cursor:"pointer"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</span>
+        <span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"2px 7px",cursor:"pointer"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑":"↓"}</span>
       </div>
-      {showFil&&<div style={{...S.card(),marginTop:10}}>
+      {/* Filtros rápidos — chips pequeños con ícono */}
+      <div style={{display:"flex",gap:5,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+        {destacadasCount>0&&<span style={{...S.chip(fDestacadas,GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setFDestacadas(v=>!v)}>⭐ {destacadasCount}</span>}
+        <span style={{...S.chip(fAlineado,"#22c55e"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setFAlineado(v=>!v)}>🎯 {fAlineado&&alineadasCount>0?alineadasCount:"Obj."}</span>
+        <input type="month" style={{background:"#13131f",border:`1px solid ${fAlineado?"#22c55e":"#1e293b"}`,borderRadius:8,padding:"2px 6px",color:"#e2e8f0",fontSize:9,outline:"none",width:110,flexShrink:0}} value={mesAlineado} onChange={e=>setMesAlineado(e.target.value)}/>
+        {sinSeguimiento.length>0&&<span style={{...S.chip(fSinAct,"#ef4444"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setFSinAct(v=>!v)}>⚠ {sinSeguimiento.length}</span>}
+      </div>
+      {/* Objetivo del Mes — colapsable */}
+      <div style={{marginBottom:8}}>
+        <button style={{...S.chip(showObjetivo,"#a78bfa"),fontSize:9,padding:"3px 10px",width:"100%",cursor:"pointer",textAlign:"center"}} onClick={()=>setShowObjetivo(v=>!v)}>🎯 Objetivo del Mes {showObjetivo?"▲":"▾"}</button>
+        {showObjetivo&&<div style={{marginTop:6}}><ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/></div>}
+      </div>
+      {/* Panel de filtros elaborados */}
+      {showFil&&<div style={{...S.card(),marginBottom:8}}>
         <div style={S.fl}>Etapa</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
           {fEts.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 8px"}} onClick={()=>setFEts([])}>✕ Todas</span>}
@@ -2644,8 +2647,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         <div style={{...S.fl,marginTop:10}}>Aliado</div>
         <BuscaSelect opciones={aliadoOpts} value={fAliado} onChange={v=>setFAliado(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={S.g2}>
-          <div><div style={{...S.fl,marginTop:10}}>Cierre estimado desde</div><input type="date" style={S.inp} value={cDesde} onChange={e=>{setCDesde(e.target.value);if(e.target.value&&!cHasta)setCHasta(e.target.value);}}/></div>
-          <div><div style={{...S.fl,marginTop:10}}>Cierre estimado hasta</div><input type="date" style={S.inp} value={cHasta} onChange={e=>setCHasta(e.target.value)}/></div>
+          <div><div style={{...S.fl,marginTop:10}}>Cierre desde</div><input type="date" style={S.inp} value={cDesde} onChange={e=>{setCDesde(e.target.value);if(e.target.value&&!cHasta)setCHasta(e.target.value);}}/></div>
+          <div><div style={{...S.fl,marginTop:10}}>Cierre hasta</div><input type="date" style={S.inp} value={cHasta} onChange={e=>setCHasta(e.target.value)}/></div>
         </div>
         {nFil>0&&<div style={{textAlign:"right",marginTop:10}}><button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar filtros</button></div>}
       </div>}
