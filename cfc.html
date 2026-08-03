@@ -2576,17 +2576,10 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const destacadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&(catalogos.solucion||[]).find(s=>s.id===o.solucionId)?.ancla).length;
   const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div><div style={S.sub}>{oportunidades.length} en total · {abiertas.length} abiertas</div></div></div>
+    <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div></div></div>
     <div style={S.line}/>
     <div style={S.sec}>
-      {/* Comisión esperada según filtro activo */}
-      <div style={S.card()}>
-        <div style={S.lbl}>Comisión esperada{(fAlineado||fDestacadas||fEts.length||fSol.length||fSinAct)?" (filtrado)":""}</div>
-        <div style={S.big("#fbbf24")}>{money(list.filter(ABIERTA).reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0))}</div>
-        <div style={{fontSize:9,color:"#64748b",marginTop:4}}>{list.filter(ABIERTA).length} oportunidades activas en vista</div>
-      </div>
-      {/* Filtros rápidos — chips con label en una sola fila */}
-      {/* Comisión esperada — una sola línea compacta */}
+      {/* Comisión esperada — compacta, con conteo inline */}
       <div style={{...S.card(),padding:"8px 12px",marginBottom:8}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
