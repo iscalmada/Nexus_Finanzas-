@@ -1367,6 +1367,46 @@ function Configuracion({data,onRestore,onExcel,go}){
 }
 
 /* ════════ INICIO (shell) ════════ */
+function ObjetivoMes({productos,oportunidades,catalogos}){
+  const[mes,setMes]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const rows=(catalogos.solucion||[]).map(s=>{
+    const prods=(productos||[]).filter(p=>p.solucionId===s.id&&Number((p.metas||{})[mes])>0);
+    if(!prods.length)return null;
+    const metaUnid=prods.reduce((t,p)=>t+Number((p.metas||{})[mes]),0);
+    const metaCom=prods.reduce((t,p)=>t+Number((p.metas||{})[mes])*comResultProd(p),0);
+    const devOpps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id&&(o.fechaEstimadaCierre||"").slice(0,7)===mes);
+    const devCom=devOpps.reduce((t,o)=>t+(Number(o.comisionEstimada)||0),0);
+    const pct=metaCom>0?Math.min(100,Math.round(devCom/metaCom*100)):0;
+    return{s,metaUnid,metaCom,devOpps,devCom,pct};
+  }).filter(Boolean);
+  if(!rows.length&&!productos?.length)return null;
+  return <div style={S.card()}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <div style={S.sTit}>🎯 Objetivo del Mes</div>
+      <input type="month" value={mes} onChange={e=>setMes(e.target.value)} style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"4px 8px",color:"#e2e8f0",fontSize:11,outline:"none"}}/>
+    </div>
+    {rows.length===0
+      ?<div style={{fontSize:10,color:"#475569",textAlign:"center",padding:"12px 0"}}>Sin metas definidas para este mes</div>
+      :rows.map(({s,metaUnid,metaCom,devOpps,devCom,pct})=><div key={s.id} style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid #1e293b"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",flex:1,paddingRight:8}}>{s.nombre}</div>
+          <div style={{fontSize:13,fontWeight:800,color:pct>=100?"#22c55e":pct>=60?"#fbbf24":"#f87171",flexShrink:0}}>{pct}%</div>
+        </div>
+        <div style={{height:5,background:"#1a1a2e",borderRadius:3,marginBottom:6}}>
+          <div style={{height:"100%",width:pct+"%",background:pct>=100?"#22c55e":pct>=60?"#fbbf24":"#f87171",borderRadius:3}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b"}}>
+          <span>En desarrollo: {devOpps.length} opp · <span style={{color:"#e2e8f0",fontWeight:600}}>{money(devCom)}</span></span>
+          <span>Meta: {metaUnid} u. · {money(metaCom)}</span>
+        </div>
+        {metaCom>0&&devCom<metaCom&&<div style={{fontSize:9,color:"#f87171",marginTop:3}}>
+          Faltan {money(metaCom-devCom)} en comisión esperada
+        </div>}
+        {pct>=100&&<div style={{fontSize:9,color:"#22c55e",marginTop:3}}>✓ Meta cubierta</div>}
+      </div>)
+    }
+  </div>;
+}
 function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView,catalogos,productos}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   const[limite,setLimite]=useState("");
@@ -1407,6 +1447,9 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
             <div style={{height:5,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:pct+"%",background:ec(et),borderRadius:3}}/></div>
           </div>;})}
       </div>
+    </div>
+    <div style={S.sec}>
+      <ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>
     </div>
     <div style={S.sec}>
       <div onClick={()=>setProxOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:proxOpen?8:0}}>
@@ -2530,17 +2573,19 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const limpiar=()=>{setFEts([]);setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFDestacadas(false);setFAlineado(false);};
   const alineadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&solIdsConMeta.has(o.solucionId)&&(o.fechaEstimadaCierre||"").slice(0,7)===mesAlineado).length;
   const destacadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&(catalogos.solucion||[]).find(s=>s.id===o.solucionId)?.ancla).length;
-  const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
-  const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
   return <div>
     <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div><div style={S.sub}>{oportunidades.length} en total · {abiertas.length} abiertas</div></div></div>
     <div style={S.line}/>
     <div style={S.sec}>
-      <div style={S.g2}>
-        <div style={S.card()}><div style={S.lbl}>Monto abierto</div><div style={S.big()}>{money(totalAb)}</div></div>
-        <div style={S.card()}><div style={S.lbl}>Comisión abierta</div><div style={S.big("#22c55e")}>{money(totalCom)}</div></div>
+      {/* Comisión esperada según filtro activo */}
+      <div style={S.card()}>
+        <div style={S.lbl}>Comisión esperada{(fAlineado||fDestacadas||fEts.length||fSol.length||fSinAct)?" (filtrado)":""}</div>
+        <div style={S.big("#fbbf24")}>{money(list.filter(ABIERTA).reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0))}</div>
+        <div style={{fontSize:9,color:"#64748b",marginTop:4}}>{list.filter(ABIERTA).length} oportunidades activas en vista</div>
       </div>
+      {/* Objetivo del mes */}
+      <ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>
       {/* Chip Alineadas al Objetivo */}
       <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
         <button style={{...S.pill(fAlineado,"#22c55e"),flex:1,padding:"7px 0",fontWeight:700,fontSize:11,display:"flex",alignItems:"center",justifyContent:"center",gap:5}} onClick={()=>setFAlineado(v=>!v)}>
