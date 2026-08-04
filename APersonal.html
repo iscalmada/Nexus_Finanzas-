@@ -95,7 +95,7 @@ const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){c
 const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,Alta:1,Media:2,Baja:3};let b=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<b)b=r;});return Object.keys(rank).find(k=>rank[k]===b)||"Media";};
 
 /* ── BuscaContactoEmpresa ── */
-function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onChange,onAdd,S}){
+function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onChange,onAdd}){
   const[q,setQ]=useState("");
   const[open,setOpen]=useState(false);
   const[showModalLite,setShowModalLite]=useState(false);
@@ -155,7 +155,7 @@ function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onC
           {onAdd&&<button style={{...S.pill(false,"#2dd4bf"),padding:"0 12px",fontWeight:700,fontSize:12,flexShrink:0}} onClick={crear}>+ Nuevo</button>}
         </div>
     }
-    {showModalLite&&onAdd&&<ContactoModalLite S={S} onClose={()=>setShowModalLite(false)} onSave={(data)=>{const id=onAdd(data.nombreCompleto,data);if(id){setShowModalLite(false);}}}/>}
+    {showModalLite&&onAdd&&<ContactoModalLite onClose={()=>setShowModalLite(false)} onSave={(data)=>{const id=onAdd(data.nombreCompleto,data);if(id){setShowModalLite(false);}}}/>}
     {open&&q.trim().length>=2&&results.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:300,background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,.8)",marginTop:4,maxHeight:260,overflowY:"auto"}}>
       {results.map((r,i)=><div key={i} style={{padding:"10px 13px",borderBottom:"1px solid #0f172a",cursor:"pointer"}} onClick={()=>select(r)}>
         <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0"}}>{r.kind==="empresa"?"🏢":"👤"} {r.label}</div>
@@ -217,7 +217,7 @@ function SubtareasEditor({subtareas,onChange,onIndependizar}){
 }
 /* ── Modal de Actividad ── */
 /* ── Modal lite de contacto para APersonal ── */
-function ContactoModalLite({onSave,onClose,S}){
+function ContactoModalLite({onSave,onClose}){
   const[f,setF]=useState({nombre:"",apellido:"",alias:"",prefijo:"",telefono:"",correo:"",actividad:""});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const PREFIJOS=["Dr.","Dra.","Lic.","Ing.","Arq.","Mtro.","Mtra.","C.P."];
@@ -316,7 +316,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
       {/* CONTACTAR */}
       {esContactar&&<>
         <Field label="Contacto / Empresa">
-          <BuscaContactoEmpresa S={S} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={f.contactoId} empresaId={f.empresaId} onChange={({contactoId,empresaId})=>{set("contactoId",contactoId);set("empresaId",empresaId);}} onAdd={onCreateContacto?(nombre,data)=>{const id=onCreateContacto(nombre,data);if(id){set("contactoId",id);set("empresaId",null);}}:undefined}/>
+          <BuscaContactoEmpresa cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={f.contactoId} empresaId={f.empresaId} onChange={({contactoId,empresaId})=>{set("contactoId",contactoId);set("empresaId",empresaId);}} onAdd={onCreateContacto?(nombre,data)=>{const id=onCreateContacto(nombre,data);if(id){set("contactoId",id);set("empresaId",null);}}:undefined}/>
         </Field>
         <div style={S.g2}>
           <Field label="Fecha">
