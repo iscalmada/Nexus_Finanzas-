@@ -856,7 +856,7 @@ function App(){
     </div>}
     <style>{`@keyframes napSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     <div style={S.hdr}>
-      <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW</div></div>
+      <div><div style={S.logo}>Agenda Personal</div></div>
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
         {sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setFDesde("");setFHasta("");setModoFecha("todas");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}
         <button style={{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 10px",cursor:"pointer"}} onClick={()=>setModo("config")}>⚙</button>
