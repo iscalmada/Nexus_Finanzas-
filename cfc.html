@@ -1764,8 +1764,13 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   const cont=cid?contactos.find(c=>c.id===cid):null;
   const opsCont=!esInterno?(oportunidades||[]).filter(o=>
     o.contactoPrincipalId===cid||o.contactoId===cid||
-    (o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(cid)
+    (o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(cid)||
+    o.aliadoEstrategicoId===cid||o.aliadoComercialId===cid
   ):[];
+  // Siempre mostrar todas las activas; las del contacto van primero destacadas
+  const opsActivas=(oportunidades||[]).filter(ABIERTA);
+  const opsOtras=opsActivas.filter(o=>!opsCont.find(x=>x.id===o.id));
+  const opsDisp=[...opsCont.filter(ABIERTA),...opsOtras];
   const save=()=>{
     const modo=f.modoTarea||"unica";
     // ── Mover a proyecto ──
@@ -1909,8 +1914,8 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
 
       {!esInterno&&(<>
         <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
-        {opsCont.length>0&&<Field label="Oportunidad ligada (opcional)">
-          {/* Aviso si hay oportunidades abiertas sin vincular */}
+        <Field label="Oportunidad ligada (opcional)">
+          {/* Aviso si hay oportunidades directas del contacto sin vincular */}
           {!f.oportunidadId&&opsCont.filter(ABIERTA).length>0&&(
             <div style={{display:"flex",alignItems:"center",gap:7,background:"#fbbf2411",border:"1px solid #fbbf2444",borderRadius:8,padding:"7px 10px",marginBottom:7,cursor:"pointer"}} onClick={()=>{if(opsCont.filter(ABIERTA).length===1)set("oportunidadId",opsCont.filter(ABIERTA)[0].id);}}>
               <span style={{fontSize:14}}>💡</span>
@@ -1924,11 +1929,17 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
               </div>
             </div>
           )}
+          {opsCont.length===0&&<div style={{fontSize:9,color:"#64748b",marginBottom:5}}>Este contacto no aparece en ninguna oportunidad directamente — puedes vincular a cualquiera.</div>}
           <select style={{...S.sel,borderColor:!f.oportunidadId&&opsCont.filter(ABIERTA).length>0?"#fbbf2466":undefined}} value={f.oportunidadId||""} onChange={e=>set("oportunidadId",e.target.value||null)}>
-            <option value="">— Seguimiento de contacto —</option>
-            {opsCont.map(o=><option key={o.id} value={o.id}>{ABIERTA(o)?"🎯 ":"✓ "}{o.concepto}</option>)}
+            <option value="">— Sin vincular a oportunidad —</option>
+            {opsCont.filter(ABIERTA).length>0&&<optgroup label="── Del contacto ──">
+              {opsCont.filter(ABIERTA).map(o=><option key={o.id} value={o.id}>🎯 {o.concepto}</option>)}
+            </optgroup>}
+            {opsOtras.length>0&&<optgroup label="── Otras activas ──">
+              {opsOtras.map(o=><option key={o.id} value={o.id}>{o.concepto}</option>)}
+            </optgroup>}
           </select>
-        </Field>}
+        </Field>
       </>)}
 
     <Field label={LblVoz(esInterno?"Descripción / objetivo":"Intención (al programar)",v=>set("intencion",(f.intencion||f.intencionResultado||"")+" "+v))}><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder={esInterno?"Qué se va a hacer o revisar…":"Qué se busca lograr…"}/></Field>
