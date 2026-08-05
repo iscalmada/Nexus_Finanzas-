@@ -1120,13 +1120,20 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
     if(val===""||val===null)delete metas[mes];else metas[mes]=val;
     return {...p,metas};
   }));
+  const setLogrado=(pid,mes,val)=>setProductos(prev=>prev.map(p=>{
+    if(p.id!==pid)return p;
+    const logrado={...(p.logrado||{})};
+    if(val===""||val===null)delete logrado[mes];else logrado[mes]=val;
+    return {...p,logrado};
+  }));
+  const restanteMes=(p,mes)=>Math.max(0,(Number((p.metas||{})[mes])||0)-(Number((p.logrado||{})[mes])||0));
   const pRec=(p)=>p.recurrencia||(p.recurrente===true?"mensual":"único"); // backward compat
-  const cierreProd=(p,mes)=>(Number((p.metas||{})[mes])||0)*comResultProd(p);
+  const cierreProd=(p,mes)=>restanteMes(p,mes)*comResultProd(p);
   const ingresoProd=(p,mes)=>{
-    const com=comResultProd(p),metas=p.metas||{},rec=pRec(p);
-    if(rec==="mensual"){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}
-    if(rec==="anual"){const mesM=mes.slice(5),mesY=mes.slice(0,4);let u=0;for(const k in metas){if(k.slice(5)===mesM&&k.slice(0,4)<=mesY)u+=Number(metas[k])||0;}return u*com;}
-    return (Number(metas[mes])||0)*com; // único
+    const com=comResultProd(p),metas=p.metas||{},logrado=p.logrado||{},rec=pRec(p);
+    if(rec==="mensual"){let u=0;for(const k in metas){if(k<=mes)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
+    if(rec==="anual"){const mesM=mes.slice(5),mesY=mes.slice(0,4);let u=0;for(const k in metas){if(k.slice(5)===mesM&&k.slice(0,4)<=mesY)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
+    return restanteMes(p,mes)*com; // único
   };
   const sols=(catalogos.solucion||[]).map(s=>({s,prods:productos.filter(p=>p.solucionId===s.id)})).filter(g=>g.prods.length>0);
   const sumProds=(prods,mes,fn)=>prods.reduce((a,p)=>a+fn(p,mes),0);
@@ -1169,11 +1176,12 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
                   <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{({mensual:" · mensual",anual:" · anual",único:" · único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||" · único"}</div>
                 </div>
                 {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
-                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"5px 6px"}}/>
+                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"4px 4px",marginBottom:2}}/>
+                  <input type="text" inputMode="decimal" value={(p.logrado||{})[m]??""} onChange={e=>setLogrado(p.id,m,e.target.value)} placeholder="✓" style={{width:"100%",background:"#0a140a",border:"1px solid #22c55e44",borderRadius:6,color:"#22c55e",fontSize:10,textAlign:"center",padding:"3px 4px"}}/>
                 </div>)}
               </div>)}
               <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14"}}>
-                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"5px 0"}}>Cierres $</div>
+                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"5px 0"}}>Cierres $ (rest.)</div>
                 {meses.map(m=><div key={m} style={cellNum}>{money(sumProds(g.prods,m,cierreProd))}</div>)}
               </div>
               <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14",borderBottom:"1px solid #1e293b"}}>
@@ -1210,20 +1218,26 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
                 <span style={{fontSize:12,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</span>
                 <span style={{fontSize:13,fontWeight:800,color:GOLD}}>{money(g.sub)}</span>
               </div>
-              {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
+              {g.items.map(it=>{const logr=Number((it.p.logrado||{})[mesRep])||0;const rest=Math.max(0,it.meta-logr);return <div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
                   <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.p.tipo}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>{it.meta>0?it.meta+" u. meta":(({mensual:"acumulado",anual:"renovación anual"})[it.p.recurrencia||(it.p.recurrente===true?"mensual":"único")]||"—")} · {money(comResultProd(it.p))}/u · {({mensual:"mensual",anual:"anual",único:"único"})[it.p.recurrencia||(it.p.recurrente===true?"mensual":"único")]||"único"}</div>
+                  <div style={{display:"flex",gap:6,marginTop:2,flexWrap:"wrap"}}>
+                    {it.meta>0&&<span style={{fontSize:9,color:"#94a3b8"}}>Meta: {it.meta}</span>}
+                    {logr>0&&<span style={{fontSize:9,color:"#22c55e",fontWeight:700}}>✓ {logr}</span>}
+                    {it.meta>0&&rest>0&&<span style={{fontSize:9,color:"#f87171"}}>Falta: {rest}</span>}
+                    {it.meta>0&&rest===0&&logr>0&&<span style={{fontSize:9,color:"#22c55e"}}>✓ Cubierta</span>}
+                  </div>
+                  <div style={{fontSize:9,color:"#64748b"}}>{money(comResultProd(it.p))}/u · {({mensual:"mensual",anual:"anual",único:"único"})[it.p.recurrencia||(it.p.recurrente===true?"mensual":"único")]||"único"}</div>
                 </div>
                 <div style={{fontSize:13,fontWeight:700,color:"#2dd4bf",whiteSpace:"nowrap"}}>{money(it.ing)}</div>
-              </div>)}
+              </div>;})}
             </div>)}
         <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Incluye productos con meta del mes y recurrentes con acumulado vivo. El total coincide con el Ingreso Nexus Proyectado que alimenta el presupuesto del CFP.</div>
       </div>;
     })()}
     {modo==="productos"&&(()=>{
       const shiftMes=(mk,d)=>{let a=mk.split("-").map(Number),y=a[0],m=a[1];m+=d;while(m<1){m+=12;y--;}while(m>12){m-=12;y++;}return y+"-"+String(m).padStart(2,"0");};
-      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
+      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0,logr:Number((p.logrado||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
       return <div style={S.sec}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"8px 10px",marginBottom:12}}>
           <button onClick={()=>setMesRep(shiftMes(mesRep,-1))} style={{background:"transparent",border:"none",color:GOLD,fontSize:20,cursor:"pointer",padding:"0 12px"}}>‹</button>
@@ -1234,13 +1248,17 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
           ? <div style={{...S.card(),textAlign:"center",color:"#475569",fontSize:12,padding:"24px 12px"}}>Sin productos con meta este mes.</div>
           : grupos.map(g=><div key={g.s.id} style={{...S.card(),marginBottom:10,padding:0}}>
               <div style={{padding:"9px 12px",borderBottom:"1px solid #1e293b",fontSize:12,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</div>
-              {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
+              {g.items.map(it=>{const rest=Math.max(0,it.meta-it.logr);return <div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
                   <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"pre-wrap"}}>{it.p.tipo}</div>
                   <div style={{fontSize:10,color:"#94a3b8"}}>{[it.p.categoria,(it.p.montoNegocio?money(it.p.montoNegocio):null)].filter(Boolean).join(" · ")||"—"}</div>
+                  {it.logr>0&&<div style={{fontSize:9,color:"#22c55e",marginTop:2}}>✓ {it.logr} logrado{it.logr>=it.meta?" — Cubierta":""}</div>}
                 </div>
-                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:800,color:"#a78bfa"}}>{it.meta}</div><div style={{fontSize:8,color:"#64748b"}}>cantidad</div></div>
-              </div>)}
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:16,fontWeight:800,color:rest===0?"#22c55e":"#a78bfa"}}>{rest}</div>
+                  <div style={{fontSize:8,color:"#64748b"}}>restante</div>
+                </div>
+              </div>;})}
             </div>)}
         <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Síntesis de venta del mes: producto, categoría, monto de producción y unidades meta. Sin comisiones ni proyección de ingreso.</div>
       </div>;
@@ -2032,24 +2050,29 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
     /* Progress para checklist y proyecto */
     const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return {done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return {done:d,total:a.subtareas.length};}return null;})();
     const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
-    return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,position:"relative"}}>
-      {featTag&&<span onClick={e=>{e.stopPropagation();if(!onPatchAct)return;const cur=a.etiquetasAgenda||[];const has=cur.includes(featTag.nombre);onPatchAct(a.id,{etiquetasAgenda:has?cur.filter(x=>x!==featTag.nombre):[...cur,featTag.nombre]});}} style={{position:"absolute",top:8,right:8,fontSize:13,cursor:"pointer",filter:(a.etiquetasAgenda||[]).includes(featTag.nombre)?"none":"grayscale(1) opacity(0.25)",zIndex:2}}>💰</span>}
+    const toggleFeatTag=(e)=>{e.stopPropagation();if(!onPatchAct||!featTag)return;const cur=a.etiquetasAgenda||[];const has=cur.includes(featTag.nombre);onPatchAct(a.id,{etiquetasAgenda:has?cur.filter(x=>x!==featTag.nombre):[...cur,featTag.nombre]});};
+    const isFeat=featTag&&(a.etiquetasAgenda||[]).includes(featTag.nombre);
+    return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`,borderRadius:9,padding:"9px 11px",marginBottom:6}}>
       {esContactarA
         ? <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))}>
-            {/* R1: Contacto · Empresa ………… atraso + fecha */}
+            {/* R1: Contacto · Empresa ………… 💰 + fecha */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
               <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0,flex:1}}>
                 {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
                 <div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad")}
+                  {showContacto&&c?nombreDisplay(c):(a.tipoAccion||"Actividad")}
                   {showContacto&&c&&empN&&<span style={{color:"#475569",fontWeight:400}}> │ </span>}
                   {showContacto&&empN&&<span style={{color:"#7dd3fc",fontWeight:700}}>{empN}</span>}
                 </div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
-                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
-                {hasDesc&&!selectable&&<span style={{fontSize:12,color:isDescExp?"#94a3b8":"#475569",lineHeight:1,padding:"2px 3px",cursor:"pointer"}} onClick={e=>{e.stopPropagation();toggleDesc(a.id);}}>{isDescExp?"▲":"▾"}</span>}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+                  {featTag&&<span onClick={toggleFeatTag} style={{cursor:"pointer",fontSize:14,filter:isFeat?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
+                  <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
+                  {hasDesc&&!selectable&&<span style={{fontSize:12,color:isDescExp?"#94a3b8":"#475569",lineHeight:1,padding:"2px 3px",cursor:"pointer"}} onClick={e=>{e.stopPropagation();toggleDesc(a.id);}}>{isDescExp?"▲":"▾"}</span>}
+                </div>
+                {a.hora&&<span style={{fontSize:10,color:"#94a3b8",marginTop:1,textAlign:"right"}}>{a.hora}</span>}
               </div>
             </div>
             {/* R2: enfoque · etapa · prioridad · tipo acción · orientación */}
@@ -2058,7 +2081,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:8}}>{a.prioridad}</span>}
               {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:8}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
             </div>
             {/* R3: etapa contacto · etapa oportunidad · solución (formato chip) */}
             {(c||op||a.servicioSolucion)&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginTop:5}}>
@@ -2081,10 +2104,14 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
                 {modo==="checklist"&&<span style={{fontSize:11,flexShrink:0,marginTop:1}}>☑</span>}
                 <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{tituloCard}</div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
-                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
-                {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569"}}>{isExp?"▲":"▾"}</span>}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+                  {featTag&&<span onClick={toggleFeatTag} style={{cursor:"pointer",fontSize:14,filter:isFeat?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
+                  <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
+                  {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569"}}>{isExp?"▲":"▾"}</span>}
+                </div>
+                {a.hora&&<span style={{fontSize:10,color:"#94a3b8",marginTop:1,textAlign:"right"}}>{a.hora}</span>}
               </div>
             </div>
             {/* R2: enfoque · etapa · prioridad · tipo acción · etiquetas · toggle-desc */}
@@ -2093,7 +2120,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
               {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
               {hasDesc&&!selectable&&<span style={{fontSize:12,color:isDescExp?"#94a3b8":"#475569",lineHeight:1,padding:"2px 3px",cursor:"pointer",marginLeft:2}} onClick={e=>{e.stopPropagation();toggleDesc(a.id);}}>{isDescExp?"▲":"▾"}</span>}
             </div>
             {/* R3: contacto vinculado (si aplica) */}
@@ -2443,15 +2470,20 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
             const ctoObj=contactos.find(x=>x.id===a.contactoId);
             const empObj=esCom&&ctoObj?(empresas||[]).find(e=>e.id===(cEmpresas(ctoObj)[0]||{}).empresaId):null;
             const principal=esCom?((nombreDisplay(ctoObj))||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
+            const isFeatRow=featTag&&(a.etiquetasAgenda||[]).includes(featTag.nombre);
             return <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`}}>
               {selMode&&<span style={{width:14,height:14,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
               <div style={{width:62,flexShrink:0,display:"flex",flexDirection:"column"}}>
-                <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{efFech?efFech.split("-").reverse().join("/"):"—"}</span>
+                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                  {featTag&&<span onClick={e=>{e.stopPropagation();onEditActs([a.id],{etiquetasAgenda:isFeatRow?(a.etiquetasAgenda||[]).filter(x=>x!==featTag.nombre):[...(a.etiquetasAgenda||[]),featTag.nombre]});}} style={{cursor:"pointer",fontSize:13,filter:isFeatRow?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
+                  <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{efFech?efFech.split("-").reverse().join("/"):"—"}</span>
+                </div>
                 {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
               </div>
               <div style={{flex:esCom?1.6:2.4,minWidth:0}}>
                 <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word"}}>{principal}</div>
                 {esCom&&nombreDisplay(ctoObj)&&empObj?.nombre&&<div style={{fontSize:9,color:"#7dd3fc",marginTop:1,wordBreak:"break-word"}}>{empObj.nombre}</div>}
+                {!esCom&&ctoObj&&<div style={{fontSize:9,color:"#7dd3fc",marginTop:1}}>👤 {nombreDisplay(ctoObj)}</div>}
               </div>
               {esCom&&<div style={{flex:1,minWidth:0,color:"#94a3b8",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.tipoAccion||"—"}</div>}
               <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
@@ -2701,7 +2733,7 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades}){
             <div style={{fontSize:11,color:"#22c55e",lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px"}}>→ {a.resultado}</div>
           </div>}
           {(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
-            {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+            {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
           </div>}
         </>);})()}
       </div>
