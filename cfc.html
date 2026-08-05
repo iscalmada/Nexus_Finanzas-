@@ -1916,7 +1916,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
         <Field label="Oportunidad ligada (opcional)">
           {/* Aviso si hay oportunidades directas del contacto sin vincular */}
-          {!f.oportunidadId&&opsCont.filter(ABIERTA).length>0&&(
+          {cid&&!f.oportunidadId&&opsCont.filter(ABIERTA).length>0&&(
             <div style={{display:"flex",alignItems:"center",gap:7,background:"#fbbf2411",border:"1px solid #fbbf2444",borderRadius:8,padding:"7px 10px",marginBottom:7,cursor:"pointer"}} onClick={()=>{if(opsCont.filter(ABIERTA).length===1)set("oportunidadId",opsCont.filter(ABIERTA)[0].id);}}>
               <span style={{fontSize:14}}>💡</span>
               <div style={{flex:1}}>
@@ -2008,7 +2008,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   </div></div>;
 }
 
-function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct}){
+function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct,featTag}){
   const[expandidos,setExpandidos]=useState(new Set());  // mecanismo 2: subtareas Proyecto/Checklist
   const[expandDesc,setExpandDesc]=useState(new Set());  // mecanismo 1: descripción en TODAS las tarjetas
   const[selSub,setSelSub]=useState({});     // {actId: Set<subId>}
@@ -2032,7 +2032,8 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
     /* Progress para checklist y proyecto */
     const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return {done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return {done:d,total:a.subtareas.length};}return null;})();
     const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
-    return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`,borderRadius:9,padding:"9px 11px",marginBottom:6}}>
+    return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`,borderRadius:9,padding:"9px 11px",marginBottom:6,position:"relative"}}>
+      {featTag&&<span onClick={e=>{e.stopPropagation();if(!onPatchAct)return;const cur=a.etiquetasAgenda||[];const has=cur.includes(featTag.nombre);onPatchAct(a.id,{etiquetasAgenda:has?cur.filter(x=>x!==featTag.nombre):[...cur,featTag.nombre]});}} style={{position:"absolute",top:8,right:8,fontSize:13,cursor:"pointer",filter:(a.etiquetasAgenda||[]).includes(featTag.nombre)?"none":"grayscale(1) opacity(0.25)",zIndex:2}}>💰</span>}
       {esContactarA
         ? <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))}>
             {/* R1: Contacto · Empresa ………… atraso + fecha */}
@@ -2264,6 +2265,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[sel,setSel]=useState([]);
   const[fEnfoque,setFEnfoque]=useState("");
   const[fSinFecha,setFSinFecha]=useState(false);
+  const[fFeat,setFFeat]=useState(false);
   const[fEtiqAgenda,setFEtiqAgenda]=useState("");
   const[batch,setBatch]=useState(null);
   const toggleSel=(id)=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
@@ -2286,6 +2288,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(fEtC){const c=ctById(a.contactoId);if(!c||c.etapaEspecifica!==fEtC)return false;}
     if(fEtO){const o=opById(a.oportunidadId);if(!o||o.etapa!==fEtO)return false;}
     if(fSinFecha){if(efFech)return false;}
+    if(fFeat){const ft=(catalogos.etiqAgenda||[])[0];if(ft&&!(a.etiquetasAgenda||[]).includes(ft.nombre))return false;}
     if(fEnfoque&&(a.enfoque||"Contactar")!==fEnfoque)return false;
     if(fEtiqAgenda&&!(a.etiquetasAgenda||[]).includes(fEtiqAgenda))return false;
     if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,a.asunto,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
@@ -2302,10 +2305,14 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
   const sinFechaCount=(actividades||[]).filter(a=>!(proyFecha(a)||a.fecha||"")).length;
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(filtros.length?1:0)+(fSinFecha?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFSinFecha(false);setFiltros([]);};
+  const featTag=(catalogos.etiqAgenda||[])[0];
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(filtros.length?1:0)+(fSinFecha?1:0)+(fFeat?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFSinFecha(false);setFiltros([]);setFFeat(false);};
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Agenda de Trabajo</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div><div style={{display:"flex",alignItems:"center"}}>{sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setDesde("");setHasta("");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}</div></div>
+    <div style={S.hdr}><div><div style={S.logo}>Agenda de Trabajo</div></div><div style={{display:"flex",alignItems:"center",gap:6}}>
+      {featTag&&<span onClick={()=>setFFeat(v=>!v)} title={featTag.nombre} style={{...S.pill(fFeat,"#fbbf24"),padding:"6px 10px",fontSize:14,cursor:"pointer"}}>💰</span>}
+      {sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setDesde("");setHasta("");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}
+    </div></div>
     <div style={S.line}/>
     {/* ── BARRA STICKY COMPACTA ── */}
     <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"8px 12px 8px"}}>
@@ -2331,36 +2338,32 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
       </div>
       {/* Fila 3: búsqueda + filtros */}
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
-        <input style={{...S.inp,flex:1,padding:"7px 10px",fontSize:12}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <div style={{flex:1,position:"relative"}}>
+          <input style={{...S.inp,paddingRight:q?32:10,fontSize:12}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
+          {q&&<span style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",color:"#64748b",cursor:"pointer",fontSize:15,lineHeight:1}} onClick={()=>setQ("")}>✕</span>}
+        </div>
         <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 12px",fontWeight:700,whiteSpace:"nowrap",fontSize:12}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` ${nFil}`:""} {showFil?"▲":"▾"}</button>
       </div>
     </div>
-    {/* ── PANEL DE FILTROS ── */}
+    {/* ── FUERA DEL PANEL: Selección múltiple + Rezago (igual que APersonal) ── */}
     <div style={{...S.sec,paddingTop:4}}>
-      {showFil&&<div style={{...S.card(),marginTop:6,padding:"10px 12px"}}>
-        {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{marginBottom:8}}>
-          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orientación</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catalogos.etiqAgenda.map(et=><span key={et.id} style={{...S.chip(fEtiqAgenda===et.nombre,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et.nombre?"":et.nombre)}>🏷 {et.nombre}</span>)}
-          </div>
-        </div>}
-        {/* 2 Selección múltiple */}
-        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          {!selMode
-            ? <button style={{...S.pill(false,GOLD),padding:"5px 12px",fontWeight:700,width:"100%",fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
-            : <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
-                <button style={{...S.pill(false,"#60a5fa"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
-                <button style={{...S.pill(false,"#64748b"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel([])}>Ninguna</button>
-                <button style={{...S.pill(false,GOLD),padding:"4px 8px",fontWeight:700,fontSize:11,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
-                <button style={{...S.pill(false,"#f87171"),padding:"4px 8px",fontSize:11}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
-              </div>}
-        </div>
-        {/* 3 Rezago */}
-        <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 12px",width:"100%",fontWeight:700,fontSize:11,marginBottom:8}} onClick={()=>setFRezago(v=>!v)}>⚠ Solo rezagados{fRezago?" ✓":""}</button>
-        {/* 4 Orden */}
-        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ORDEN</div>
+      <div style={{display:"flex",gap:6,marginBottom:6}}>
+        {!selMode
+          ? <button style={{...S.pill(false,GOLD),flex:1,padding:"8px 0",fontWeight:700,fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
+          : <div style={{flex:1,display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",background:"#10101e",borderRadius:10,padding:"6px 10px"}}>
+              <span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
+              <button style={{...S.pill(false,"#60a5fa"),padding:"3px 8px",fontSize:11}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
+              <button style={{...S.pill(false,"#64748b"),padding:"3px 8px",fontSize:11}} onClick={()=>setSel([])}>Ninguna</button>
+              <button style={{...S.pill(false,GOLD),padding:"3px 8px",fontWeight:700,fontSize:11,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
+              <button style={{...S.pill(false,"#f87171"),padding:"3px 8px",fontSize:11}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
+            </div>}
+        <button style={{...S.pill(fRezago,"#ef4444"),padding:"8px 12px",fontWeight:700,fontSize:11,flexShrink:0}} onClick={()=>setFRezago(v=>!v)}>⚠ Rezago</button>
+      </div>
+      {/* ── PANEL DE FILTROS ── */}
+      {showFil&&<div style={{...S.card(),marginTop:0,padding:"10px 12px"}}>
+        {/* ORDEN */}
+        <div style={{marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orden</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
             <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
             <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
@@ -2368,47 +2371,60 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
             <button style={{...S.pill(false,"#60a5fa"),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
           </div>
         </div>
-        {/* 5 Prioridad */}
+        {/* PRIORIDAD */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>PRIORIDAD</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{PRIOR.map(p=><span key={p} style={{...S.chip(fPrioridad.includes(p),PRIOR_COLOR[p]),fontSize:10}} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Prioridad</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{PRIOR.map(p=><span key={p} style={{...S.chip(fPrioridad.includes(p),PRIOR_COLOR[p]),fontSize:10,cursor:"pointer"}} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
         </div>
-        {/* 6 Contacto */}
+        {/* ORIENTACIÓN */}
+        {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orientación</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {catalogos.etiqAgenda.map(et=><span key={et.id} style={{...S.chip(fEtiqAgenda===et.nombre,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et.nombre?"":et.nombre)}>🏷 {et.nombre}</span>)}
+          </div>
+        </div>}
+        {/* TIPO DE ACCIÓN */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>CONTACTO</div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Tipo de acción</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={{...S.chip(fTipos.includes(t.nombre),GOLD),fontSize:10,cursor:"pointer"}} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
+        </div>
+        {/* CONTACTO */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Contacto</div>
           <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:nombreDisplay(c)}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         </div>
-        {/* 7 Empresa */}
+        {/* EMPRESA */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>EMPRESA</div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Empresa</div>
           <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         </div>
-        {/* 8 Tipo de acción */}
-        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>TIPO DE ACCIÓN</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={{...S.chip(fTipos.includes(t.nombre),GOLD),fontSize:10}} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
-        </div>
-        {/* 9 Etapas */}
+        {/* ETAPAS */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
           <div style={S.g2}>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ETAPA CONTACTO</div><select style={{...S.sel,fontSize:11}} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ETAPA OPO.</div><select style={{...S.sel,fontSize:11}} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+            <div><div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:5,textTransform:"uppercase",letterSpacing:.5}}>Etapa contacto</div><select style={{...S.sel,fontSize:11}} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+            <div><div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:5,textTransform:"uppercase",letterSpacing:.5}}>Etapa opo.</div><select style={{...S.sel,fontSize:11}} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
           </div>
         </div>
-        {/* 10 Fechas */}
+        {/* FECHAS — Todas / Hoy / Rango */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={S.g2}>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>DESDE</div><input type="date" style={{...S.inp,fontSize:11}} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>HASTA</div><input type="date" style={{...S.inp,fontSize:11}} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:6,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Fechas</div>
+          <div style={{display:"flex",gap:5,marginBottom:6}}>
+            <button style={{...S.pill(!desde&&!hasta,GOLD),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>{setDesde("");setHasta("");}}>Todas</button>
+            <button style={{...S.pill(desde===hoyISO()&&hasta===hoyISO(),"#60a5fa"),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>{setDesde(hoyISO());setHasta(hoyISO());}}>Hoy</button>
+            <button style={{...S.pill(!!(desde||hasta)&&!(desde===hoyISO()&&hasta===hoyISO()),"#a78bfa"),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>{}}>Rango</button>
           </div>
+          {(desde||hasta)&&<div style={S.g2}>
+            <div><div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Desde</div><input type="date" style={{...S.inp,fontSize:11}} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
+            <div><div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Hasta</div><input type="date" style={{...S.inp,fontSize:11}} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+          </div>}
         </div>
-        {/* Limpiar */}
         {nFil>0&&<button style={{...S.pill(false,"#f87171"),width:"100%",padding:"6px 0",fontWeight:700,fontSize:11}} onClick={limpiar}>✕ Limpiar filtros ({nFil})</button>}
       </div>}
     </div>
     {/* ── CONTENIDO ── */}
     <div id="ag-top" style={{...S.sec,paddingTop:4}}>
-      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)}/>}
+      <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{base.length} de {actividades.length} actividades</div>
+      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)} featTag={featTag}/>}
       {(modo==="rptCom"||modo==="rptTar"||modo==="rptAcc")&&(()=>{
         const esCom=modo==="rptCom";
         const enfRpt=modo==="rptCom"?"Contactar":modo==="rptTar"?"Tareas":"Acciones";
