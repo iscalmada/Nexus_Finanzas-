@@ -1822,7 +1822,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         const compFecha=ds[0]||(f.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";
         const sts=(f.subtareas||[]).map(s=>s.estatus||"Programada");
         const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
-        onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null,fecha:compFecha,estatus:compEst});
+        onSave({...f,contactoId:f.contactoId||null,oportunidadId:f.oportunidadId||null,servicioSolucion:null,fecha:compFecha,estatus:compEst});
       } else {
         if(modo==="checklist"){
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
@@ -1889,7 +1889,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         </div>
       </Field>
       <Field label={LblVoz("Asunto / Tarea",v=>set("asunto",(f.asunto||"")+" "+v))}>
-        <textarea style={{...S.ta,minHeight:72}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
+        <textarea style={{...S.ta}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
       </Field>
       {(f.modoTarea||"unica")==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
       {(f.modoTarea||"unica")==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}
