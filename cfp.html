@@ -2331,7 +2331,7 @@ function App(){
       if(editCarteraId!==null) setDeudores(p=>p.map(x=>x.id===editCarteraId?{...x,...data}:x));
       else setDeudores(p=>[...p,{...data,id:nextCarteraId(deudores),abonos:[],movIdsVinculados:[]}]);
     } else {
-      const monto=parseFloat(formCartera.monto||formCartera.montoObjetivo)||0;
+      const monto=parseFloat(formCartera.montoObjetivo??formCartera.monto)||0;
       const data={...formCartera,monto,montoObjetivo:monto};
       if(editCarteraId!==null) setIngresosExt(p=>p.map(x=>x.id===editCarteraId?{...x,...data}:x));
       else setIngresosExt(p=>[...p,{...data,id:nextCarteraId(ingresosExt),movIdsVinculados:[]}]);
