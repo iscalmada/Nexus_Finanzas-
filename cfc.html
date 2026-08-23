@@ -2653,7 +2653,7 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades}){
+function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades,onToggleFav}){
   const[showActs,setShowActs]=useState(false);
   const[selAct,setSelAct]=useState(null);
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
@@ -2664,9 +2664,12 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades}){
   return <div style={{...S.cCard(col),borderLeft:sinAct?`3px solid #ef4444`:`3px solid ${col}44`}}>
     <div onClick={()=>onTap&&onTap(o)} style={{cursor:"pointer"}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-      <div style={{fontSize:14,fontWeight:700}}>{o.concepto}</div>
+      <div style={{fontSize:14,fontWeight:700,flex:1,minWidth:0}}>{o.concepto}</div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-        {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <span onClick={ev=>{ev.stopPropagation();onToggleFav&&onToggleFav(o.id);}} style={{fontSize:16,cursor:"pointer",filter:o.fav?"none":"grayscale(1) opacity(0.22)",transition:"filter 0.15s"}} title={o.fav?"Quitar de favoritas":"Marcar como favorita"}>⭐</span>
+          {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
+        </div>
         {sinAct&&<span style={{fontSize:9,fontWeight:700,color:"#ef4444",background:"#ef444411",border:"1px solid #ef444433",borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap"}}>⚠ Sin seguimiento</span>}
       </div>
     </div>
@@ -2742,7 +2745,7 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades}){
   </div>;
 }
 
-function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,productos,openOpo}){
+function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,productos,openOpo,onToggleFav}){
   const[fEts,setFEts]=useState([]);
   const toggleEt=(v)=>setFEts(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
   const[showFil,setShowFil]=useState(false);
@@ -2757,6 +2760,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const[q,setQ]=useState("");
   const[fSinAct,setFSinAct]=useState(false);
   const[fDestacadas,setFDestacadas]=useState(false);
+  const[fFavOpo,setFFavOpo]=useState(false);
   const[fAlineado,setFAlineado]=useState(false);
   const[mesAlineado,setMesAlineado]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
   const[showObjetivo,setShowObjetivo]=useState(false);
@@ -2788,6 +2792,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const list=oportunidades.filter(o=>{
     if(fSinAct&&tieneSeg(o))return false;
     if(fSinAct&&!ABIERTA(o))return false;
+    if(fFavOpo&&!o.fav)return false;
     if(fAlineado){if(!ABIERTA(o)||!solIdsConMeta.has(o.solucionId)||(o.fechaEstimadaCierre||"").slice(0,7)!==mesAlineado)return false;}
     if(fDestacadas){const sol=(catalogos.solucion||[]).find(s=>s.id===o.solucionId);if(!sol?.ancla||!ABIERTA(o))return false;}
     if(fEts.length>0&&!fEts.includes(o.etapa||""))return false;
@@ -2811,8 +2816,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     else if(ord==="monto")  r=(Number(b.montoEstimado)||0)-(Number(a.montoEstimado)||0);
     return ordDir==="asc"?r:-r;
   });
-  const nFil=(fEts.length?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0)+(fDestacadas?1:0)+(fAlineado?1:0);
-  const limpiar=()=>{setFEts([]);setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFDestacadas(false);setFAlineado(false);};
+  const nFil=(fEts.length?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0)+(fDestacadas?1:0)+(fAlineado?1:0)+(fFavOpo?1:0);
+  const limpiar=()=>{setFEts([]);setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFDestacadas(false);setFAlineado(false);setFFavOpo(false);};
   const alineadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&solIdsConMeta.has(o.solucionId)&&(o.fechaEstimadaCierre||"").slice(0,7)===mesAlineado).length;
   const destacadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&(catalogos.solucion||[]).find(s=>s.id===o.solucionId)?.ancla).length;
   const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:nombreDisplay(a)}));
@@ -2845,7 +2850,8 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       </div>
       {/* Filtros rápidos — chips con labels descriptivos en una sola línea */}
       <div style={{display:"flex",gap:5,marginBottom:8,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
-        {destacadasCount>0&&<span style={{...S.chip(fDestacadas,GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFDestacadas(v=>!v)}>⭐ Destacadas{fDestacadas?` (${destacadasCount})`:""}</span>}
+        {(oportunidades||[]).filter(o=>o.fav).length>0&&<span style={{...S.chip(fFavOpo,"#fbbf24"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFFavOpo(v=>!v)}>⭐ Mis favoritas{fFavOpo?` (${(oportunidades||[]).filter(o=>o.fav).length})`:""}</span>}
+        {destacadasCount>0&&<span style={{...S.chip(fDestacadas,GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFDestacadas(v=>!v)}>★ Destacadas{fDestacadas?` (${destacadasCount})`:""}</span>}
         <span style={{...S.chip(fAlineado,"#22c55e"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFAlineado(v=>!v)}>🎯 Objetivo{fAlineado&&alineadasCount>0?` (${alineadasCount})`:""}</span>
         <input type="month" style={{background:"#13131f",border:`1px solid ${fAlineado?"#22c55e":"#1e293b"}`,borderRadius:8,padding:"2px 5px",color:"#e2e8f0",fontSize:9,outline:"none",width:100,flexShrink:0}} value={mesAlineado} onChange={e=>setMesAlineado(e.target.value)}/>
         {sinSeguimiento.length>0&&<span style={{...S.chip(fSinAct,"#ef4444"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFSinAct(v=>!v)}>⚠ Sin actividad{fSinAct?` (${sinSeguimiento.length})`:""}</span>}
@@ -2886,7 +2892,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} actividades={actividades} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} actividades={actividades} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)} onToggleFav={onToggleFav}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
@@ -3059,7 +3065,7 @@ function App(){
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
-    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} productos={productos} openOpo={openOpo}/>}
+    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} productos={productos} openOpo={openOpo} onToggleFav={(id)=>setOportunidades(p=>p.map(o=>o.id===id?{...o,fav:!o.fav}:o))}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
