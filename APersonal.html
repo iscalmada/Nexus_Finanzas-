@@ -98,7 +98,6 @@ const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).lengt
 function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onChange,onAdd}){
   const[q,setQ]=useState("");
   const[open,setOpen]=useState(false);
-  const[showModalLite,setShowModalLite]=useState(false);
   const ref=useRef();
   // contacto/empresa seleccionados
   const selCto=contactoId?cfcContactos.find(x=>x.id===contactoId):null;
@@ -143,7 +142,7 @@ function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onC
   },[q,cfcContactos,cfcEmpresas]);
   const select=(item)=>{onChange({contactoId:item.contactoId,empresaId:item.empresaId});setQ("");setOpen(false);};
   const clear=()=>{onChange({contactoId:null,empresaId:null});setQ("");};
-  const crear=()=>{if(q.trim()){if(onAdd){onAdd(q.trim());setQ("");setOpen(false);}}else{setShowModalLite(true);setOpen(false);}};
+  const crear=()=>{if(onAdd&&q.trim()){onAdd(q.trim());setQ("");setOpen(false);}};
   return <div style={{position:"relative"}}>
     {selectedLabel
       ? <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -155,7 +154,6 @@ function BuscaContactoEmpresa({cfcContactos,cfcEmpresas,contactoId,empresaId,onC
           {onAdd&&<button style={{...S.pill(false,"#2dd4bf"),padding:"0 12px",fontWeight:700,fontSize:12,flexShrink:0}} onClick={crear}>+ Nuevo</button>}
         </div>
     }
-    {showModalLite&&onAdd&&<ContactoModalLite onClose={()=>setShowModalLite(false)} onSave={(data)=>{const id=onAdd(data.nombreCompleto,data);if(id){setShowModalLite(false);}}}/>}
     {open&&q.trim().length>=2&&results.length>0&&<div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:300,background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:10,boxShadow:"0 8px 24px rgba(0,0,0,.8)",marginTop:4,maxHeight:260,overflowY:"auto"}}>
       {results.map((r,i)=><div key={i} style={{padding:"10px 13px",borderBottom:"1px solid #0f172a",cursor:"pointer"}} onClick={()=>select(r)}>
         <div style={{fontSize:13,fontWeight:700,color:"#e2e8f0"}}>{r.kind==="empresa"?"🏢":"👤"} {r.label}</div>
@@ -216,43 +214,6 @@ function SubtareasEditor({subtareas,onChange,onIndependizar}){
   </div>;
 }
 /* ── Modal de Actividad ── */
-/* ── Modal lite de contacto para APersonal ── */
-function ContactoModalLite({onSave,onClose}){
-  const[f,setF]=useState({nombre:"",apellido:"",alias:"",prefijo:"",telefono:"",correo:"",actividad:""});
-  const set=(k,v)=>setF(p=>({...p,[k]:v}));
-  const PREFIJOS=["Dr.","Dra.","Lic.","Ing.","Arq.","Mtro.","Mtra.","C.P."];
-  const save=()=>{
-    if(!f.nombre.trim()){alert("El nombre es obligatorio");return;}
-    const nombreCompleto=[f.prefijo,f.nombre,f.apellido].filter(Boolean).join(" ");
-    const id="cnap"+Date.now();
-    onSave({id,nombre:f.nombre.trim(),apellido:f.apellido.trim()||null,prefijo:f.prefijo||null,alias:f.alias||null,telefono:f.telefono||null,correo:f.correo||null,actividad:f.actividad||null,nombreCompleto,giros:[],solucionesAncla:[],etiquetas:[],tiposContacto:[],etapaPrincipal:"Candidato",etapaEspecifica:"Candidato Identificado"});
-  };
-  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:600,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
-    <div style={{background:"#0e0e1a",borderRadius:"16px 16px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480}} onClick={e=>e.stopPropagation()}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <div style={{fontSize:14,fontWeight:800,color:"#2dd4bf"}}>NUEVO CONTACTO</div>
-        <button style={{background:"none",border:"none",color:"#94a3b8",fontSize:20,cursor:"pointer"}} onClick={onClose}>✕</button>
-      </div>
-      <div style={{display:"flex",gap:6,marginBottom:8}}>
-        <select style={{...S.inp,flex:"0 0 90px"}} value={f.prefijo} onChange={e=>set("prefijo",e.target.value)}>
-          <option value="">—</option>
-          {PREFIJOS.map(p=><option key={p} value={p}>{p}</option>)}
-        </select>
-        <input style={{...S.inp,flex:1}} placeholder="Nombre *" value={f.nombre} onChange={e=>set("nombre",e.target.value)} autoFocus/>
-      </div>
-      <div style={{display:"flex",gap:6,marginBottom:8}}>
-        <input style={{...S.inp,flex:1}} placeholder="Apellido(s)" value={f.apellido} onChange={e=>set("apellido",e.target.value)}/>
-        <input style={{...S.inp,flex:"0 0 90px"}} placeholder="Alias" value={f.alias} onChange={e=>set("alias",e.target.value)}/>
-      </div>
-      <input style={{...S.inp,marginBottom:8}} placeholder="Actividad / profesión" value={f.actividad} onChange={e=>set("actividad",e.target.value)}/>
-      <div style={{display:"flex",gap:6,marginBottom:14}}>
-        <input style={S.inp} placeholder="Teléfono" value={f.telefono} onChange={e=>set("telefono",e.target.value)}/>
-        <input style={S.inp} placeholder="Correo" value={f.correo} onChange={e=>set("correo",e.target.value)}/>
-      </div>
-      <button style={{...S.pill(true,"#2dd4bf"),width:"100%",padding:"12px 0",fontWeight:700,fontSize:13}} onClick={save}>✓ Crear contacto</button>
-    </div>
-  </div>;
-}
 function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreateContacto,catContactar,catTareas,catAcciones,catEtiquetas,actividades,onSave,onSaveExtra,onDelete,onClose}){
   const[f,setF]=useState(()=>({enfoque:"Contactar",estatus:"Programada",fecha:hoyISO(),prioridad:"Media",modoTarea:"unica",...(init||{})}));
   const[moveToProject,setMoveToProject]=useState("");
@@ -316,7 +277,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
       {/* CONTACTAR */}
       {esContactar&&<>
         <Field label="Contacto / Empresa">
-          <BuscaContactoEmpresa cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={f.contactoId} empresaId={f.empresaId} onChange={({contactoId,empresaId})=>{set("contactoId",contactoId);set("empresaId",empresaId);}} onAdd={onCreateContacto?(nombre,data)=>{const id=onCreateContacto(nombre,data);if(id){set("contactoId",id);set("empresaId",null);}}:undefined}/>
+          <BuscaContactoEmpresa cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} contactoId={f.contactoId} empresaId={f.empresaId} onChange={({contactoId,empresaId})=>{set("contactoId",contactoId);set("empresaId",empresaId);}} onAdd={onCreateContacto?(nombre)=>{const id=onCreateContacto(nombre);if(id){set("contactoId",id);set("empresaId",null);}}:undefined}/>
         </Field>
         <div style={S.g2}>
           <Field label="Fecha">
@@ -607,45 +568,6 @@ function ConfigView({catContactar,setCatContactar,catTareas,setCatTareas,catAcci
     <CatEd title="🏷 Orientación" items={catEtiquetas} setItems={setCatEtiquetas} color="#f472b6"/>
   </div>;
 }
-/* ── Reporte tabla (Contactar / Tareas / Acciones) — fuera de App para evitar remount ── */
-function Reporte({enfoque,ordenadas,cfcContactos,cfcEmpresas,cfcOportunidades,catEtiquetas,patchAct,selMode,sel,toggleSel,setModal}){
-  const acts=ordenadas.filter(a=>a.enfoque===enfoque);
-  const esCom=enfoque==="Contactar";
-  const featTag=(catEtiquetas||[])[0];
-  const toggleFeat=(a,ev)=>{ev.stopPropagation();if(!featTag)return;const cur=a.etiquetas||[];const has=cur.includes(featTag);patchAct(a.id,{etiquetas:has?cur.filter(x=>x!==featTag):[...cur,featTag]});};
-  if(!acts.length)return <div style={{fontSize:11,color:"#475569",padding:"8px 0"}}>Sin actividades de {enfoque}.</div>;
-  return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
-    <div style={{display:"flex",gap:8,fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
-      {featTag&&<div style={{width:18,flexShrink:0}}></div>}
-      <div style={{width:62,flexShrink:0}}>Fecha</div>
-      <div style={{flex:esCom?1.6:2.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
-      {esCom&&<div style={{flex:1,minWidth:0,whiteSpace:"nowrap"}}>Tipo</div>}
-      <div style={{width:62,flexShrink:0,textAlign:"right"}}>Estatus</div>
-    </div>
-    {acts.map(a=>{const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const efFech=proyFecha(a)||a.fecha||"";
-      const isSel=selMode&&sel.indexOf(a.id)>-1;
-      const ctoObj=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
-      const empObj=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
-      const principal=esCom?((ctoObj?.nombreCompleto&&(ctoObj?.prefijo?ctoObj.prefijo+" ":"")+ctoObj.nombreCompleto)||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
-      const isFeat=featTag&&(a.etiquetas||[]).includes(featTag);
-      return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>selMode?toggleSel(a.id):setModal(a)}>
-        {selMode&&<span style={{width:14,height:14,flexShrink:0,marginTop:1,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-        {featTag&&<span onClick={(ev)=>toggleFeat(a,ev)} title={featTag} style={{width:18,flexShrink:0,fontSize:13,cursor:"pointer",filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
-        <div style={{width:62,flexShrink:0,display:"flex",flexDirection:"column"}}>
-          <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{fmtF(efFech)||"—"}</span>
-          {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
-        </div>
-        <div style={{flex:esCom?1.6:2.4,minWidth:0}}>
-          <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word"}}>{principal}</div>
-          {esCom&&ctoObj?.nombreCompleto&&empObj?.nombre&&<div style={{fontSize:9,color:"#3b82f6",marginTop:1,wordBreak:"break-word"}}>{empObj.nombre}</div>}
-          {!esCom&&ctoObj&&(()=>{const opv=a.oportunidadId?(cfcOportunidades||[]).find(o=>o.id===a.oportunidadId):null;return <div style={{fontSize:9,color:"#3b82f6",marginTop:1,wordBreak:"break-word"}}>👤 {ctoObj.prefijo?ctoObj.prefijo+" ":""}{ctoObj.nombreCompleto}{opv?` · 🎯 ${(opv.etapa||"").replace("Oportunidad ","")}`:""}</div>;})()}
-        </div>
-        {esCom&&<div style={{flex:1,minWidth:0,color:"#94a3b8",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.tipoAccion||"—"}</div>}
-        <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&a.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
-      </div>;
-    })}
-  </div>;
-}
 function App(){
   const[actividades,setActividades]=useState(()=>loadLS("actividades",[]));
   const[catContactar,setCatContactarRaw]=useState(()=>loadLS("catContactar",["Llamada","WhatsApp","Correo","Visita","Video llamada","Mensaje"]));
@@ -716,12 +638,12 @@ function App(){
     window.addEventListener("storage",onStorage);
     return()=>window.removeEventListener("storage",onStorage);
   },[]);
-  const addCfcContacto=(nombre,dataObj)=>{
+  const addCfcContacto=(nombre)=>{
     const n=(nombre||"").trim();
-    if(!n&&!dataObj)return null;
-    const id=dataObj?.id||"cnap"+Date.now();
+    if(!n)return null;
+    const id="cnap"+Date.now();
     const partes=n.split(" ");
-    const nuevo=dataObj?{...dataObj,id}:{id,nombre:partes[0]||n,apellido:partes.slice(1).join(" ")||null,prefijo:null,alias:null,nombreCompleto:n,domicilio:null,telefono:null,correo:null,actividad:null,empresaId:null,rolEmpresa:null,circulo:null,relacion:null,notaRelacion:null,cercania:null,nivelEconomico:null,potencial:null,referidor:null,capacidadRef:null,cuentaPresentacion:false,fechaUltimoContacto:null,resumenAvance:null,acercamientoPixan:false,etapaPixan:null,etapaPrincipal:"Candidato",etapaEspecifica:"Candidato Identificado",tipoPersona:null,giros:[],giroPrincipal:null,solucionesAncla:[],obs:null};
+    const nuevo={id,nombre:partes[0]||n,apellido:partes.slice(1).join(" ")||null,nombreCompleto:n,alias:null,domicilio:null,telefono:null,correo:null,actividad:null,empresaId:null,rolEmpresa:null,circulo:null,relacion:null,notaRelacion:null,cercania:null,nivelEconomico:null,potencial:null,referidor:null,capacidadRef:null,cuentaPresentacion:false,fechaUltimoContacto:null,resumenAvance:null,acercamientoPixan:false,etapaPixan:null,etapaPrincipal:"Candidato",etapaEspecifica:"Candidato Activado",tipoPersona:null,giros:[],giroPrincipal:null,solucionesAncla:[],obs:null};
     const updated=[...cfcContactos,nuevo];
     setCfcContactos(updated);
     try{localStorage.setItem(CFC_PFX+"contactos",JSON.stringify(updated));}catch(e){}
@@ -732,7 +654,7 @@ function App(){
   const[modal,setModal]=useState(null);
   const[expandidos,setExpandidos]=useState(new Set());
   // Filtros
-  const[filtros,setFiltros]=useState(["Programada"]);
+  const[filtros,setFiltros]=useState(["Programada","En Proceso"]);
   const[fEnfoque,setFEnfoque]=useState("");
   const[fEtiqueta,setFEtiqueta]=useState([]);
   const[fFeat,setFFeat]=useState(false);
@@ -847,6 +769,45 @@ function App(){
   const hoyIdx=ordDir==="asc"?ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")>=hoy):ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")<=hoy);
   const enfRptActual=modo==="rptContactar"?"Contactar":modo==="rptTareas"?"Tareas":modo==="rptAcciones"?"Acciones":null;
   const visibles=enfRptActual?ordenadas.filter(a=>a.enfoque===enfRptActual):ordenadas;
+  // Reporte simplificado
+  const Reporte=({enfoque})=>{
+    const acts=ordenadas.filter(a=>a.enfoque===enfoque);
+    const esCom=enfoque==="Contactar";
+    const featTag=(catEtiquetas||[])[0];
+    const toggleFeat=(a,ev)=>{ev.stopPropagation();if(!featTag)return;const cur=a.etiquetas||[];const has=cur.includes(featTag);patchAct(a.id,{etiquetas:has?cur.filter(x=>x!==featTag):[...cur,featTag]});};
+    if(!acts.length)return <div style={{fontSize:11,color:"#475569",padding:"8px 0"}}>Sin actividades de {enfoque}.</div>;
+    return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
+      <div style={{display:"flex",gap:8,fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
+        {featTag&&<div style={{width:18,flexShrink:0}}></div>}
+        <div style={{width:62,flexShrink:0}}>Fecha</div>
+        <div style={{flex:esCom?1.6:2.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
+        {esCom&&<div style={{flex:1,minWidth:0,whiteSpace:"nowrap"}}>Tipo</div>}
+        <div style={{width:62,flexShrink:0,textAlign:"right"}}>Estatus</div>
+      </div>
+      {acts.map(a=>{const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const efFech=proyFecha(a)||a.fecha||"";
+        const isSel=selMode&&sel.indexOf(a.id)>-1;
+        const ctoObj=a.contactoId?cfcContactos.find(x=>x.id===a.contactoId):null;
+        const empObj=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
+        const principal=esCom?((ctoObj?.nombreCompleto&&(ctoObj?.prefijo?ctoObj.prefijo+" ":"")+ctoObj.nombreCompleto)||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
+        const isFeat=featTag&&(a.etiquetas||[]).includes(featTag);
+        return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>selMode?toggleSel(a.id):setModal(a)}>
+          {selMode&&<span style={{width:14,height:14,flexShrink:0,marginTop:1,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+          {featTag&&<span onClick={(ev)=>toggleFeat(a,ev)} title={featTag} style={{width:18,flexShrink:0,fontSize:13,cursor:"pointer",filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
+          <div style={{width:62,flexShrink:0,display:"flex",flexDirection:"column"}}>
+            <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{fmtF(efFech)||"—"}</span>
+            {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
+          </div>
+          <div style={{flex:esCom?1.6:2.4,minWidth:0}}>
+            <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word"}}>{principal}</div>
+            {esCom&&ctoObj?.nombreCompleto&&empObj?.nombre&&<div style={{fontSize:9,color:"#3b82f6",marginTop:1,wordBreak:"break-word"}}>{empObj.nombre}</div>}
+            {!esCom&&ctoObj&&(()=>{const opv=a.oportunidadId?(cfcOportunidades||[]).find(o=>o.id===a.oportunidadId):null;return <div style={{fontSize:9,color:"#3b82f6",marginTop:1,wordBreak:"break-word"}}>👤 {ctoObj.prefijo?ctoObj.prefijo+" ":""}{ctoObj.nombreCompleto}{opv?` · 🎯 ${(opv.etapa||"").replace("Oportunidad ","")}`:""}</div>;})()}
+          </div>
+          {esCom&&<div style={{flex:1,minWidth:0,color:"#94a3b8",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.tipoAccion||"—"}</div>}
+          <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&a.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
+        </div>;
+      })}
+    </div>;
+  };
   // Config catálogos
   const configProps={catContactar,setCatContactar,catTareas,setCatTareas,catAcciones,setCatAcciones,catEtiquetas,setCatEtiquetas,onBack:()=>setModo("lista")};
   return <div ref={rootRef} style={{minHeight:"100vh",background:"#0c0c16"}}>
@@ -856,7 +817,7 @@ function App(){
     </div>}
     <style>{`@keyframes napSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
     <div style={S.hdr}>
-      <div><div style={S.logo}>Agenda Personal</div></div>
+      <div><div style={S.logo}>Agenda Personal</div><div style={S.sub}>NEXUS FLOW · {actividades.length} actividades</div></div>
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
         {sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setFDesde("");setFHasta("");setModoFecha("todas");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}
         <button style={{background:"none",border:"1px solid #1e293b",borderRadius:8,color:"#64748b",fontSize:11,padding:"5px 10px",cursor:"pointer"}} onClick={()=>setModo("config")}>⚙</button>
@@ -986,9 +947,9 @@ function App(){
             <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas}/>
           </div>;
         })}
-        {modo==="rptContactar"&&<Reporte enfoque="Contactar" ordenadas={ordenadas} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} catEtiquetas={catEtiquetas} patchAct={patchAct} selMode={selMode} sel={sel} toggleSel={toggleSel} setModal={setModal}/>}
-        {modo==="rptTareas"&&<Reporte enfoque="Tareas" ordenadas={ordenadas} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} catEtiquetas={catEtiquetas} patchAct={patchAct} selMode={selMode} sel={sel} toggleSel={toggleSel} setModal={setModal}/>}
-        {modo==="rptAcciones"&&<Reporte enfoque="Acciones" ordenadas={ordenadas} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} catEtiquetas={catEtiquetas} patchAct={patchAct} selMode={selMode} sel={sel} toggleSel={toggleSel} setModal={setModal}/>}
+        {modo==="rptContactar"&&<Reporte enfoque="Contactar"/>}
+        {modo==="rptTareas"&&<Reporte enfoque="Tareas"/>}
+        {modo==="rptAcciones"&&<Reporte enfoque="Acciones"/>}
         {base.length===0&&modo==="lista"&&<div style={{textAlign:"center",color:"#334155",fontSize:12,padding:"40px 0"}}>Sin actividades. Toca + para comenzar.</div>}
       </div>
     </>}

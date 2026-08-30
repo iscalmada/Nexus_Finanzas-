@@ -1090,7 +1090,7 @@ function Productos({productos,setProductos,catalogos,onBack}){
       {sinSol.length>0&&<div style={{...S.card("#f8717144"),marginBottom:8}}>
         <div style={{fontSize:13,fontWeight:800,color:"#f87171",marginBottom:6}}>Sin solución válida <span style={{color:"#475569",fontWeight:600}}>· {sinSol.length}</span></div>
         {sinSol.map(p=><div key={p.id} onClick={()=>setModal(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"7px 0",borderTop:"1px solid #1e293b",cursor:"pointer"}}>
-          <span style={{fontSize:13,fontWeight:600}}>{p.tipo}</span>
+          <span style={{fontSize:13,fontWeight:600}}>{p.tipo}{p.categoria&&<span style={{fontSize:10,color:"#64748b",fontWeight:400}}> · {p.categoria}</span>}</span>
           <span style={{fontSize:13,fontWeight:800,color:"#fbbf24"}}>{money(comResultProd(p))}</span>
         </div>)}
       </div>}
@@ -1172,7 +1172,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               <div style={{padding:"7px 10px",background:"#0d1420",borderBottom:"1px solid #1e293b",fontSize:11,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</div>
               {g.prods.map(p=><div key={p.id} style={{display:"flex",alignItems:"center",padding:"0 0 0 10px",borderBottom:"1px solid #14141f"}}>
                 <div style={{width:WCOL,flexShrink:0,padding:"6px 6px 6px 0"}}>
-                  <div style={{fontSize:11,fontWeight:600,lineHeight:1.2}}>{p.tipo}</div>
+                  <div style={{fontSize:11,fontWeight:600,lineHeight:1.2}}>{p.tipo}{p.categoria&&<span style={{fontSize:9,color:"#64748b",fontWeight:400}}> · {p.categoria}</span>}</div>
                   <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{({mensual:" · mensual",anual:" · anual",único:" · único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||" · único"}</div>
                 </div>
                 {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
@@ -1220,7 +1220,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               </div>
               {g.items.map(it=>{const logr=Number((it.p.logrado||{})[mesRep])||0;const rest=Math.max(0,it.meta-logr);return <div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
-                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.p.tipo}</div>
+                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,wordBreak:"break-word"}}>{it.p.tipo}{it.p.categoria&&<span style={{fontSize:9,color:"#64748b",fontWeight:400}}> · {it.p.categoria}</span>}</div>
                   <div style={{display:"flex",gap:6,marginTop:2,flexWrap:"wrap"}}>
                     {it.meta>0&&<span style={{fontSize:9,color:"#94a3b8"}}>Meta: {it.meta}</span>}
                     {logr>0&&<span style={{fontSize:9,color:"#22c55e",fontWeight:700}}>✓ {logr}</span>}
@@ -1250,7 +1250,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               <div style={{padding:"9px 12px",borderBottom:"1px solid #1e293b",fontSize:12,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</div>
               {g.items.map(it=>{const rest=Math.max(0,it.meta-it.logr);return <div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
-                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"pre-wrap"}}>{it.p.tipo}</div>
+                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,wordBreak:"break-word"}}>{it.p.tipo}{it.p.categoria&&<span style={{fontSize:9,color:"#64748b",fontWeight:400}}> · {it.p.categoria}</span>}</div>
                   <div style={{fontSize:10,color:"#94a3b8"}}>{[it.p.categoria,(it.p.montoNegocio?money(it.p.montoNegocio):null)].filter(Boolean).join(" · ")||"—"}</div>
                   {it.logr>0&&<div style={{fontSize:9,color:"#22c55e",marginTop:2}}>✓ {it.logr} logrado{it.logr>=it.meta?" — Cubierta":""}</div>}
                 </div>
@@ -1466,6 +1466,7 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
     const opps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id);
     const ctosAnc=contactos.filter(c=>["Contacto","Prospecto"].includes(c.etapaPrincipal)&&(c.solucionesAncla||[]).includes(s.id));
     const candAnc=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso"&&(c.solucionesAncla||[]).includes(s.id));
+    const reprocesoAnc=contactos.filter(c=>["Cliente Cerrado en Reproceso","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)&&(c.solucionesAncla||[]).includes(s.id));
     const esAnclada=!!(catalogos.solucion||[]).find(x=>x.id===s.id)?.ancla;
     return{s,metaUnid,opps,ctosAnc,candAnc,esAnclada,hasMeta:prods.length>0};
   });
@@ -1507,7 +1508,7 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
       </div>
       <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Por Solución — {mes.split("-").reverse().join("/")}</div>
       {pipeRows.length===0&&<div style={{fontSize:10,color:"#475569",textAlign:"center",padding:"10px 0"}}>Sin soluciones para el filtro seleccionado</div>}
-      {pipeRows.map(({s,metaUnid,opps,ctosAnc,candAnc,esAnclada})=>{
+      {pipeRows.map(({s,metaUnid,opps,ctosAnc,candAnc,reprocesoAnc,esAnclada})=>{
         const kO=s.id+"_opps",kC=s.id+"_ctos",kP=s.id+"_cand";
         return <div key={s.id} style={{padding:"10px 0",borderTop:"1px solid #1e293b"}}>
           <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",marginBottom:6}}>{esAnclada?"⭐ ":""}{s.nombre}</div>
@@ -1516,6 +1517,7 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
             <span style={{...S.chip(expandTag[kO],opps.length>=metaUnid&&metaUnid>0?"#22c55e":"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kO)}>🚀 {opps.length} oportunidad{opps.length!==1?"es":""}</span>
             {ctosAnc.length>0&&<span style={{...S.chip(expandTag[kC],"#a78bfa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kC)}>👤 {ctosAnc.length} contacto{ctosAnc.length!==1?"s":""}</span>}
             {candAnc.length>0&&<span style={{...S.chip(expandTag[kP],"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kP)}>⏳ {candAnc.length} en proceso</span>}
+            {reprocesoAnc.length>0&&<span style={{...S.chip(expandTag[s.id+"_rep"],"#f97316"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(s.id+"_rep")}>🔄 {reprocesoAnc.length} en reproceso</span>}
             {metaUnid>0&&opps.length<metaUnid&&<span style={{...S.tag("#f87171"),fontSize:9}}>⚠ Faltan {metaUnid-opps.length}</span>}
           </div>
           {expandTag[kO]&&<div style={{marginTop:8,paddingLeft:8,borderLeft:"2px solid #60a5fa44"}}>
@@ -1534,6 +1536,12 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
             {candAnc.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
               <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
               <div style={{fontSize:9,color:"#64748b"}}>{c.etapaEspecifica}</div>
+            </div>)}
+          </div>}
+          {expandTag[s.id+"_rep"]&&<div style={{marginTop:8,paddingLeft:8,borderLeft:"2px solid #f9731644"}}>
+            {reprocesoAnc.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
+              <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
+              <div style={{fontSize:9,color:"#f97316"}}>{c.etapaEspecifica}</div>
             </div>)}
           </div>}
         </div>;
@@ -2272,7 +2280,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
 }
 
 function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
-  const[filtros,setFiltros]=useState(["Programada"]);
+  const[filtros,setFiltros]=useState(["Programada","En Proceso"]);
   const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
   const[modo,setModo]=useState("rptCom");
   const[desde,setDesde]=useState("");
@@ -2790,6 +2798,9 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const solIdsConMeta=new Set((productos||[]).filter(p=>Number((p.metas||{})[mesAlineado])>0).map(p=>p.solucionId));
   const ql=q.trim().toLowerCase();
   const list=oportunidades.filter(o=>{
+    // Filtro base: excluir Concretadas/Rechazadas/En Espera a menos que el usuario las seleccione explícitamente
+    const userPickedClosed=fEts.length>0&&fEts.some(et=>!ABIERTA({etapa:et}));
+    if(!userPickedClosed&&!ABIERTA(o))return false;
     if(fSinAct&&tieneSeg(o))return false;
     if(fSinAct&&!ABIERTA(o))return false;
     if(fFavOpo&&!o.fav)return false;
@@ -2810,10 +2821,14 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     const PROB_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
     const etapas=(catalogos.etapaOportunidad||[]).map(e=>e.nombre);
     let r=0;
-    if(ord==="etapa")     r=(etapas.indexOf(a.etapa)>-1?etapas.indexOf(a.etapa):99)-(etapas.indexOf(b.etapa)>-1?etapas.indexOf(b.etapa):99);
+    if(ord==="etapa"){
+      r=(etapas.indexOf(a.etapa)>-1?etapas.indexOf(a.etapa):99)-(etapas.indexOf(b.etapa)>-1?etapas.indexOf(b.etapa):99);
+      if(r===0)r=((PROB_RANK[a.probabilidad]??9)-(PROB_RANK[b.probabilidad]??9));
+      if(r===0)r=(a.fechaEstimadaCierre||"9999").localeCompare(b.fechaEstimadaCierre||"9999");
+    }
     else if(ord==="cierre") r=(a.fechaEstimadaCierre||"9999").localeCompare(b.fechaEstimadaCierre||"9999");
     else if(ord==="prob")   r=((PROB_RANK[a.probabilidad]??9)-(PROB_RANK[b.probabilidad]??9));
-    else if(ord==="monto")  r=(Number(b.montoEstimado)||0)-(Number(a.montoEstimado)||0);
+    else if(ord==="monto")  r=((Number(b.comisionEstimada)||Number(b.montoEstimado)||0))-((Number(a.comisionEstimada)||Number(a.montoEstimado)||0));
     return ordDir==="asc"?r:-r;
   });
   const nFil=(fEts.length?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0)+(fDestacadas?1:0)+(fAlineado?1:0)+(fFavOpo?1:0);
@@ -2829,10 +2844,10 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       <div style={{...S.card(),padding:"8px 12px",marginBottom:8}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <div>
-            <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:.5}}>COMISIÓN ESPERADA{(fAlineado||fDestacadas||fEts.length||fSol.length||fSinAct)?" · FILTRADO":""}</div>
-            <div style={{fontSize:18,fontWeight:800,color:GOLD}}>{money(list.filter(ABIERTA).reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0))}</div>
+            <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:.5}}>COMISIÓN ESPERADA{(fAlineado||fDestacadas||fFavOpo||fEts.length||fSol.length||fSinAct)?" · FILTRADO":""}</div>
+            <div style={{fontSize:18,fontWeight:800,color:GOLD}}>{money(list.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0))}</div>
           </div>
-          <div style={{textAlign:"right",fontSize:9,color:"#475569"}}>{list.filter(ABIERTA).length} activas<br/>{list.length} en vista</div>
+          <div style={{textAlign:"right",fontSize:9,color:"#475569"}}>{list.length} en vista</div>
         </div>
       </div>
       {/* Búsqueda + filtros elaborados */}
