@@ -2544,7 +2544,7 @@ function App(){
               </div>
             )}
             {(()=>{
-              const concretadasSinMov=crmOpos().filter(o=>o.etapa==="Oportunidad Concretada"&&!movs.some(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id&&m.estatus==="INGRESADO"));
+              const concretadasSinMov=crmOpos().filter(o=>(o.etapa==="Oportunidad Concretada")&&o.etapa!=="Oportunidad Liquidada"&&!movs.some(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id&&m.estatus==="INGRESADO"));
               if(concretadasSinMov.length===0) return null;
               return(
                 <div style={{...S.alertCard,background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.3)"}}

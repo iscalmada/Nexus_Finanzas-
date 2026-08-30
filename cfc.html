@@ -1468,7 +1468,8 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
     const candAnc=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso"&&(c.solucionesAncla||[]).includes(s.id));
     const reprocesoAnc=contactos.filter(c=>["Cliente Cerrado en Reproceso","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)&&(c.solucionesAncla||[]).includes(s.id));
     const esAnclada=!!(catalogos.solucion||[]).find(x=>x.id===s.id)?.ancla;
-    return{s,metaUnid,opps,ctosAnc,candAnc,esAnclada,hasMeta:prods.length>0};
+    if(!reprocesoAnc.length&&!prods.length&&!opps.length&&!ctosAnc.length&&!candAnc.length)return null;
+    return{s,metaUnid,opps,ctosAnc,candAnc,reprocesoAnc,esAnclada,hasMeta:prods.length>0};
   });
   const pipeRows=allRows.filter(r=>{
     if(modo==="meta")return r.hasMeta;
@@ -2548,7 +2549,7 @@ const ENF_CFC_COLOR={Contactar:"#60a5fa",Tareas:"#a78bfa",Acciones:"#2dd4bf"};
 const ENF_CFC_ICON={Contactar:"📞",Tareas:"📋",Acciones:"⚡"};
 const PRIOR_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
 const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
-const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&!((o.etapa||"").toLowerCase().includes("espera"));
+const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad Liquidada"&&!((o.etapa||"").toLowerCase().includes("espera"));
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
 
 function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
