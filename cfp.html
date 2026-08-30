@@ -1344,6 +1344,8 @@ function App(){
   const[prioFEF_ing,setPrioFEF_ing]=useState(2);
   const[showFEFDesglose,setShowFEFDesglose]=useState(false);
   const[showFEF,setShowFEF]=useState(()=>loadLS('showFEF',false));
+  const[showAcep,setShowAcep]=useState(false);
+  const[showConc,setShowConc]=useState(false);
   const toggleFEF=()=>{const v=!showFEF;setShowFEF(v);try{localStorage.setItem('ncfp_showFEF',JSON.stringify(v));}catch(e){}};
   const[horizonteFEF,setHorizonteFEF]=useState(()=>{
     // Default: hoy + factorFEF meses (en días)
@@ -2548,8 +2550,6 @@ function App(){
               const tieneMov=(o,estatus)=>movs.some(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id&&estatus.includes(m.estatus));
               const aceptadasSinProy=opos.filter(o=>o.etapa==="Oportunidad Aceptada"&&!tieneMov(o,["PROYECTADO","PROGRAMADO","INGRESADO"]));
               const concretadasSinProg=opos.filter(o=>o.etapa==="Oportunidad Concretada"&&o.etapa!=="Oportunidad Liquidada"&&!tieneMov(o,["PROGRAMADO","INGRESADO"]));
-              const[showAcep,setShowAcep]=useState(false);
-              const[showConc,setShowConc]=useState(false);
               if(aceptadasSinProy.length===0&&concretadasSinProg.length===0)return null;
               return <div style={{marginBottom:8}}>
                 <div style={{display:"flex",gap:6}}>

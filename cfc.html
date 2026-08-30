@@ -1464,7 +1464,7 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
     const prods=(productos||[]).filter(p=>p.solucionId===s.id&&Number((p.metas||{})[mes])>0);
     const metaUnid=prods.reduce((t,p)=>t+Number((p.metas||{})[mes]),0);
     const opps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id);
-    const ctosAnc=contactos.filter(c=>["Contacto","Prospecto"].includes(c.etapaPrincipal)&&(c.solucionesAncla||[]).includes(s.id));
+    const ctosAnc=contactos.filter(c=>{if(!(c.solucionesAncla||[]).includes(s.id))return false;const ep=c.etapaPrincipal,ee=c.etapaEspecifica||"";return ["Contacto","Prospecto"].includes(ep)||["Cliente Cerrado en Reproceso","Cliente Activo en Reproceso"].includes(ee);});
     const candAnc=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso"&&(c.solucionesAncla||[]).includes(s.id));
     const reprocesoAnc=contactos.filter(c=>["Cliente Cerrado en Reproceso","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)&&(c.solucionesAncla||[]).includes(s.id));
     const esAnclada=!!(catalogos.solucion||[]).find(x=>x.id===s.id)?.ancla;
@@ -1513,38 +1513,40 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
         const kO=s.id+"_opps",kC=s.id+"_ctos",kP=s.id+"_cand";
         return <div key={s.id} style={{padding:"10px 0",borderTop:"1px solid #1e293b"}}>
           <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",marginBottom:6}}>{esAnclada?"⭐ ":""}{s.nombre}</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {metaUnid>0&&<span style={{...S.tag(GOLD),fontSize:9}}>🎯 Meta: {metaUnid} u.</span>}
-            <span style={{...S.chip(expandTag[kO],opps.length>=metaUnid&&metaUnid>0?"#22c55e":"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kO)}>🚀 {opps.length} oportunidad{opps.length!==1?"es":""}</span>
-            {ctosAnc.length>0&&<span style={{...S.chip(expandTag[kC],"#a78bfa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kC)}>👤 {ctosAnc.length} contacto{ctosAnc.length!==1?"s":""}</span>}
-            {candAnc.length>0&&<span style={{...S.chip(expandTag[kP],"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kP)}>⏳ {candAnc.length} en proceso</span>}
-            {reprocesoAnc.length>0&&<span style={{...S.chip(expandTag[s.id+"_rep"],"#f97316"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(s.id+"_rep")}>🔄 {reprocesoAnc.length} en reproceso</span>}
-            {metaUnid>0&&opps.length<metaUnid&&<span style={{...S.tag("#f87171"),fontSize:9}}>⚠ Faltan {metaUnid-opps.length}</span>}
-          </div>
-          {expandTag[kO]&&<div style={{marginTop:8,paddingLeft:8,borderLeft:"2px solid #60a5fa44"}}>
-            {opps.length===0?<div style={{fontSize:10,color:"#475569"}}>Sin oportunidades activas</div>:opps.map(o=><div key={o.id} style={{padding:"5px 0",borderBottom:"1px solid #0f172a"}}>
-              <div style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{o.concepto}</div>
-              <div style={{fontSize:9,color:"#64748b"}}>{(o.etapa||"").replace("Oportunidad ","")} {o.fechaEstimadaCierre?" · "+o.fechaEstimadaCierre.split("-").reverse().join("/"):""}{o.comisionEstimada?" · $"+Number(o.comisionEstimada).toLocaleString("es-MX"):""}</div>
-            </div>)}
-          </div>}
-          {expandTag[kC]&&<div style={{marginTop:8,paddingLeft:8,borderLeft:"2px solid #a78bfa44"}}>
-            {ctosAnc.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
-              <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
-              <div style={{fontSize:9,color:"#64748b"}}>{c.etapaEspecifica||c.etapaPrincipal}</div>
-            </div>)}
-          </div>}
-          {expandTag[kP]&&<div style={{marginTop:8,paddingLeft:8,borderLeft:"2px solid #60a5fa44"}}>
-            {candAnc.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
-              <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
-              <div style={{fontSize:9,color:"#64748b"}}>{c.etapaEspecifica}</div>
-            </div>)}
-          </div>}
-          {expandTag[s.id+"_rep"]&&<div style={{marginTop:8,paddingLeft:8,borderLeft:"2px solid #f9731644"}}>
-            {reprocesoAnc.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
-              <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
-              <div style={{fontSize:9,color:"#f97316"}}>{c.etapaEspecifica}</div>
-            </div>)}
-          </div>}
+          {(()=>{
+            const OPO_RANK={"Propuesta Presentada":0,"Oportunidad en Preparación":1,"Oportunidad Identificada":2};
+            const PROB_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
+            const EXCLUIR=["Oportunidad Aceptada","Oportunidad Concretada","Oportunidad Liquidada","Oportunidad Rechazada"];
+            const oppsVis=opps.filter(o=>!EXCLUIR.includes(o.etapa)&&!((o.etapa||"").toLowerCase().includes("espera")))
+              .sort((a,b)=>{let r=(OPO_RANK[a.etapa]??9)-(OPO_RANK[b.etapa]??9);if(r===0)r=(a.fechaEstimadaCierre||"9999").localeCompare(b.fechaEstimadaCierre||"9999");if(r===0)r=(PROB_RANK[a.probabilidad]??9)-(PROB_RANK[b.probabilidad]??9);return r;});
+            const CTOS_RANK={"Cliente Activo en Reproceso":0,"Cliente Cerrado en Reproceso":1,"Oportunidad Activa":2,"Encuentro Concretado":3,"Encuentro Programado":4,"Encuentro Inicial Previo":5,"Contacto en Avance":6,"Contacto":7};
+            const ctosOrd=[...ctosAnc].sort((a,b)=>(CTOS_RANK[a.etapaEspecifica]??9)-(CTOS_RANK[b.etapaEspecifica]??9));
+            return <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {metaUnid>0&&<span style={{...S.tag(GOLD),fontSize:9}}>🎯 Meta: {metaUnid} u.</span>}
+              <span style={{...S.chip(expandTag[kO],"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kO)}>🚀 {oppsVis.length} oportunidad{oppsVis.length!==1?"es":""}</span>
+              {ctosAnc.length>0&&<span style={{...S.chip(expandTag[kC],"#a78bfa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kC)}>👤 {ctosAnc.length} contacto{ctosAnc.length!==1?"s":""}</span>}
+              {candAnc.length>0&&<span style={{...S.chip(expandTag[kP],"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kP)}>⏳ {candAnc.length} en proceso</span>}
+              {metaUnid>0&&oppsVis.length<metaUnid&&<span style={{...S.tag("#f87171"),fontSize:9}}>⚠ Faltan {metaUnid-oppsVis.length}</span>}
+              {expandTag[kO]&&<div style={{width:"100%",marginTop:6,paddingLeft:8,borderLeft:"2px solid #60a5fa44"}}>
+                {oppsVis.length===0?<div style={{fontSize:10,color:"#475569"}}>Sin oportunidades en pipeline</div>:oppsVis.map(o=><div key={o.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
+                  <div style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{o.concepto}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>{(o.etapa||"").replace("Oportunidad ","")} {o.fechaEstimadaCierre?" · "+o.fechaEstimadaCierre.split("-").reverse().join("/"):""}{o.probabilidad?" · "+o.probabilidad:""}</div>
+                </div>)}
+              </div>}
+              {expandTag[kC]&&<div style={{width:"100%",marginTop:6,paddingLeft:8,borderLeft:"2px solid #a78bfa44"}}>
+                {ctosOrd.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
+                  <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
+                  <div style={{fontSize:9,color:["Cliente Activo en Reproceso","Cliente Cerrado en Reproceso"].includes(c.etapaEspecifica)?"#f97316":"#64748b"}}>{c.etapaEspecifica||c.etapaPrincipal}</div>
+                </div>)}
+              </div>}
+              {expandTag[kP]&&<div style={{width:"100%",marginTop:6,paddingLeft:8,borderLeft:"2px solid #60a5fa44"}}>
+                {candAnc.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
+                  <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>{c.etapaEspecifica}</div>
+                </div>)}
+              </div>}
+            </div>;
+          })()}
         </div>;
       })}
     </div>
