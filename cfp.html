@@ -2544,18 +2544,37 @@ function App(){
               </div>
             )}
             {(()=>{
-              const concretadasSinMov=crmOpos().filter(o=>(o.etapa==="Oportunidad Concretada")&&o.etapa!=="Oportunidad Liquidada"&&!movs.some(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id&&m.estatus==="INGRESADO"));
-              if(concretadasSinMov.length===0) return null;
-              return(
-                <div style={{...S.alertCard,background:"rgba(201,168,76,0.06)",border:"1px solid rgba(201,168,76,0.3)"}}
-                  onClick={()=>{setView("oportunidades");setOpoTab("concretadas");}}>
-                  <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:3}}>
-                    <span>🚀</span>
-                    <span style={{fontSize:11,fontWeight:800,color:"#C9A84C"}}>{concretadasSinMov.length} oportunidad{concretadasSinMov.length>1?"es":""} concretada{concretadasSinMov.length>1?"s":""} sin movimiento vinculado</span>
-                  </div>
-                  <div style={{fontSize:10,color:"#92400e"}}>Toca para dar de alta el ingreso correspondiente</div>
+              const opos=crmOpos();
+              const tieneMov=(o,estatus)=>movs.some(m=>m.vinculoTipo==="oportunidades"&&m.vinculoId===o.id&&estatus.includes(m.estatus));
+              const aceptadasSinProy=opos.filter(o=>o.etapa==="Oportunidad Aceptada"&&!tieneMov(o,["PROYECTADO","PROGRAMADO","INGRESADO"]));
+              const concretadasSinProg=opos.filter(o=>o.etapa==="Oportunidad Concretada"&&o.etapa!=="Oportunidad Liquidada"&&!tieneMov(o,["PROGRAMADO","INGRESADO"]));
+              const[showAcep,setShowAcep]=useState(false);
+              const[showConc,setShowConc]=useState(false);
+              if(aceptadasSinProy.length===0&&concretadasSinProg.length===0)return null;
+              return <div style={{marginBottom:8}}>
+                <div style={{display:"flex",gap:6}}>
+                  {aceptadasSinProy.length>0&&<button style={{flex:1,background:"rgba(251,191,36,0.1)",border:"1px solid #fbbf2466",borderRadius:9,padding:"7px 8px",cursor:"pointer",textAlign:"left"}} onClick={()=>setShowAcep(v=>!v)}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#fbbf24"}}>🟡 {aceptadasSinProy.length} aceptada{aceptadasSinProy.length!==1?"s":""}</div>
+                    <div style={{fontSize:8,color:"#92400e"}}>sin proyectado</div>
+                  </button>}
+                  {concretadasSinProg.length>0&&<button style={{flex:1,background:"rgba(249,115,22,0.1)",border:"1px solid #f9731666",borderRadius:9,padding:"7px 8px",cursor:"pointer",textAlign:"left"}} onClick={()=>setShowConc(v=>!v)}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#f97316"}}>🟠 {concretadasSinProg.length} concretada{concretadasSinProg.length!==1?"s":""}</div>
+                    <div style={{fontSize:8,color:"#92400e"}}>sin programado</div>
+                  </button>}
                 </div>
-              );
+                {showAcep&&<div style={{background:"#0d0d1a",border:"1px solid #fbbf2433",borderRadius:8,padding:"8px 10px",marginTop:5}}>
+                  {aceptadasSinProy.map(o=><div key={o.id} style={{padding:"5px 0",borderBottom:"1px solid #1e293b",fontSize:10}}>
+                    <div style={{color:"#e2e8f0",fontWeight:600}}>{o.concepto}</div>
+                    <div style={{color:"#64748b"}}>{o.fechaEstimadaCierre?fmtDate(o.fechaEstimadaCierre):"Sin fecha estimada"}</div>
+                  </div>)}
+                </div>}
+                {showConc&&<div style={{background:"#0d0d1a",border:"1px solid #f9731633",borderRadius:8,padding:"8px 10px",marginTop:5}}>
+                  {concretadasSinProg.map(o=><div key={o.id} style={{padding:"5px 0",borderBottom:"1px solid #1e293b",fontSize:10}}>
+                    <div style={{color:"#e2e8f0",fontWeight:600}}>{o.concepto}</div>
+                    <div style={{color:"#64748b"}}>{o.fechaConcretada?fmtDate(o.fechaConcretada):"Sin fecha"}</div>
+                  </div>)}
+                </div>}
+              </div>;
             })()}
             {primerNegativo&&(
               <div style={S.alertRojo}>

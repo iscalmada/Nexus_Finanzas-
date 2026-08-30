@@ -1471,7 +1471,7 @@ function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
     if(!reprocesoAnc.length&&!prods.length&&!opps.length&&!ctosAnc.length&&!candAnc.length)return null;
     return{s,metaUnid,opps,ctosAnc,candAnc,reprocesoAnc,esAnclada,hasMeta:prods.length>0};
   });
-  const pipeRows=allRows.filter(r=>{
+  const pipeRows=allRows.filter(Boolean).filter(r=>{
     if(modo==="meta")return r.hasMeta;
     if(modo==="ancladas")return r.esAnclada;
     return true;
