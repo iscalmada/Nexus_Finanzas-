@@ -91,7 +91,7 @@ function DictadoBtn({onResult}){
 const LblVoz=(texto,onDictado)=><span style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}><span>{texto}</span><DictadoBtn onResult={onDictado}/></span>;
 /* ── Helpers proyecto ── */
 const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
-const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
+const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){if(a.estatus==="Cerrada")return"Cerrada";const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
 const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,Alta:1,Media:2,Baja:3};let b=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<b)b=r;});return Object.keys(rank).find(k=>rank[k]===b)||"Media";};
 
 /* ── BuscaContactoEmpresa ── */
@@ -406,7 +406,9 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
   </div>;
 }
 /* ── Tarjeta de actividad ── */
-function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onToggleExp,onPatch,catEtiquetas}){
+function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onToggleExp,onPatch,catEtiquetas,actividades}){
+  const[historial,setHistorial]=useState({});
+  const toggleHist=(actId,nivel)=>setHistorial(p=>({...p,[actId]:p[actId]===nivel?null:nivel}));
   const[selSub,setSelSub]=useState(new Set());
   const[batchSub,setBatchSub]=useState(null);
   const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
@@ -727,8 +729,6 @@ function App(){
     if(emp)return emp.nombre;
     return "";
   };
-  const[historial,setHistorial]=useState({});
-  const toggleHist=(actId,nivel)=>setHistorial(p=>({...p,[actId]:p[actId]===nivel?null:nivel}));
   const base=actividades.filter(a=>{
     const efEst=proyEstatus(a);const efFech=proyFecha(a)||a.fecha||"";
     const pend=efEst==="Programada"||efEst==="En Proceso";
@@ -975,7 +975,7 @@ function App(){
             {selMode&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:-2}}>
               <span style={{width:16,height:16,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel?"✓":""}</span>
             </div>}
-            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas}/>
+            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas} actividades={actividades}/>
           </div>;
         })}
         {modo==="rptContactar"&&<Reporte enfoque="Contactar"/>}

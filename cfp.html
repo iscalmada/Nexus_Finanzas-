@@ -2087,11 +2087,8 @@ function App(){
   const doDelete=id=>{
     const r=movs.find(x=>x.id===id);
     if(!r)return;
-    if(r?.serieId){setSerieConfirm({action:"delete",id,serieId:r.serieId,payload:null,mov:r});setConfirmDel(null);}
-    else{
-      if(EJECUTADO(r.estatus)&&!window.confirm("Este movimiento ya fue ejecutado ("+r.estatus+"). ¿Deseas eliminarlo de todas formas?"))return;
-      softDelete([id],r.concepto||"Movimiento");
-    }
+    if(r.serieId){setSerieConfirm({action:"delete",id,serieId:r.serieId,payload:null,mov:r});setConfirmDel(null);}
+    else{softDelete([id],r.concepto||"Movimiento");}
   };
   const applySerieConfirm=scope=>{
     const{action,id,serieId,payload,mov}=serieConfirm;
