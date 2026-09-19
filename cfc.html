@@ -212,7 +212,7 @@ function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd,addLa
 /* ════════ MODAL CONTACTO ════════ */
 function cEmpresas(c){return (c&&c.empresas&&c.empresas.length)?c.empresas:((c&&c.empresaId)?[{empresaId:c.empresaId,rol:c.rolEmpresa||""}]:[]);}
 function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose}){
-  const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],tiposAliado:[],solucionesAliado:[],etiquetas:[],...init}));
+  const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],areasIntegradas:[],tiposAliado:[],solucionesAliado:[],etiquetas:[],...init}));
   const[nuevaEmp,setNuevaEmp]=useState(null);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const empList=f.empresas||(f.empresaId?[{empresaId:f.empresaId,rol:f.rolEmpresa||""}]:[]);
@@ -224,6 +224,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
   const toggleGiro=(g)=>setF(p=>{const has=p.giros.includes(g);const giros=has?p.giros.filter(x=>x!==g):[...p.giros,g];
     let gp=p.giroPrincipal; if(has&&gp===g)gp=giros[0]||null; if(!has&&!gp)gp=g; return {...p,giros,giroPrincipal:gp};});
   const toggleSol=(v)=>setF(p=>({...p,solucionesAncla:p.solucionesAncla.includes(v)?p.solucionesAncla.filter(x=>x!==v):[...p.solucionesAncla,v]}));
+  const toggleArea=(v)=>setF(p=>({...p,areasIntegradas:(p.areasIntegradas||[]).includes(v)?(p.areasIntegradas||[]).filter(x=>x!==v):[...(p.areasIntegradas||[]),v]}));
   const toggleEtiqueta=(id)=>setF(p=>({...p,etiquetas:(p.etiquetas||[]).includes(id)?(p.etiquetas||[]).filter(x=>x!==id):[...(p.etiquetas||[]),id]}));
   const save=()=>{ if(!f.nombre&&!f.nombreCompleto){alert("El nombre es obligatorio");return;}
     const completo=f.nombreCompleto||[f.nombre,f.apellido].filter(Boolean).join(" ");
@@ -348,6 +349,13 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
           <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
             {(catalogos.solucion||[]).filter(s=>s.ancla).map(s=><span key={s.id} onClick={()=>toggleSol(s.id)} style={S.chip(f.solucionesAncla.includes(s.id),"#C9A84C")}>{s.nombre}</span>)}
           </div>
+
+          {(catalogos.areaEstrategica||[]).length>0&&<>
+            <div style={S.sTit}>Soluciones Integradas</div>
+            <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+              {(catalogos.areaEstrategica||[]).map(a=><span key={a.id} onClick={()=>toggleArea(a.id)} style={S.chip((f.areasIntegradas||[]).includes(a.id),"#2dd4bf")}>{a.nombre}</span>)}
+            </div>
+          </>}
 
           <div style={S.sTit}>Avance Nexus</div>
           <div style={S.g2}>
@@ -901,7 +909,7 @@ const CAT_LABEL={
   tipoContacto:"Tipo de contacto",circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cercanía",nivelEconomico:"Nivel económico",
   potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",actividadPrincipal:"Actividad principal",capacidadRef:"Capacidad referidor",etiquetas:"Marcadores",
   etapaPrincipal:"Etapa principal de contacto",etapaEspecifica:"Etapa específica de contacto",pixan:"Etapa Pixán (histórico)",
-  solucion:"Solución de intervención",etapaOportunidad:"Etapa de oportunidad",areaEstrategica:"Área estratégica",
+  solucion:"Solución de intervención",etapaOportunidad:"Etapa de oportunidad",areaEstrategica:"Soluciones Integradas",
   tipoAccion:"Tipo de acción — Contactar",accTareas:"Tipo de acción — Tareas",accAcciones:"Tipo de acción — Acciones",etiqAgenda:"Orientación",estatusAccion:"Estatus de acción",
   tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado",
   tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa"};
@@ -1837,8 +1845,10 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
       } else {
         if(modo==="checklist"){
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
-          const compEst=total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada";
-          
+          // Si el usuario forzó "Cerrada" explícitamente, respetarlo con advertencia
+          const usuarioCerro=f.estatus==="Cerrada";
+          const compEst=usuarioCerro?"Cerrada":(total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada");
+          if(usuarioCerro&&done<total&&!window.confirm(`Hay ${total-done} subactividad${total-done!==1?"es":""} sin concluir. ¿Cerrar de todas formas?`))return;
           onSave({...f,servicioSolucion:null,estatus:compEst});
         } else {
           

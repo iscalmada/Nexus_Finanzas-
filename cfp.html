@@ -1447,6 +1447,7 @@ function App(){
   const[multiForm,setMultiForm]=useState({estatus:"",prioridad:"",fecha:""});
 
   const[confirmDel,setConfirmDel]=useState(null);
+  const[undoMov,setUndoMov]=useState(null); // {movs: [], label, timerId}
   const[viewMov,setViewMov]=useState(null); // modal consulta
   const[serieConfirm,setSerieConfirm]=useState(null);
   const[showReset,setShowReset]=useState(false);
@@ -2074,8 +2075,45 @@ function App(){
     setShowTC(false);setEditTCId(null);
   },[formTC,editTCId,tarjetas]);
 
-  const doDelete=id=>{const r=movs.find(x=>x.id===id);if(r?.serieId){setSerieConfirm({action:"delete",id,serieId:r.serieId,payload:null});setConfirmDel(null);}else{setMovs(p=>p.filter(x=>x.id!==id));setConfirmDel(null);}};
-  const applySerieConfirm=scope=>{const{action,id,serieId,payload}=serieConfirm;if(action==="edit"){if(scope==="one")setMovs(p=>p.map(r=>r.id===id?{...r,...payload}:r));else setMovs(p=>p.map(r=>r.serieId===serieId?{...r,...payload,fecha:r.fecha,id:r.id,orden:r.orden}:r));}else{if(scope==="one")setMovs(p=>p.filter(r=>r.id!==id));else setMovs(p=>p.filter(r=>r.serieId!==serieId));}setSerieConfirm(null);};
+  const EJECUTADO=s=>["INGRESADO","PAGADO"].includes(s);
+  const softDelete=(ids,label)=>{
+    const saved=movs.filter(r=>ids.includes(r.id));
+    if(!saved.length)return;
+    setMovs(p=>p.filter(r=>!ids.includes(r.id)));
+    setConfirmDel(null);setSerieConfirm(null);
+    const timerId=setTimeout(()=>setUndoMov(null),5000);
+    setUndoMov({movs:saved,label,timerId});
+  };
+  const doDelete=id=>{
+    const r=movs.find(x=>x.id===id);
+    if(!r)return;
+    if(r?.serieId){setSerieConfirm({action:"delete",id,serieId:r.serieId,payload:null,mov:r});setConfirmDel(null);}
+    else{
+      if(EJECUTADO(r.estatus)&&!window.confirm("Este movimiento ya fue ejecutado ("+r.estatus+"). ¿Deseas eliminarlo de todas formas?"))return;
+      softDelete([id],r.concepto||"Movimiento");
+    }
+  };
+  const applySerieConfirm=scope=>{
+    const{action,id,serieId,payload,mov}=serieConfirm;
+    if(action==="edit"){
+      if(scope==="one")setMovs(p=>p.map(r=>r.id===id?{...r,...payload}:r));
+      else setMovs(p=>p.map(r=>r.serieId===serieId?{...r,...payload,fecha:r.fecha,id:r.id,orden:r.orden}:r));
+      setSerieConfirm(null);
+    }else{
+      const refFecha=mov?.fecha||"";
+      if(scope==="solo"){
+        if(EJECUTADO(mov?.estatus)&&!window.confirm("Este movimiento ya fue ejecutado ("+mov?.estatus+"). ¿Eliminarlo de todas formas?"))return;
+        softDelete([id],"1 movimiento de la serie");
+      }else if(scope==="posteriores"){
+        const ids=movs.filter(r=>r.serieId===serieId&&r.fecha>=refFecha&&!EJECUTADO(r.estatus)).map(r=>r.id);
+        softDelete(ids,ids.length+" movimientos de la serie");
+      }else{
+        const ids=movs.filter(r=>r.serieId===serieId&&!EJECUTADO(r.estatus)).map(r=>r.id);
+        softDelete(ids,ids.length+" movimientos de la serie");
+      }
+    }
+  };
+  const handleUndo=()=>{if(!undoMov)return;clearTimeout(undoMov.timerId);setMovs(p=>[...p,...undoMov.movs]);setUndoMov(null);};
   const toggleSelect=id=>setSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
   const applyMultiEdit=()=>{
     const selMovs=movs.filter(r=>selected.has(r.id));
@@ -4864,13 +4902,23 @@ function App(){
           <div style={S.delCon}>
             <div style={{...S.delBox,border:"1px solid #a78bfa44"}}>
               <div style={{fontSize:13,fontWeight:700,color:"#a78bfa",marginBottom:7}}>↻ Movimiento en serie</div>
-              <div style={{fontSize:11,color:"#94a3b8",marginBottom:18}}>{serieConfirm.action==="edit"?"¿Editar solo este o toda la serie?":"¿Eliminar solo este o toda la serie?"}</div>
-              <button style={{...S.saveB,background:"linear-gradient(135deg,#a78bfa,#7c3aed)",marginBottom:7}} onClick={()=>applySerieConfirm("one")}>Solo este</button>
-              <button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>applySerieConfirm("all")}>Toda la serie</button>
+              {serieConfirm.action==="edit"
+                ?<><div style={{fontSize:11,color:"#94a3b8",marginBottom:14}}>¿Editar solo este o toda la serie?</div>
+                  <button style={{...S.saveB,background:"linear-gradient(135deg,#a78bfa,#7c3aed)",marginBottom:7}} onClick={()=>applySerieConfirm("one")}>Solo este</button>
+                  <button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>applySerieConfirm("all")}>Toda la serie</button></>
+                :<><div style={{fontSize:11,color:"#94a3b8",marginBottom:14}}>¿Qué movimientos eliminar?<br/><span style={{fontSize:9,color:"#64748b"}}>Los ya ejecutados (INGRESADO/PAGADO) no se eliminan.</span></div>
+                  <button style={{...S.saveB,background:"linear-gradient(135deg,#a78bfa,#7c3aed)",marginBottom:7}} onClick={()=>applySerieConfirm("solo")}>Solo este</button>
+                  <button style={{...S.saveB,background:"linear-gradient(135deg,#f97316,#c2410c)",marginBottom:7}} onClick={()=>applySerieConfirm("posteriores")}>Este y posteriores</button>
+                  <button style={{...S.saveB,background:"linear-gradient(135deg,#f87171,#b91c1c)"}} onClick={()=>applySerieConfirm("todos")}>Toda la serie</button></>}
               <button style={S.cancB} onClick={()=>setSerieConfirm(null)}>Cancelar</button>
             </div>
           </div>
         )}
+        {/* Toast: deshacer eliminación */}
+        {undoMov&&<div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 16px",display:"flex",alignItems:"center",gap:12,zIndex:600,boxShadow:"0 4px 20px rgba(0,0,0,.6)",minWidth:260,maxWidth:340}}>
+          <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>🗑 {undoMov.label} eliminado{undoMov.movs.length!==1?"s":""}</span>
+          <button style={{...S.pill(true,"#C9A84C"),padding:"4px 12px",fontWeight:700,fontSize:11,flexShrink:0}} onClick={handleUndo}>Deshacer</button>
+        </div>}
 
         {showReset&&(
           <div style={S.delCon}>
