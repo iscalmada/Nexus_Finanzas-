@@ -1447,7 +1447,8 @@ function App(){
   const[multiForm,setMultiForm]=useState({estatus:"",prioridad:"",fecha:""});
 
   const[confirmDel,setConfirmDel]=useState(null);
-  const[undoMov,setUndoMov]=useState(null); // {movs: [], label, timerId}
+  const[undoMov,setUndoMov]=useState(null); // {mov, label}
+  const undoTimerRef=useRef(null);
   const[viewMov,setViewMov]=useState(null); // modal consulta
   const[serieConfirm,setSerieConfirm]=useState(null);
   const[showReset,setShowReset]=useState(false);
@@ -2075,20 +2076,18 @@ function App(){
     setShowTC(false);setEditTCId(null);
   },[formTC,editTCId,tarjetas]);
 
-  const EJECUTADO=s=>["INGRESADO","PAGADO"].includes(s);
-  const softDelete=(ids,label)=>{
-    const saved=movs.filter(r=>ids.includes(r.id));
-    if(!saved.length)return;
-    setMovs(p=>p.filter(r=>!ids.includes(r.id)));
-    setConfirmDel(null);setSerieConfirm(null);
-    const timerId=setTimeout(()=>setUndoMov(null),5000);
-    setUndoMov({movs:saved,label,timerId});
-  };
+  const isEjecutado=s=>["INGRESADO","PAGADO"].includes(s);
   const doDelete=id=>{
     const r=movs.find(x=>x.id===id);
     if(!r)return;
     if(r.serieId){setSerieConfirm({action:"delete",id,serieId:r.serieId,payload:null,mov:r});setConfirmDel(null);}
-    else{softDelete([id],r.concepto||"Movimiento");}
+    else{
+      setMovs(p=>p.filter(x=>x.id!==id));
+      setConfirmDel(null);
+      if(undoTimerRef.current)clearTimeout(undoTimerRef.current);
+      setUndoMov({mov:r,label:r.concepto||"Movimiento"});
+      undoTimerRef.current=setTimeout(()=>setUndoMov(null),5000);
+    }
   };
   const applySerieConfirm=scope=>{
     const{action,id,serieId,payload,mov}=serieConfirm;
@@ -2099,18 +2098,21 @@ function App(){
     }else{
       const refFecha=mov?.fecha||"";
       if(scope==="solo"){
-        if(EJECUTADO(mov?.estatus)&&!window.confirm("Este movimiento ya fue ejecutado ("+mov?.estatus+"). ¿Eliminarlo de todas formas?"))return;
-        softDelete([id],"1 movimiento de la serie");
+        setMovs(p=>p.filter(r=>r.id!==id));
       }else if(scope==="posteriores"){
-        const ids=movs.filter(r=>r.serieId===serieId&&r.fecha>=refFecha&&!EJECUTADO(r.estatus)).map(r=>r.id);
-        softDelete(ids,ids.length+" movimientos de la serie");
+        setMovs(p=>p.filter(r=>!(r.serieId===serieId&&r.fecha>=refFecha&&!isEjecutado(r.estatus))));
       }else{
-        const ids=movs.filter(r=>r.serieId===serieId&&!EJECUTADO(r.estatus)).map(r=>r.id);
-        softDelete(ids,ids.length+" movimientos de la serie");
+        setMovs(p=>p.filter(r=>!(r.serieId===serieId&&!isEjecutado(r.estatus))));
       }
+      setSerieConfirm(null);
     }
   };
-  const handleUndo=()=>{if(!undoMov)return;clearTimeout(undoMov.timerId);setMovs(p=>[...p,...undoMov.movs]);setUndoMov(null);};
+  const handleUndo=()=>{
+    if(!undoMov)return;
+    if(undoTimerRef.current)clearTimeout(undoTimerRef.current);
+    setMovs(p=>[...p,undoMov.mov]);
+    setUndoMov(null);
+  };
   const toggleSelect=id=>setSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
   const applyMultiEdit=()=>{
     const selMovs=movs.filter(r=>selected.has(r.id));
@@ -4913,8 +4915,8 @@ function App(){
         )}
         {/* Toast: deshacer eliminación */}
         {undoMov&&<div style={{position:"fixed",bottom:80,left:"50%",transform:"translateX(-50%)",background:"#1e293b",border:"1px solid #334155",borderRadius:12,padding:"10px 16px",display:"flex",alignItems:"center",gap:12,zIndex:600,boxShadow:"0 4px 20px rgba(0,0,0,.6)",minWidth:260,maxWidth:340}}>
-          <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>🗑 {undoMov.label} eliminado{undoMov.movs.length!==1?"s":""}</span>
-          <button style={{...S.pill(true,"#C9A84C"),padding:"4px 12px",fontWeight:700,fontSize:11,flexShrink:0}} onClick={handleUndo}>Deshacer</button>
+          <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>🗑 {undoMov.label} eliminado</span>
+          <button style={{background:"none",border:"1px solid #C9A84C",borderRadius:8,color:"#C9A84C",padding:"4px 12px",fontWeight:700,fontSize:11,cursor:"pointer",flexShrink:0}} onClick={handleUndo}>Deshacer</button>
         </div>}
 
         {showReset&&(

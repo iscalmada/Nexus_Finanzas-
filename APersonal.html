@@ -494,7 +494,9 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
                   {h.tipoAccion&&<span style={{fontSize:8,color:"#60a5fa",background:"#60a5fa11",border:"1px solid #60a5fa33",borderRadius:4,padding:"1px 5px"}}>{h.tipoAccion}</span>}
                   <span style={{...S.tag(hCol),fontSize:8}}>{h.estatus||"Programada"}</span>
                 </div>
-                {hTxt&&<div style={{fontSize:10,color:"#64748b",lineHeight:1.3,wordBreak:"break-word"}}>{hTxt.slice(0,120)}{hTxt.length>120?"…":""}</div>}
+                {h.intencion&&<div style={{fontSize:9,color:"#94a3b8",marginTop:2,wordBreak:"break-word"}}>{h.intencion.slice(0,100)}{h.intencion.length>100?"…":""}</div>}
+                {h.accionProceso&&<div style={{fontSize:9,color:"#60a5fa",marginTop:1,wordBreak:"break-word"}}>▸ {h.accionProceso.slice(0,100)}{h.accionProceso.length>100?"…":""}</div>}
+                {h.resultado&&<div style={{fontSize:9,color:"#22c55e",marginTop:1,wordBreak:"break-word"}}>✓ {h.resultado.slice(0,100)}{h.resultado.length>100?"…":""}</div>}
               </div>
             </div>;
           })}
