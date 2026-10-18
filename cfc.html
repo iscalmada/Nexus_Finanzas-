@@ -1744,9 +1744,11 @@ function SubtareasEditor({subtareas,onChange,onIndependizar}){
   </div>;
 }
 const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||!(a.subtareas||[]).length)return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
-const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return "Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return "En Proceso";return "Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const done=(a.items||[]).filter(i=>i.done).length;if(done===(a.items||[]).length)return "Cerrada";if(done>0)return "En Proceso";return "Programada";}return a.estatus||"Programada";};
+const proyEstatus=(a)=>{if((a.modoTarea==="proyecto"||a.modoTarea==="checklist")&&a.cierreForzado)return "Cerrada";if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return "Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return "En Proceso";return "Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const done=(a.items||[]).filter(i=>i.done).length;if(done===(a.items||[]).length)return "Cerrada";if(done>0)return "En Proceso";return "Programada";}return a.estatus||"Programada";};
 const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};let best=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<best)best=r;});return Object.keys(rank).find(k=>rank[k]===best)||"Media";};
 const MODO_NEXT_EST={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Programada"};
+/* Aplica un patch a una actividad; si cambia el estatus de un checklist/proyecto, mantiene coherente el flag cierreForzado */
+const aplicaPatchAct=(a,p)=>{const r={...a,...p};if(p&&p.estatus!==undefined&&p.cierreForzado===undefined&&(a.modoTarea==="checklist"||a.modoTarea==="proyecto")){if(p.estatus==="Cerrada"){const its=a.modoTarea==="checklist"?(r.items||[]).map(x=>!!x.done):(r.subtareas||[]).map(x=>x.estatus==="Cerrada");r.cierreForzado=its.length>0&&!its.every(Boolean);}else r.cierreForzado=false;}return r;};
 
 /* ════════ BUSCA CONTACTO/EMPRESA CFC ════════ */
 function BuscaCtoEmpCFC({contactos,empresas,value,onChange,placeholder,onAdd}){
@@ -1793,7 +1795,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   const[esCopia,setEsCopia]=useState(false);
   const[showAvance,setShowAvance]=useState(false);
   const[moveToProjectId,setMoveToProjectId]=useState("");
-  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",enfoque:"Contactar",modoTarea:"unica",...init}));
+  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",enfoque:"Contactar",modoTarea:"unica",...init,...(init&&init.modoTarea&&init.modoTarea!=="unica"?{estatus:proyEstatus(init)}:{})}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const esContactar=f.enfoque==="Contactar";
   const esInterno=!esContactar;
@@ -1822,7 +1824,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         const pend=allSubs.filter(s=>s.estatus!=="Cerrada");
         const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
         const compFecha=ds[0]||allSubs.map(s=>s.fecha).filter(Boolean).sort()[0]||"";
-        onSaveExtra({...proj,subtareas:allSubs,estatus:compEst,fecha:compFecha});
+        onSaveExtra({...proj,subtareas:allSubs,estatus:compEst,fecha:compFecha,cierreForzado:false});
         if(f.id)onDelete(f.id);
         onClose();return;
       }
@@ -1840,16 +1842,23 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
         const compFecha=ds[0]||(f.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";
         const sts=(f.subtareas||[]).map(s=>s.estatus||"Programada");
-        const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
-        onSave({...f,contactoId:f.contactoId||null,oportunidadId:f.oportunidadId||null,servicioSolucion:null,fecha:compFecha,estatus:compEst});
+        const estIni=(init&&init.id)?proyEstatus(init):null;
+        const usuarioCerro=f.estatus==="Cerrada"&&(estIni!=="Cerrada"||!!f.cierreForzado);
+        const nTot=sts.length;const nDone=sts.filter(x=>x==="Cerrada").length;
+        const forzado=usuarioCerro&&nDone<nTot;
+        const compEst=usuarioCerro?"Cerrada":(sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada");
+        if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${nTot-nDone} subtarea${nTot-nDone!==1?"s":""} sin concluir. ¿Cerrar de todas formas?`))return;
+        onSave({...f,contactoId:f.contactoId||null,oportunidadId:f.oportunidadId||null,servicioSolucion:null,fecha:compFecha,estatus:compEst,cierreForzado:forzado});
       } else {
         if(modo==="checklist"){
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
           // Si el usuario forzó "Cerrada" explícitamente, respetarlo con advertencia
-          const usuarioCerro=f.estatus==="Cerrada";
+          const estIni=(init&&init.id)?proyEstatus(init):null;
+          const usuarioCerro=f.estatus==="Cerrada"&&(estIni!=="Cerrada"||!!f.cierreForzado);
+          const forzado=usuarioCerro&&total>0&&done<total;
           const compEst=usuarioCerro?"Cerrada":(total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada");
-          if(usuarioCerro&&done<total&&!window.confirm(`Hay ${total-done} subactividad${total-done!==1?"es":""} sin concluir. ¿Cerrar de todas formas?`))return;
-          onSave({...f,servicioSolucion:null,estatus:compEst});
+          if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${total-done} subactividad${total-done!==1?"es":""} sin concluir. ¿Cerrar de todas formas?`))return;
+          onSave({...f,servicioSolucion:null,estatus:compEst,cierreForzado:forzado});
         } else {
           
           if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
@@ -1912,8 +1921,8 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
       <Field label={LblVoz("Asunto / Tarea",v=>set("asunto",(f.asunto||"")+" "+v))}>
         <textarea style={{...S.ta}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
       </Field>
-      {(f.modoTarea||"unica")==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
-      {(f.modoTarea||"unica")==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}
+      {(f.modoTarea||"unica")==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>setF(p=>{const reabre=p.cierreForzado&&(p.items||[]).some(o=>o.done&&(v.find(n=>n.id===o.id)||{done:true}).done===false);return {...p,items:v,...(reabre?{cierreForzado:false,estatus:"En Proceso"}:{})};})}/>}
+      {(f.modoTarea||"unica")==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>setF(p=>{const reabre=p.cierreForzado&&(p.subtareas||[]).some(o=>o.estatus==="Cerrada"&&(v.find(n=>n.id===o.id)||{estatus:"Cerrada"}).estatus!=="Cerrada");return {...p,subtareas:v,...(reabre?{cierreForzado:false,estatus:"En Proceso"}:{})};})}
         onIndependizar={onSaveExtra?(idx)=>{
           const st=(f.subtareas||[])[idx];
           if(!st)return;
@@ -2220,7 +2229,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
         }).map((it,idx)=>{
           const origIdx=(a.items||[]).findIndex(x=>x.id===it.id);
           return <div key={it.id} style={{padding:"6px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}}
-            onClick={()=>{if(!onPatchAct)return;const ni=(a.items||[]).map((x,j)=>j===origIdx?{...x,done:!x.done}:x);const done=ni.filter(x=>x.done).length;const compEst=ni.length>0&&done===ni.length?"Cerrada":done>0?"En Proceso":"Programada";onPatchAct(a.id,{items:ni,estatus:compEst});}}>
+            onClick={()=>{if(!onPatchAct)return;const ni=(a.items||[]).map((x,j)=>j===origIdx?{...x,done:!x.done}:x);const done=ni.filter(x=>x.done).length;const compEst=ni.length>0&&done===ni.length?"Cerrada":done>0?"En Proceso":"Programada";if(a.cierreForzado&&!(a.items||[])[origIdx].done)onPatchAct(a.id,{items:ni});else onPatchAct(a.id,{items:ni,estatus:compEst,...(a.cierreForzado?{cierreForzado:false}:{})});}}>
             {/* Renglón 1: icono + tarea + prioridad */}
             <div style={{display:"flex",gap:8,alignItems:"center"}}>
               <span style={{fontSize:14,flexShrink:0}}>{it.done?"✅":"⬜"}</span>
@@ -2289,7 +2298,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
               const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
               const pend=nst.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
               const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";
-              onPatchAct(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});
+              const reabreSub=a.cierreForzado&&batchSub.estatus&&batchSub.estatus!=="Cerrada";onPatchAct(a.id,a.cierreForzado&&!reabreSub?{subtareas:nst,fecha:compFecha}:{subtareas:nst,estatus:compEst,fecha:compFecha,...(reabreSub?{cierreForzado:false}:{})});
               setBatchSub(null);setSelSub(p=>({...p,[a.id]:new Set()}));
             }}>Aplicar</button>
           </div>
@@ -2687,6 +2696,7 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
 }
 
 function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades,onToggleFav}){
+  const featTag=((catalogos&&catalogos.etiqAgenda)||[])[0];
   const[showActs,setShowActs]=useState(false);
   const[selAct,setSelAct]=useState(null);
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
@@ -3076,7 +3086,7 @@ function App(){
   };
 
   const delAct=(id)=>setActividades(prev=>prev.filter(a=>a.id!==id));
-  const onEditActs=(ids,patch)=>setActividades(prev=>prev.map(a=>ids.indexOf(a.id)>-1?{...a,...(typeof patch==="function"?patch(a):patch)}:a));
+  const onEditActs=(ids,patch)=>setActividades(prev=>prev.map(a=>ids.indexOf(a.id)>-1?aplicaPatchAct(a,typeof patch==="function"?patch(a):patch):a));
   const onCopyActs=(ids)=>setActividades(prev=>{let mx=Math.max(0,...prev.map(a=>parseInt((a.id||"a0").slice(1))||0));const cps=prev.filter(a=>ids.indexOf(a.id)>-1).map(a=>{mx+=1;const{id,...r}=a;return {...r,id:"a"+mx};});return [...prev,...cps];});
   const sinRespuesta=(a)=>{setActividades(prev=>prev.map(x=>x.id===a.id?{...x,estatus:"Cerrada",resultado:x.resultado||"Sin respuesta"}:x));if(window.confirm("Cerrada sin respuesta. ¿Agendar la siguiente acción para este contacto?")){openAct({contactoId:a.contactoId,oportunidadId:a.oportunidadId||null,tipoAccion:a.tipoAccion||"",servicioSolucion:a.servicioSolucion||null,prioridad:a.prioridad||"Media",estatus:"Programada",fecha:""},a.contactoId);}};
   const openOpo=(init,fixed)=>setOpoModal({init,fixed:fixed||null});

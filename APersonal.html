@@ -91,7 +91,9 @@ function DictadoBtn({onResult}){
 const LblVoz=(texto,onDictado)=><span style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}><span>{texto}</span><DictadoBtn onResult={onDictado}/></span>;
 /* ── Helpers proyecto ── */
 const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
-const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
+const proyEstatus=(a)=>{if((a.modoTarea==="proyecto"||a.modoTarea==="checklist")&&a.cierreForzado)return"Cerrada";if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
+/* Aplica un patch; si cambia el estatus de un checklist/proyecto mantiene coherente cierreForzado */
+const aplicaPatchAct=(a,p)=>{const r={...a,...p};if(p&&p.estatus!==undefined&&p.cierreForzado===undefined&&(a.modoTarea==="checklist"||a.modoTarea==="proyecto")){if(p.estatus==="Cerrada"){const its=a.modoTarea==="checklist"?(r.items||[]).map(x=>!!x.done):(r.subtareas||[]).map(x=>x.estatus==="Cerrada");r.cierreForzado=its.length>0&&!its.every(Boolean);}else r.cierreForzado=false;}return r;};
 const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,Alta:1,Media:2,Baja:3};let b=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<b)b=r;});return Object.keys(rank).find(k=>rank[k]===b)||"Media";};
 
 /* ── BuscaContactoEmpresa ── */
@@ -215,7 +217,7 @@ function SubtareasEditor({subtareas,onChange,onIndependizar}){
 }
 /* ── Modal de Actividad ── */
 function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreateContacto,catContactar,catTareas,catAcciones,catEtiquetas,actividades,onSave,onSaveExtra,onDelete,onClose}){
-  const[f,setF]=useState(()=>({enfoque:"Contactar",estatus:"Programada",fecha:hoyISO(),prioridad:"Media",modoTarea:"unica",...(init||{})}));
+  const[f,setF]=useState(()=>({enfoque:"Contactar",estatus:"Programada",fecha:hoyISO(),prioridad:"Media",modoTarea:"unica",...(init||{}),...(init&&init.modoTarea&&init.modoTarea!=="unica"?{estatus:proyEstatus(init)}:{})}));
   const[moveToProject,setMoveToProject]=useState("");
   const[esCopia,setEsCopia]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -235,7 +237,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
         const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
         const pend=all.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
         const compFecha=ds[0]||all.map(s=>s.fecha).filter(Boolean).sort()[0]||"";
-        onSaveExtra({...proj,subtareas:all,estatus:compEst,fecha:compFecha});
+        onSaveExtra({...proj,subtareas:all,estatus:compEst,fecha:compFecha,cierreForzado:false});
         if(f.id)onDelete(f.id);onClose();return;
       }
     }
@@ -252,12 +254,21 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
         const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
         const compFecha=ds[0]||(f.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";
         const sts=(f.subtareas||[]).map(s=>s.estatus||"Programada");
-        const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
-        onSave({...f,fecha:compFecha,estatus:compEst});
+        const estIni=(init&&init.id)?proyEstatus(init):null;
+        const usuarioCerro=f.estatus==="Cerrada"&&(estIni!=="Cerrada"||!!f.cierreForzado);
+        const nTot=sts.length;const nDone=sts.filter(x=>x==="Cerrada").length;
+        const forzado=usuarioCerro&&nDone<nTot;
+        const compEst=usuarioCerro?"Cerrada":(sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada");
+        if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${nTot-nDone} subtarea${nTot-nDone!==1?"s":""} sin concluir. ¿Cerrar de todas formas?`))return;
+        onSave({...f,fecha:compFecha,estatus:compEst,cierreForzado:forzado});
       } else if(modo==="checklist"){
                 const done=(f.items||[]).filter(i=>i.done).length,tot=(f.items||[]).length;
-        const compEst=tot>0&&done===tot?"Cerrada":done>0?"En Proceso":"Programada";
-        onSave({...f,estatus:compEst});
+        const estIni=(init&&init.id)?proyEstatus(init):null;
+        const usuarioCerro=f.estatus==="Cerrada"&&(estIni!=="Cerrada"||!!f.cierreForzado);
+        const forzado=usuarioCerro&&tot>0&&done<tot;
+        const compEst=usuarioCerro?"Cerrada":(tot>0&&done===tot?"Cerrada":done>0?"En Proceso":"Programada");
+        if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${tot-done} subactividad${tot-done!==1?"es":""} sin concluir. ¿Cerrar de todas formas?`))return;
+        onSave({...f,estatus:compEst,cierreForzado:forzado});
       } else {
                 onSave({...f});
       }
@@ -325,8 +336,8 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
           </div>
         </Field>
         <Field label="Asunto / Tarea"><textarea style={{...S.ta,minHeight:72}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value||null)} placeholder="Describe la tarea…"/></Field>
-        {modo==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
-        {modo==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}
+        {modo==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>setF(p=>{const reabre=p.cierreForzado&&(p.items||[]).some(o=>o.done&&(v.find(n=>n.id===o.id)||{done:true}).done===false);return {...p,items:v,...(reabre?{cierreForzado:false,estatus:"En Proceso"}:{})};})}/>}
+        {modo==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>setF(p=>{const reabre=p.cierreForzado&&(p.subtareas||[]).some(o=>o.estatus==="Cerrada"&&(v.find(n=>n.id===o.id)||{estatus:"Cerrada"}).estatus!=="Cerrada");return {...p,subtareas:v,...(reabre?{cierreForzado:false,estatus:"En Proceso"}:{})};})}
           onIndependizar={onSaveExtra?(idx)=>{
             const st=(f.subtareas||[])[idx];
             if(!st||!window.confirm(`¿Independizar "${st.titulo||"subtarea"}"?`))return;
@@ -334,6 +345,11 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
             set("subtareas",(f.subtareas||[]).filter((_,j)=>j!==idx));
           }:undefined}
         />}
+        {modo==="proyecto"&&<Field label="Estatus">
+          <select style={S.sel} value={f.estatus||"Programada"} onChange={e=>set("estatus",e.target.value)}>
+            {["Programada","En Proceso","Cerrada"].map(s=><option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>}
         {modo!=="proyecto"&&<>
           <div style={S.g2}>
             <Field label="Fecha">
@@ -513,7 +529,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
     {expanded&&modo==="checklist"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
       {[...(a.items||[])].sort((x,y)=>{if(x.done!==y.done)return x.done?1:-1;return(PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);}).map((it,idx)=>{
         const origIdx=(a.items||[]).findIndex(x=>x.id===it.id);
-        return <div key={it.id} style={{padding:"6px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}} onClick={()=>{if(!onPatch)return;const ni=(a.items||[]).map((x,j)=>j===origIdx?{...x,done:!x.done}:x);const d=ni.filter(x=>x.done).length;const ce=ni.length>0&&d===ni.length?"Cerrada":d>0?"En Proceso":"Programada";onPatch(a.id,{items:ni,estatus:ce});}}>
+        return <div key={it.id} style={{padding:"6px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}} onClick={()=>{if(!onPatch)return;const ni=(a.items||[]).map((x,j)=>j===origIdx?{...x,done:!x.done}:x);const d=ni.filter(x=>x.done).length;const ce=ni.length>0&&d===ni.length?"Cerrada":d>0?"En Proceso":"Programada";if(a.cierreForzado&&!(a.items||[])[origIdx].done)onPatch(a.id,{items:ni});else onPatch(a.id,{items:ni,estatus:ce,...(a.cierreForzado?{cierreForzado:false}:{})});}}>
           <div style={{display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:14}}>{it.done?"✅":"⬜"}</span><span style={{fontSize:12,fontWeight:700,color:it.done?"#475569":"#e2e8f0",textDecoration:it.done?"line-through":"none",flex:1}}>{it.texto||"Ítem"}</span>{it.prioridad&&it.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[it.prioridad]),fontSize:7}}>{it.prioridad}</span>}</div>
           {it.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,paddingLeft:22}}>{it.descripcion}</div>}
         </div>;
@@ -566,7 +582,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
             const pend=nst.filter(s=>s.estatus!=="Cerrada");
             const ds=pend.map(s=>s.fecha).filter(Boolean).sort();
             const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";
-            onPatch(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});
+            const reabreSub=a.cierreForzado&&batchSub.estatus&&batchSub.estatus!=="Cerrada";onPatch(a.id,a.cierreForzado&&!reabreSub?{subtareas:nst,fecha:compFecha}:{subtareas:nst,estatus:compEst,fecha:compFecha,...(reabreSub?{cierreForzado:false}:{})});
             setBatchSub(null);setSelSub(new Set());
           }}>Aplicar</button>
         </div>
@@ -724,8 +740,8 @@ function App(){
   // CRUD
   const saveAct=(data)=>{setActividades(prev=>{const n=data.id?prev.map(a=>a.id===data.id?{...a,...data}:a):[...prev,{...data,id:"a"+Date.now()}];saveLS("actividades",n);return n;});};
   const delAct=(id)=>{setActividades(prev=>{const n=prev.filter(a=>a.id!==id);saveLS("actividades",n);return n;});};
-  const patchAct=(id,patch)=>{setActividades(prev=>{const n=prev.map(a=>a.id===id?{...a,...patch}:a);saveLS("actividades",n);return n;});};
-  const editActs=(ids,fn)=>{setActividades(prev=>{const n=prev.map(a=>ids.includes(a.id)?{...a,...fn(a)}:a);saveLS("actividades",n);return n;});};
+  const patchAct=(id,patch)=>{setActividades(prev=>{const n=prev.map(a=>a.id===id?aplicaPatchAct(a,patch):a);saveLS("actividades",n);return n;});};
+  const editActs=(ids,fn)=>{setActividades(prev=>{const n=prev.map(a=>ids.includes(a.id)?aplicaPatchAct(a,fn(a)):a);saveLS("actividades",n);return n;});};
   useEffect(()=>{const el=document.getElementById("loading");if(el){el.classList.add("fade-out");setTimeout(()=>{el.parentNode&&el.parentNode.removeChild(el);},400);}},[]);
   const hoy=hoyISO();
   // Filtrado
