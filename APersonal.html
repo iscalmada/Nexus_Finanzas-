@@ -91,7 +91,7 @@ function DictadoBtn({onResult}){
 const LblVoz=(texto,onDictado)=><span style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}><span>{texto}</span><DictadoBtn onResult={onDictado}/></span>;
 /* ── Helpers proyecto ── */
 const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
-const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){if(a.estatus==="Cerrada")return"Cerrada";const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
+const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return"Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return"En Proceso";return"Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(i=>i.done).length;if(d===(a.items||[]).length)return"Cerrada";if(d>0)return"En Proceso";return"Programada";}return a.estatus||"Programada";};
 const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,Alta:1,Media:2,Baja:3};let b=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<b)b=r;});return Object.keys(rank).find(k=>rank[k]===b)||"Media";};
 
 /* ── BuscaContactoEmpresa ── */
@@ -407,10 +407,11 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
 }
 /* ── Tarjeta de actividad ── */
 function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onToggleExp,onPatch,catEtiquetas,actividades}){
-  const[historial,setHistorial]=useState({});
-  const toggleHist=(actId,nivel)=>setHistorial(p=>({...p,[actId]:p[actId]===nivel?null:nivel}));
   const[selSub,setSelSub]=useState(new Set());
   const[batchSub,setBatchSub]=useState(null);
+  const[showHist,setShowHist]=useState(false);
+  const toggleHist=()=>setShowHist(v=>!v);
+  const toggleStar=(ev)=>{ev.stopPropagation();if(onPatch)onPatch(a.id,{starred:!a.starred});};
   const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
   const efFech=proyFecha(a)||a.fecha||"";const modo=a.modoTarea||"unica";
   const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
@@ -444,7 +445,8 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
         </div>
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",gap:5}}>
-            {featTag&&<span onClick={toggleFeat} title={featTag} style={{cursor:"pointer",fontSize:15,filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
+            {featTag&&<span onClick={toggleFeat} title="Pronta recuperación" style={{cursor:"pointer",fontSize:15,filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
+            <span onClick={toggleStar} title="Destacada" style={{cursor:"pointer",fontSize:15,filter:a.starred?"none":"grayscale(1) opacity(0.35)"}}>⭐</span>
             <span style={{fontSize:11,color:"#94a3b8",fontWeight:600}}>{fmtF(efFech)}</span>
           </div>
           {a.hora&&<span style={{fontSize:10,color:"#94a3b8",marginTop:1}}>{a.hora}</span>}
@@ -465,6 +467,41 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
     {expanded&&a.intencion&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion}</div>}
     {expanded&&a.accionEnProceso&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionEnProceso}</div>}
     {expanded&&a.conclusion&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4}}>→ {a.conclusion}</div>}
+    {/* Historial del contacto */}
+    {a.contactoId&&(()=>{
+      const todosActs=actividades||[];
+      const histCto=todosActs.filter(x=>x.id!==a.id&&x.contactoId===a.contactoId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||""));
+      if(histCto.length===0)return null;
+      return <div style={{marginTop:6}}>
+        <button style={{...S.pill(showHist,"#60a5fa"),padding:"3px 9px",fontSize:9,fontWeight:700}} onClick={e=>{e.stopPropagation();toggleHist();}}>
+          🕐 {histCto.length} con este contacto
+        </button>
+        {showHist&&<div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",marginTop:6}}>
+          <div style={{fontSize:8,color:"#475569",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Historial del contacto · más reciente primero</div>
+          {histCto.map(h=>{
+            const hCol=EST_COLOR[h.estatus||"Programada"]||"#64748b";
+            const hInt=h.intencion||"";const hAcc=h.accionEnProceso||"";const hRes=h.conclusion||"";
+            const hayH=hInt||hAcc||hRes;
+            return <div key={h.id} style={{padding:"6px 0",borderBottom:"1px solid #1e293b22",display:"flex",gap:8,alignItems:"flex-start"}}>
+              <div style={{flexShrink:0,minWidth:62}}>
+                <div style={{fontSize:9,color:"#8a93a3",fontWeight:600}}>{(h.fecha||"—").split("-").reverse().join("/")}</div>
+                {h.hora&&<div style={{fontSize:8,color:"#475569"}}>{h.hora}</div>}
+              </div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center",marginBottom:hayH?3:0}}>
+                  {h.enfoque&&<span style={{fontSize:8,color:ENF_COLOR[h.enfoque]||"#64748b",background:(ENF_COLOR[h.enfoque]||"#64748b")+"11",border:`1px solid ${ENF_COLOR[h.enfoque]||"#64748b"}33`,borderRadius:4,padding:"1px 5px"}}>{ENF_ICON[h.enfoque]||"●"} {h.enfoque}</span>}
+                  {h.tipoAccion&&<span style={{fontSize:8,color:"#60a5fa",background:"#60a5fa11",border:"1px solid #60a5fa33",borderRadius:4,padding:"1px 5px"}}>{h.tipoAccion}</span>}
+                  <span style={{...S.tag(hCol),fontSize:8}}>{h.estatus||"Programada"}</span>
+                </div>
+                {hInt&&<div style={{fontSize:10,color:"#94a3b8",lineHeight:1.3,wordBreak:"break-word"}}>{hInt.slice(0,100)}{hInt.length>100?"…":""}</div>}
+                {hAcc&&<div style={{fontSize:10,color:"#60a5fa",lineHeight:1.3,wordBreak:"break-word",marginTop:2}}>▸ {hAcc.slice(0,100)}{hAcc.length>100?"…":""}</div>}
+                {hRes&&<div style={{fontSize:10,color:"#22c55e",lineHeight:1.3,wordBreak:"break-word",marginTop:2}}>→ {hRes.slice(0,100)}{hRes.length>100?"…":""}</div>}
+              </div>
+            </div>;
+          })}
+        </div>}
+      </div>;
+    })()}
     {/* Barra de progreso */}
     {prog&&<div style={{marginTop:6}}>
       <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b",marginBottom:2}}><span>{prog.done}/{prog.total}</span><span>{Math.round(prog.done/prog.total*100)}%</span></div>
@@ -472,37 +509,6 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
     </div>}
     {/* Botón editar para proyectos/checklist */}
     {modo!=="unica"&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();onTap(a);}}>✏ Editar {modo==="proyecto"?"proyecto":"Checklist"}</button>}
-    {/* Historial del mismo contacto */}
-    {a.contactoId&&(()=>{
-      const histCto=actividades.filter(x=>x.id!==a.id&&x.contactoId===a.contactoId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||""));
-      if(!histCto.length)return null;
-      const nivel=historial[a.id];
-      return <div style={{marginTop:6}}>
-        <button style={{...S.pill(nivel==="contacto","#60a5fa"),padding:"3px 9px",fontSize:9,fontWeight:700}} onClick={e=>{e.stopPropagation();toggleHist(a.id,"contacto");}}>
-          🕐 {histCto.length} con este contacto
-        </button>
-        {nivel==="contacto"&&<div style={{background:"#0d0d1a",border:"1px solid #1e293b",borderRadius:8,padding:"8px 10px",marginTop:6}}>
-          <div style={{fontSize:8,color:"#475569",fontWeight:700,letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Historial · más reciente primero</div>
-          {histCto.map(h=>{const hCol=EST_COLOR[h.estatus||"Programada"]||"#64748b";const hTxt=h.resultado||h.accionProceso||h.intencion||"";
-            return <div key={h.id} style={{padding:"6px 0",borderBottom:"1px solid #1e293b22",display:"flex",gap:8,alignItems:"flex-start"}}>
-              <div style={{flexShrink:0,minWidth:58}}>
-                <div style={{fontSize:9,color:"#8a93a3",fontWeight:600}}>{(h.fecha||"—").split("-").reverse().join("/")}</div>
-                {h.hora&&<div style={{fontSize:8,color:"#475569"}}>{h.hora}</div>}
-              </div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center",marginBottom:hTxt?3:0}}>
-                  {h.tipoAccion&&<span style={{fontSize:8,color:"#60a5fa",background:"#60a5fa11",border:"1px solid #60a5fa33",borderRadius:4,padding:"1px 5px"}}>{h.tipoAccion}</span>}
-                  <span style={{...S.tag(hCol),fontSize:8}}>{h.estatus||"Programada"}</span>
-                </div>
-                {h.intencion&&<div style={{fontSize:9,color:"#94a3b8",marginTop:2,wordBreak:"break-word"}}>{h.intencion.slice(0,100)}{h.intencion.length>100?"…":""}</div>}
-                {h.accionProceso&&<div style={{fontSize:9,color:"#60a5fa",marginTop:1,wordBreak:"break-word"}}>▸ {h.accionProceso.slice(0,100)}{h.accionProceso.length>100?"…":""}</div>}
-                {h.resultado&&<div style={{fontSize:9,color:"#22c55e",marginTop:1,wordBreak:"break-word"}}>✓ {h.resultado.slice(0,100)}{h.resultado.length>100?"…":""}</div>}
-              </div>
-            </div>;
-          })}
-        </div>}
-      </div>;
-    })()}
     {/* Panel expandido checklist */}
     {expanded&&modo==="checklist"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
       {[...(a.items||[])].sort((x,y)=>{if(x.done!==y.done)return x.done?1:-1;return(PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);}).map((it,idx)=>{
@@ -687,10 +693,11 @@ function App(){
   const[modal,setModal]=useState(null);
   const[expandidos,setExpandidos]=useState(new Set());
   // Filtros
-  const[filtros,setFiltros]=useState(["Programada","En Proceso"]);
+  const[filtros,setFiltros]=useState(["Programada"]);
   const[fEnfoque,setFEnfoque]=useState("");
   const[fEtiqueta,setFEtiqueta]=useState([]);
   const[fFeat,setFFeat]=useState(false);
+  const[fStarred,setFStarred]=useState(false);
   const featTag=(catEtiquetas||[])[0];
   const[fPrioridad,setFPrioridad]=useState([]);
   const[fContacto,setFContacto]=useState("");
@@ -739,6 +746,7 @@ function App(){
     if(fEnfoque&&a.enfoque!==fEnfoque)return false;
     if(fEtiqueta.length&&!fEtiqueta.some(et=>(a.etiquetas||[]).includes(et)))return false;
     if(fFeat&&featTag&&!(a.etiquetas||[]).includes(featTag))return false;
+    if(fStarred&&!a.starred)return false;
     if(fPrioridad.length&&!fPrioridad.includes(proyPrioridad(a)))return false;
     if(fContacto&&a.contactoId!==fContacto)return false;
     if(fEmpresa&&a.empresaId!==fEmpresa)return false;
@@ -786,8 +794,8 @@ function App(){
     if(fc!==0)return fc;
     return horaCmp(a,b);
   });
-  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta.length?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0)+(fSinFecha?1:0)+(fFeat?1:0);
-  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta([]);setFFeat(false);setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setFSinFecha(false);setQ("");setModoFecha("todas");};
+  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta.length?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0)+(fSinFecha?1:0)+(fFeat?1:0)+(fStarred?1:0);
+  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta([]);setFFeat(false);setFStarred(false);setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setFSinFecha(false);setQ("");setModoFecha("todas");};
   const sinFechaCount=actividades.filter(a=>!(proyFecha(a)||a.fecha||"")).length;
   // Catálogo unificado de tipos de acción
   const todosTipos=fEnfoque==="Contactar"?catContactar:fEnfoque==="Tareas"?catTareas:fEnfoque==="Acciones"?catAcciones:[...new Set([...catContactar,...catTareas,...catAcciones])];
@@ -879,7 +887,8 @@ function App(){
           <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Etapa:</span>
           {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]),fontSize:9,padding:"3px 6px",flexShrink:0,cursor:"pointer"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
           {(filtros.length>0||fEnfoque)&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 7px",flexShrink:0,cursor:"pointer"}} onClick={()=>{setFiltros([]);setFEnfoque("");}}>✕</span>}
-          {featTag&&<span style={{marginLeft:"auto",flexShrink:0,cursor:"pointer",fontSize:16,filter:fFeat?"none":"grayscale(1) opacity(0.4)"}} title={featTag} onClick={()=>setFFeat(v=>!v)}>💰</span>}
+          {featTag&&<span style={{marginLeft:"auto",flexShrink:0,cursor:"pointer",fontSize:16,filter:fFeat?"none":"grayscale(1) opacity(0.4)"}} title="Pronta recuperación" onClick={()=>setFFeat(v=>!v)}>💰</span>}
+          <span style={{flexShrink:0,cursor:"pointer",fontSize:16,filter:fStarred?"none":"grayscale(1) opacity(0.4)"}} title="Destacadas" onClick={()=>setFStarred(v=>!v)}>⭐</span>
         </div>
         {/* Fila 4: Búsqueda + ⚙ + ✕ */}
         <div style={{display:"flex",gap:5,alignItems:"center"}}>
