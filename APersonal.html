@@ -820,6 +820,7 @@ function App(){
     return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
       <div style={{display:"flex",gap:8,fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
         {featTag&&<div style={{width:18,flexShrink:0}}></div>}
+        <div style={{width:18,flexShrink:0}}></div>
         <div style={{width:62,flexShrink:0}}>Fecha</div>
         <div style={{flex:esCom?1.6:2.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
         {esCom&&<div style={{flex:1,minWidth:0,whiteSpace:"nowrap"}}>Tipo</div>}
@@ -834,6 +835,7 @@ function App(){
         return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>selMode?toggleSel(a.id):setModal(a)}>
           {selMode&&<span style={{width:14,height:14,flexShrink:0,marginTop:1,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
           {featTag&&<span onClick={(ev)=>toggleFeat(a,ev)} title={featTag} style={{width:18,flexShrink:0,fontSize:13,cursor:"pointer",filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
+          <span onClick={(ev)=>{ev.stopPropagation();patchAct(a.id,{starred:!a.starred});}} title="Destacada" style={{width:18,flexShrink:0,fontSize:13,cursor:"pointer",filter:a.starred?"none":"grayscale(1) opacity(0.35)"}}>⭐</span>
           <div style={{width:62,flexShrink:0,display:"flex",flexDirection:"column"}}>
             <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{fmtF(efFech)||"—"}</span>
             {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
