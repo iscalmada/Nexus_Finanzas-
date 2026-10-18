@@ -109,6 +109,8 @@ function exportBackup(contactos,empresas,oportunidades,catalogos,productos){
 
 /* ─── estilos (heredados del CFP) ─── */
 const GOLD="#C9A84C";
+const PREFIJOS=["Dr.","Dra.","Lic.","Ing.","Arq.","Mtro.","Mtra.","C.P.","M.D.","Ph.D."];
+const nombreDisplay=(c)=>{if(!c)return"—";const base=[c.prefijo,c.nombre||c.nombreCompleto,!(c.nombre)&&c.apellido?null:c.apellido].filter(Boolean).join(" ").trim();return [base,c.alias?`"${c.alias}"`:""].filter(Boolean).join(" ");};
 const ISOTIPO="data:image/png;base64,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";
 const S={
   app:{background:"#080810",minHeight:"100vh",fontFamily:"'DM Sans',sans-serif",color:"#e2e8f0",maxWidth:480,margin:"0 auto",paddingBottom:74},
@@ -157,6 +159,22 @@ const POT_COLOR={Alto:"#22c55e",Medio:"#fbbf24",Bajo:"#f87171",Desconocido:"#475
 
 /* ─── helpers UI ─── */
 function Field({label,children}){return <div style={S.fg}><label style={S.fl}>{label}</label>{children}</div>;}
+function DictadoBtn({onResult}){
+  const[listening,setListening]=useState(false);
+  const recRef=useRef(null);
+  const toggle=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){alert("Tu navegador no soporta dictado por voz. Usa Chrome en Android.");return;}
+    if(listening){recRef.current&&recRef.current.stop();setListening(false);return;}
+    const rec=new SR();
+    rec.lang="es-MX";rec.continuous=true;rec.interimResults=false;
+    rec.onresult=(e)=>{let t="";for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)t+=e.results[i][0].transcript;}if(t.trim())onResult(t.trim());};
+    rec.onend=()=>setListening(false);rec.onerror=()=>setListening(false);
+    try{rec.start();recRef.current=rec;setListening(true);}catch(err){setListening(false);}
+  };
+  return <button type="button" onClick={toggle} title={listening?"Detener dictado":"Dictar por voz"} style={{border:"none",background:listening?"#ef4444":"#334155",color:"#fff",borderRadius:20,width:26,height:26,fontSize:12,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>{listening?"⏹":"🎤"}</button>;
+}
+const LblVoz=(texto,onDictado)=><span style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}><span>{texto}</span><DictadoBtn onResult={onDictado}/></span>;
 function CatSelect({cat,value,onChange,placeholder}){
   return <select style={S.sel} value={value||""} onChange={e=>onChange(e.target.value||null)}>
     <option value="">{placeholder||"— Selecciona —"}</option>
@@ -194,7 +212,7 @@ function BuscaSelect({opciones,value,onChange,placeholder,vacioLabel,onAdd,addLa
 /* ════════ MODAL CONTACTO ════════ */
 function cEmpresas(c){return (c&&c.empresas&&c.empresas.length)?c.empresas:((c&&c.empresaId)?[{empresaId:c.empresaId,rol:c.rolEmpresa||""}]:[]);}
 function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose}){
-  const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],tiposAliado:[],solucionesAliado:[],etiquetas:[],...init}));
+  const[f,setF]=useState(()=>({giros:[],solucionesAncla:[],areasIntegradas:[],tiposAliado:[],solucionesAliado:[],etiquetas:[],...init}));
   const[nuevaEmp,setNuevaEmp]=useState(null);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const empList=f.empresas||(f.empresaId?[{empresaId:f.empresaId,rol:f.rolEmpresa||""}]:[]);
@@ -206,6 +224,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
   const toggleGiro=(g)=>setF(p=>{const has=p.giros.includes(g);const giros=has?p.giros.filter(x=>x!==g):[...p.giros,g];
     let gp=p.giroPrincipal; if(has&&gp===g)gp=giros[0]||null; if(!has&&!gp)gp=g; return {...p,giros,giroPrincipal:gp};});
   const toggleSol=(v)=>setF(p=>({...p,solucionesAncla:p.solucionesAncla.includes(v)?p.solucionesAncla.filter(x=>x!==v):[...p.solucionesAncla,v]}));
+  const toggleArea=(v)=>setF(p=>({...p,areasIntegradas:(p.areasIntegradas||[]).includes(v)?(p.areasIntegradas||[]).filter(x=>x!==v):[...(p.areasIntegradas||[]),v]}));
   const toggleEtiqueta=(id)=>setF(p=>({...p,etiquetas:(p.etiquetas||[]).includes(id)?(p.etiquetas||[]).filter(x=>x!==id):[...(p.etiquetas||[]),id]}));
   const save=()=>{ if(!f.nombre&&!f.nombreCompleto){alert("El nombre es obligatorio");return;}
     const completo=f.nombreCompleto||[f.nombre,f.apellido].filter(Boolean).join(" ");
@@ -217,11 +236,24 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
       <div style={S.mTit}>{init.id?"Editar contacto":"Nuevo contacto"}</div>
 
       <div style={S.sTit}>Identidad</div>
-      <div style={S.g2}>
-        <Field label="Alias"><input style={S.inp} value={f.alias||""} onChange={e=>set("alias",e.target.value||null)}/></Field>
-        <Field label="Nombre"><input style={S.inp} value={f.nombre||""} onChange={e=>set("nombre",e.target.value)}/></Field>
+      <div style={{display:"flex",gap:6,alignItems:"flex-end",marginBottom:8}}>
+        <Field label="Prefijo" style={{flex:"0 0 90px"}}>
+          <select style={S.sel} value={f.prefijo||""} onChange={e=>set("prefijo",e.target.value||null)}>
+            <option value="">—</option>
+            {PREFIJOS.map(p=><option key={p} value={p}>{p}</option>)}
+            <option value="__otro">Otro…</option>
+          </select>
+        </Field>
+        {f.prefijo==="__otro"&&<Field label="Prefijo libre" style={{flex:1}}>
+          <input style={S.inp} value={f.prefijoCustum||""} onChange={e=>{set("prefijoCustum",e.target.value||null);set("prefijo",e.target.value||null);}}/></Field>}
+        <Field label="Alias" style={{flex:"0 0 90px"}}>
+          <input style={S.inp} value={f.alias||""} onChange={e=>set("alias",e.target.value||null)} placeholder="Apodo…"/>
+        </Field>
       </div>
-      <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
+      <div style={S.g2}>
+        <Field label="Nombre"><input style={S.inp} value={f.nombre||""} onChange={e=>set("nombre",e.target.value)}/></Field>
+        <Field label="Apellido(s)"><input style={S.inp} value={f.apellido||""} onChange={e=>set("apellido",e.target.value)}/></Field>
+      </div>
 
       <div style={S.sTit}>Generales</div>
       <Field label="Tipo de contacto">
@@ -318,6 +350,13 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
             {(catalogos.solucion||[]).filter(s=>s.ancla).map(s=><span key={s.id} onClick={()=>toggleSol(s.id)} style={S.chip(f.solucionesAncla.includes(s.id),"#C9A84C")}>{s.nombre}</span>)}
           </div>
 
+          {(catalogos.areaEstrategica||[]).length>0&&<>
+            <div style={S.sTit}>Soluciones Integradas</div>
+            <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
+              {(catalogos.areaEstrategica||[]).map(a=><span key={a.id} onClick={()=>toggleArea(a.id)} style={S.chip((f.areasIntegradas||[]).includes(a.id),"#2dd4bf")}>{a.nombre}</span>)}
+            </div>
+          </>}
+
           <div style={S.sTit}>Avance Nexus</div>
           <div style={S.g2}>
             <Field label="Etapa principal">
@@ -376,6 +415,9 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
 /* ════════ DETALLE CONTACTO ════════ */
 function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidades,onAddAct,onEditAct,onAddOpo,onEditOpo,onEdit,onDelete,onBack}){
   const emp=empresas.find(e=>e.id===c.empresaId);
+  const[showOpps,setShowOpps]=useState(false);
+  const[showActs,setShowActs]=useState(false);
+  const[showActsNAP,setShowActsNAP]=useState(false);
   const Row=({k,v})=> v?<div style={S.detRow}><span style={S.detK}>{k}</span><span style={S.detV}>{v}</span></div>:null;
   return <div>
     <div style={{...S.sec,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -385,7 +427,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
       </div>
     </div>
     <div style={S.sec}>
-      <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{c.nombreCompleto}</div>
+      <div style={{fontSize:20,fontWeight:800,color:"#e2e8f0",marginBottom:4}}>{nombreDisplay(c)}</div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:4}}>
         {c.etapaPrincipal&&<span style={S.tag(ec(c.etapaPrincipal))}>{c.etapaPrincipal}{c.etapaEspecifica?` · ${c.etapaEspecifica}`:""}</span>}
         {(c.tiposContacto||[c.tipoContacto].filter(Boolean)).map(t=><span key={t} style={S.tag("#7dd3fc")}>{t}</span>)}
@@ -462,21 +504,49 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
       {c.obs&&<div style={S.card()}><div style={S.sTit}>Observaciones</div><div style={{fontSize:12,color:"#94a3b8",lineHeight:1.6,whiteSpace:"pre-wrap"}}>{c.obs}</div></div>}
 
       <div style={S.card()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
-          <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Oportunidades</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <button style={{...S.pill(showOpps,"#fbbf24"),fontWeight:700,fontSize:10}} onClick={()=>setShowOpps(v=>!v)}>
+            🚀 Oportunidades ({(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoId===c.id||(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(c.id)).length}) {showOpps?"▲":"▾"}
+          </button>
           <button style={S.pill(true,"#fbbf24")} onClick={()=>onAddOpo(c.id)}>+ Detonar</button>
         </div>
-        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>onEditOpo(x)}/>)}
-        {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoId===c.id||(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(c.id)).length===0&&<div style={{fontSize:11,color:"#475569"}}>Sin oportunidades aún.</div>}
+        {showOpps&&<div style={{marginTop:10}}>
+          {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoOperativoId===c.id||o.contactoId===c.id).map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} onTap={(x)=>onEditOpo(x)}/>)}
+          {(oportunidades||[]).filter(o=>o.contactoPrincipalId===c.id||o.contactoId===c.id||(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(c.id)).length===0&&<div style={{fontSize:11,color:"#475569",marginTop:6}}>Sin oportunidades aún.</div>}
+        </div>}
       </div>
 
       <div style={S.card()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}>
-          <div style={{fontSize:9,color:"#475569",letterSpacing:2,textTransform:"uppercase",fontWeight:700}}>Actividades</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <button style={{...S.pill(showActs,GOLD),fontWeight:700,fontSize:10}} onClick={()=>setShowActs(v=>!v)}>
+            📋 Agenda CFC ({(actividades||[]).filter(a=>a.contactoId===c.id).length}) {showActs?"▲":"▾"}
+          </button>
           <button style={S.pill(true,GOLD)} onClick={()=>onAddAct(c.id)}>+ Registrar</button>
         </div>
-        <ActividadesList acts={(actividades||[]).filter(a=>a.contactoId===c.id)} contactos={[c]} showContacto={false} onTap={(a)=>onEditAct(a)}/>
+        {showActs&&<div style={{marginTop:10}}>
+          <ActividadesList acts={(actividades||[]).filter(a=>a.contactoId===c.id)} contactos={[c]} showContacto={false} onTap={(a)=>onEditAct(a)}/>
+        </div>}
       </div>
+      {(()=>{
+        try{
+          const napActs=JSON.parse(localStorage.getItem("nap_actividades")||"[]");
+          const napCto=napActs.filter(a=>a.contactoId===c.id);
+          if(!napCto.length)return null;
+          return <div style={{...S.card(),borderColor:"#a78bfa44"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <button style={{...S.pill(showActsNAP,"#a78bfa"),fontWeight:700,fontSize:10}} onClick={()=>setShowActsNAP(v=>!v)}>
+                📋 Agenda Personal ({napCto.length}) {showActsNAP?"▲":"▾"}
+              </button>
+            </div>
+            {showActsNAP&&<div style={{marginTop:10}}>
+              {napCto.sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||"")).map(a=><div key={a.id} style={{padding:"7px 0",borderBottom:"1px solid #0f172a"}}>
+                <div style={{fontSize:11,fontWeight:600,color:"#a78bfa"}}>{a.asunto||a.tipoAccion||"Actividad"}</div>
+                <div style={{fontSize:9,color:"#64748b"}}>{a.fecha?a.fecha.split("-").reverse().join("/"):"sin fecha"}{a.hora?" · "+a.hora:""} · {a.estatus||"Programada"}</div>
+              </div>)}
+            </div>}
+          </div>;
+        }catch(e){return null;}
+      })()}
 
       <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={onDelete}>Eliminar contacto</button>
     </div>
@@ -506,13 +576,30 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
   const[vistaAliados,setVistaAliados]=useState("aliado");
   const solName=(id)=>((catalogos.solucion||[]).find(s=>s.id===id)||{}).nombre||"";
   const[modal,setModal]=useState(null);
+  const[bulkMode,setBulkMode]=useState(false);
+  const[bulkSel,setBulkSel]=useState(new Set());
+  const[bulkPanel,setBulkPanel]=useState(null); // objeto con los campos a editar
+  const toggleBulk=(id)=>setBulkSel(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  const applyBulk=(patch)=>{
+    setContactos(prev=>prev.map(c=>bulkSel.has(c.id)?{...c,...patch}:c));
+    setBulkSel(new Set());setBulkMode(false);setBulkPanel(null);
+  };
   const createEmpresa=(d)=>{const nid="e"+(Math.max(0,...empresas.map(e=>parseInt((e.id||"e0").slice(1))||0))+1);setEmpresas(prev=>[...prev,{...d,id:nid}]);return nid;};
   useEffect(()=>{ if(fEsp.length&&fEtapa.length) setFEsp(prev=>prev.filter(n=>(catalogos.etapaEspecifica||[]).some(e=>e.nombre===n&&fEtapa.includes(e.principal)))); },[fEtapa]);
 
   const list=useMemo(()=>contactos.filter(c=>{
     const esAliado=!!(c.tiposAliado&&c.tiposAliado.length);
     if(aliadosOnly&&!esAliado)return false;
-    if(q&&!(c.nombreCompleto||"").toLowerCase().includes(q.toLowerCase()))return false;
+    if(q){const ql=q.toLowerCase();const match=(c)=>{
+      if((c.nombreCompleto||"").toLowerCase().includes(ql))return true;
+      if((c.alias||"").toLowerCase().includes(ql))return true;
+      if((c.prefijo||"").toLowerCase().includes(ql))return true;
+      if((c.actividad||"").toLowerCase().includes(ql))return true;
+      // empresa: revisar tanto array de empresas como empresaId directo
+      const empIds=[...((c.empresas||[]).map(r=>r.empresaId)),c.empresaId].filter(Boolean);
+      if(empIds.some(eid=>{const e=empresas.find(x=>x.id===eid);return e&&(e.nombre||"").toLowerCase().includes(ql);}))return true;
+      return false;
+    };if(!match(c))return false;}
     if(fEtapa.length&&!fEtapa.includes(c.etapaPrincipal))return false;
     if(fEsp.length&&!fEsp.includes(c.etapaEspecifica))return false;
     if(fGiro.length&&!(c.giros||[]).some(g=>fGiro.includes(g)))return false;
@@ -574,7 +661,55 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
         <button style={{...S.pill(panel||activos>0,GOLD),padding:"9px 12px",fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}} onClick={()=>setPanel(p=>!p)}>⚙{activos>0?` (${activos})`:""} {panel?"▲":"▾"}</button>
         {activos>0&&<button style={{...S.pill(false,"#f87171"),flexShrink:0}} onClick={limpiar}>✕</button>}
         <span style={{fontSize:9,color:"#475569",flexShrink:0,whiteSpace:"nowrap"}}>Act: {list.length}</span>
+        {!aliadosOnly&&<button style={{...S.pill(bulkMode,"#a78bfa"),flexShrink:0,padding:"9px 10px",fontWeight:700,fontSize:10}} onClick={()=>{setBulkMode(v=>!v);setBulkSel(new Set());setBulkPanel(null);}}>☑</button>}
       </div>
+      {bulkMode&&<div style={{...S.card(),marginBottom:8,padding:"10px 12px"}}>
+        <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <span style={{fontSize:10,color:"#94a3b8"}}>{bulkSel.size} seleccionado{bulkSel.size!==1?"s":""}</span>
+          <button style={{...S.pill(false,"#60a5fa"),fontSize:9,padding:"3px 8px"}} onClick={()=>setBulkSel(new Set(list.map(c=>c.id)))}>Todos los visibles ({list.length})</button>
+          {bulkSel.size>0&&<button style={{...S.pill(false,"#64748b"),fontSize:9,padding:"3px 8px"}} onClick={()=>setBulkSel(new Set())}>Deseleccionar</button>}
+          {bulkSel.size>0&&<button style={{...S.pill(true,"#22c55e"),fontSize:9,padding:"3px 10px",fontWeight:700}} onClick={()=>setBulkPanel({})}>✎ Editar {bulkSel.size}</button>}
+        </div>
+      </div>}
+      {bulkPanel!==null&&bulkSel.size>0&&(()=>{
+        const bp=bulkPanel;
+        const set=(k,v)=>setBulkPanel(p=>({...p,[k]:v}));
+        const espOk=(catalogos.etapaEspecifica||[]).filter(e=>!bp.etapaPrincipal||e.principal===bp.etapaPrincipal);
+        return <div style={{...S.card(),marginBottom:8,padding:"12px 14px",border:"1px solid #22c55e44"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#22c55e",marginBottom:10}}>✎ Editar {bulkSel.size} contactos seleccionados</div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>TIPO DE CONTACTO</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {["Cliente","Prospecto","Referido","Colaborador","Otro"].map(t=><span key={t} style={{...S.chip((bp.tiposContacto||[]).includes(t),"#7dd3fc"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.tiposContacto||[];set("tiposContacto",a.includes(t)?a.filter(x=>x!==t):[...a,t]);}}>{t}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>ETIQUETA</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.etiquetas||[]).map(et=><span key={et.id} style={{...S.chip((bp.etiquetas||[]).includes(et.id),"#a78bfa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.etiquetas||[];set("etiquetas",a.includes(et.id)?a.filter(x=>x!==et.id):[...a,et.id]);}}>{et.nombre}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>GIRO</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.giro||[]).map(g=><span key={g.id} style={{...S.chip((bp.giros||[]).includes(g.nombre),"#fbbf24"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.giros||[];set("giros",a.includes(g.nombre)?a.filter(x=>x!==g.nombre):[...a,g.nombre]);}}>{g.nombre}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>SOLUCIONES ANCLA</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.solucion||[]).map(s=><span key={s.id} style={{...S.chip((bp.solucionesAncla||[]).includes(s.id),GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>{const a=bp.solucionesAncla||[];set("solucionesAncla",a.includes(s.id)?a.filter(x=>x!==s.id):[...a,s.id]);}}>{s.nombre.length>18?s.nombre.slice(0,18)+"…":s.nombre}</span>)}
+          </div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>ETAPA PRINCIPAL</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+            {(catalogos.etapaPrincipal||[]).map(e=><span key={e.id} style={{...S.chip(bp.etapaPrincipal===e.nombre,ec(e.nombre)),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>set("etapaPrincipal",bp.etapaPrincipal===e.nombre?undefined:e.nombre)}>{e.nombre}</span>)}
+          </div>
+          {bp.etapaPrincipal&&<>
+            <div style={{fontSize:9,color:"#64748b",marginBottom:4}}>ETAPA ESPECÍFICA</div>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>
+              {espOk.map(e=><span key={e.id} style={{...S.chip(bp.etapaEspecifica===e.nombre,"#94a3b8"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>set("etapaEspecifica",bp.etapaEspecifica===e.nombre?undefined:e.nombre)}>{e.nombre}</span>)}
+            </div>
+          </>}
+          <div style={{fontSize:9,color:"#f87171",marginBottom:10}}>⚠ Los campos seleccionados se REEMPLAZARÁN en los {bulkSel.size} contactos.</div>
+          <div style={{display:"flex",gap:6}}>
+            <button style={{...S.saveB,flex:1,padding:"10px 0"}} onClick={()=>{const patch={};if(bp.tiposContacto?.length)patch.tiposContacto=bp.tiposContacto;if(bp.etiquetas?.length)patch.etiquetas=bp.etiquetas;if(bp.giros?.length)patch.giros=bp.giros;if(bp.solucionesAncla?.length)patch.solucionesAncla=bp.solucionesAncla;if(bp.etapaPrincipal)patch.etapaPrincipal=bp.etapaPrincipal;if(bp.etapaEspecifica)patch.etapaEspecifica=bp.etapaEspecifica;if(Object.keys(patch).length)applyBulk(patch);}}>Aplicar a {bulkSel.size}</button>
+            <button style={{...S.cancB,flex:1}} onClick={()=>setBulkPanel(null)}>Cancelar</button>
+          </div>
+        </div>;
+      })()}
       {panel&&<div style={{...S.card(),marginTop:10}}>
         {aliadosOnly ? (<>
           <div style={S.fl}>Tipo de aliado</div>
@@ -645,7 +780,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
           return <div key={sol.id} style={{...S.card(),marginBottom:8}}>
             <div style={{fontSize:13,fontWeight:800,color:"#2dd4bf",marginBottom:6}}>{sol.nombre} <span style={{color:"#475569",fontWeight:600}}>· {al.length}</span></div>
             {al.map(c=><div key={c.id} onClick={()=>setSel(c.id)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"7px 0",borderTop:"1px solid #1e293b",cursor:"pointer"}}>
-              <span style={{fontSize:13,fontWeight:600}}>{c.nombreCompleto}</span>
+              <span style={{fontSize:13,fontWeight:600}}>{nombreDisplay(c)}</span>
               <span style={{display:"flex",gap:5,flexShrink:0}}>
                 {(c.tiposAliado||[]).map(t=><span key={t} style={S.tag("#2dd4bf")}>{t}</span>)}
                 {c.estatusAliado&&<span style={S.tag("#64748b")}>{c.estatusAliado}</span>}
@@ -656,10 +791,13 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
         {(catalogos.solucion||[]).every(sol=>list.filter(c=>(c.solucionesAliado||[]).includes(sol.id)).length===0)&&
           <div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Ningún aliado tiene soluciones asignadas todavía. Ábrelos en "Por aliado" y asígnaselas.</div>}
       </>) : (<>
-      {list.map(c=>{const emp=empresas.find(e=>e.id===c.empresaId);return (
-        <div key={c.id} style={S.cCard(ec(c.etapaPrincipal))} onClick={()=>setSel(c.id)}>
+      {list.map(c=>{const emp=empresas.find(e=>e.id===c.empresaId);const isBulkSel=bulkSel.has(c.id);return (
+        <div key={c.id} style={{...S.cCard(ec(c.etapaPrincipal)),background:isBulkSel?"#16213a":"#10101e"}} onClick={()=>bulkMode?toggleBulk(c.id):setSel(c.id)}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
-            <div style={{fontSize:14,fontWeight:700}}>{c.nombreCompleto}</div>
+            <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0,flex:1}}>
+              {bulkMode&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isBulkSel?"none":"1.5px solid #475569",background:isBulkSel?"#22c55e":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#0c0c16",fontWeight:900}}>{isBulkSel?"✓":""}</span>}
+              <div style={{fontSize:14,fontWeight:700,minWidth:0}}>{nombreDisplay(c)}</div>
+            </div>
             {c.potencial&&<span style={S.tag(POT_COLOR[c.potencial]||"#475569")}>{c.potencial}</span>}
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>
@@ -732,7 +870,7 @@ function Empresas({empresas,setEmpresas,contactos,catalogos,goContacto}){
         <div style={S.card()}>
           <div style={S.sTit}>Contactos vinculados ({vinc.length})</div>
           {vinc.map(c=><div key={c.id} onClick={()=>goContacto(c.id)} style={{...S.detRow,cursor:"pointer"}}>
-            <span style={{fontWeight:600}}>{c.nombreCompleto}</span><span style={{...S.detK}}>{(cEmpresas(c).find(x=>x.empresaId===e.id)||{}).rol||""}</span></div>)}
+            <span style={{fontWeight:600}}>{nombreDisplay(c)}</span><span style={{...S.detK}}>{(cEmpresas(c).find(x=>x.empresaId===e.id)||{}).rol||""}</span></div>)}
           {vinc.length===0&&<div style={{fontSize:11,color:"#475569"}}>Aún sin contactos vinculados.</div>}
         </div>
         <button style={{...S.cancB,color:"#f87171",borderColor:"#f8717144"}} onClick={()=>del(e)}>Eliminar empresa</button>
@@ -771,7 +909,7 @@ const CAT_LABEL={
   tipoContacto:"Tipo de contacto",circulo:"Círculo",relacion:"Relación",cercania:"Nivel de cercanía",nivelEconomico:"Nivel económico",
   potencial:"Potencial Nexus",tipoPersona:"Tipo de persona",giro:"Giro de ocupación",actividadPrincipal:"Actividad principal",capacidadRef:"Capacidad referidor",etiquetas:"Marcadores",
   etapaPrincipal:"Etapa principal de contacto",etapaEspecifica:"Etapa específica de contacto",pixan:"Etapa Pixán (histórico)",
-  solucion:"Solución de intervención",etapaOportunidad:"Etapa de oportunidad",areaEstrategica:"Área estratégica",
+  solucion:"Solución de intervención",etapaOportunidad:"Etapa de oportunidad",areaEstrategica:"Soluciones Integradas",
   tipoAccion:"Tipo de acción — Contactar",accTareas:"Tipo de acción — Tareas",accAcciones:"Tipo de acción — Acciones",etiqAgenda:"Orientación",estatusAccion:"Estatus de acción",
   tipoAliado:"Tipo de aliado",estatusAliado:"Estatus de aliado",
   tamanoEmpresa:"Tamaño de empresa",rolEmpresa:"Rol en empresa"};
@@ -880,8 +1018,9 @@ function Catalogos({catalogos,setCatalogos,contactos,setContactos,onProductos,on
 /* ════════ PRODUCTOS POR SOLUCIÓN ════════ */
 function comResultProd(p){return (p.comisionDirecta!==undefined&&p.comisionDirecta!==null&&p.comisionDirecta!=="")?Number(p.comisionDirecta):((Number(p.montoNegocio)||0)*(Number(p.indiceComision)||0)/100);}
 function ProductoModal({init,catalogos,onSave,onClose,onDelete}){
-  const[f,setF]=useState(()=>({recurrente:true,...init}));
+  const[f,setF]=useState(()=>({recurrencia:"mensual",...init}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
+  const fRec=f.recurrencia||(f.recurrente===true?"mensual":"único"); // backward compat lectura
   const calc=(Number(f.montoNegocio)||0)*(Number(f.indiceComision)||0)/100;
   const comResult=comResultProd(f);
   const save=()=>{ if(!f.solucionId){alert("Elige la solución");return;} if(!f.tipo){alert("Captura el tipo");return;} onSave({...f}); };
@@ -901,10 +1040,11 @@ function ProductoModal({init,catalogos,onSave,onClose,onDelete}){
     </div>
     <Field label="Comisión directa (opcional, sobrescribe el cálculo)"><input type="number" inputMode="decimal" style={S.inp} value={f.comisionDirecta??""} onChange={e=>set("comisionDirecta",e.target.value===""?null:Number(e.target.value))} placeholder={"Calculada: "+money(calc)}/></Field>
     <div style={{fontSize:12,color:"#2dd4bf",fontWeight:800,margin:"2px 0 12px"}}>Comisión resultante: {money(comResult)}</div>
-    <Field label="¿Ingreso recurrente mensual?">
+    <Field label="Recurrencia">
       <div style={{display:"flex",gap:6}}>
-        <button style={{...S.pill(f.recurrente===true,"#2dd4bf"),flex:1}} onClick={()=>set("recurrente",true)}>Recurrente mensual</button>
-        <button style={{...S.pill(f.recurrente===false,"#fbbf24"),flex:1}} onClick={()=>set("recurrente",false)}>Único</button>
+        <button style={{...S.pill(fRec==="mensual","#2dd4bf"),flex:1,fontSize:10}} onClick={()=>set("recurrencia","mensual")}>🔄 Mensual</button>
+        <button style={{...S.pill(fRec==="anual","#a78bfa"),flex:1,fontSize:10}} onClick={()=>set("recurrencia","anual")}>📅 Anual</button>
+        <button style={{...S.pill(fRec==="único","#fbbf24"),flex:1,fontSize:10}} onClick={()=>set("recurrencia","único")}>1️⃣ Único</button>
       </div>
     </Field>
     <Field label="Notas"><textarea style={{...S.inp,minHeight:54,resize:"vertical",fontFamily:"inherit"}} value={f.notas||""} onChange={e=>set("notas",e.target.value||null)} placeholder="Notas abiertas sobre el producto…"/></Field>
@@ -949,7 +1089,7 @@ function Productos({productos,setProductos,catalogos,onBack}){
               </div>
               <div style={{textAlign:"right",flexShrink:0}}>
                 <div style={{fontSize:13,fontWeight:800,color:"#fbbf24"}}>{money(comResultProd(p))}</div>
-                <span style={S.tag(p.recurrente?"#2dd4bf":"#64748b")}>{p.recurrente?"Recurrente":"Único"}</span>
+                <span style={S.tag({mensual:"#2dd4bf",anual:"#a78bfa",único:"#64748b"}[p.recurrencia||(p.recurrente===true?"mensual":"único")]||"#64748b")}>{({mensual:"Mensual",anual:"Anual",único:"Único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||"Único"}</span>
               </div>
             </div>
           </div>)}
@@ -958,13 +1098,13 @@ function Productos({productos,setProductos,catalogos,onBack}){
       {sinSol.length>0&&<div style={{...S.card("#f8717144"),marginBottom:8}}>
         <div style={{fontSize:13,fontWeight:800,color:"#f87171",marginBottom:6}}>Sin solución válida <span style={{color:"#475569",fontWeight:600}}>· {sinSol.length}</span></div>
         {sinSol.map(p=><div key={p.id} onClick={()=>setModal(p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"7px 0",borderTop:"1px solid #1e293b",cursor:"pointer"}}>
-          <span style={{fontSize:13,fontWeight:600}}>{p.tipo}</span>
+          <span style={{fontSize:13,fontWeight:600}}>{p.tipo}{p.categoria&&<span style={{fontSize:10,color:"#64748b",fontWeight:400}}> · {p.categoria}</span>}</span>
           <span style={{fontSize:13,fontWeight:800,color:"#fbbf24"}}>{money(comResultProd(p))}</span>
         </div>)}
       </div>}
       {productos.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Aún no hay productos. Toca + para crear el primero por solución.</div>}
     </div>
-    <button style={S.fab} onClick={()=>setModal({recurrente:true})}>+</button>
+    <button style={S.fab} onClick={()=>setModal({recurrencia:"mensual"})}>+</button>
     {modal&&<ProductoModal init={modal} catalogos={catalogos} onSave={save} onClose={()=>setModal(null)} onDelete={del}/>}
   </div>;
 }
@@ -988,8 +1128,21 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
     if(val===""||val===null)delete metas[mes];else metas[mes]=val;
     return {...p,metas};
   }));
-  const cierreProd=(p,mes)=>(Number((p.metas||{})[mes])||0)*comResultProd(p);
-  const ingresoProd=(p,mes)=>{const com=comResultProd(p),metas=p.metas||{};if(p.recurrente){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}return (Number(metas[mes])||0)*com;};
+  const setLogrado=(pid,mes,val)=>setProductos(prev=>prev.map(p=>{
+    if(p.id!==pid)return p;
+    const logrado={...(p.logrado||{})};
+    if(val===""||val===null)delete logrado[mes];else logrado[mes]=val;
+    return {...p,logrado};
+  }));
+  const restanteMes=(p,mes)=>Math.max(0,(Number((p.metas||{})[mes])||0)-(Number((p.logrado||{})[mes])||0));
+  const pRec=(p)=>p.recurrencia||(p.recurrente===true?"mensual":"único"); // backward compat
+  const cierreProd=(p,mes)=>restanteMes(p,mes)*comResultProd(p);
+  const ingresoProd=(p,mes)=>{
+    const com=comResultProd(p),metas=p.metas||{},logrado=p.logrado||{},rec=pRec(p);
+    if(rec==="mensual"){let u=0;for(const k in metas){if(k<=mes)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
+    if(rec==="anual"){const mesM=mes.slice(5),mesY=mes.slice(0,4);let u=0;for(const k in metas){if(k.slice(5)===mesM&&k.slice(0,4)<=mesY)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
+    return restanteMes(p,mes)*com; // único
+  };
   const sols=(catalogos.solucion||[]).map(s=>({s,prods:productos.filter(p=>p.solucionId===s.id)})).filter(g=>g.prods.length>0);
   const sumProds=(prods,mes,fn)=>prods.reduce((a,p)=>a+fn(p,mes),0);
   const WCOL=120,WMES=68;
@@ -1004,58 +1157,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
       <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos</button>
       <button style={{...S.pill(modo==="prospeccion","#2dd4bf"),flex:1,fontSize:10,padding:"8px 4px"}} onClick={()=>setModo("prospeccion")}>Prospección</button>
     </div></div>
-    {modo==="prospeccion"&&(()=>{
-      const NOPROS=["Oportunidad Concretada","Oportunidad Rechazada"];
-      const candProceso=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso");
-      const enContacto=contactos.filter(c=>c.etapaPrincipal==="Contacto");
-      const prospBySol={};
-      (oportunidades||[]).forEach(o=>{if(NOPROS.indexOf(o.etapa)>-1)return;const sid=o.solucionId;const cid=o.contactoPrincipalId||o.contactoId;if(!sid||!cid)return;(prospBySol[sid]=prospBySol[sid]||{})[cid]=1;});
-      const solList=(catalogos.solucion||[]);
-      const cById=(id)=>contactos.find(c=>c.id===id);
-      const prospContactosSol=(sid)=>Object.keys(prospBySol[sid]||{}).map(cById).filter(Boolean);
-      const totalProsp=solList.reduce((a,s)=>a+Object.keys(prospBySol[s.id]||{}).length,0);
-      const totalMeta=solList.reduce((a,s)=>a+(Number(s.metaProspeccion)||0),0);
-      const setMetaProsp=(sid,val)=>setCatalogos(p=>({...p,solucion:p.solucion.map(s=>s.id===sid?{...s,metaProspeccion:val===""?null:(Number(val)||0)}:s)}));
-      const barra=(val,meta,color)=>{const pct=meta>0?Math.min(100,Math.round(val/meta*100)):0;return <div style={{height:6,background:"#1e293b",borderRadius:4,overflow:"hidden",marginTop:6}}><div style={{height:"100%",width:pct+"%",background:color}}/></div>;};
-      const Lista=({titulo,items})=><div style={{...S.card(),marginTop:10}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}><div style={{fontSize:13,fontWeight:800,color:GOLD}}>{titulo} ({items.length})</div><button style={S.pill(false,"#64748b")} onClick={()=>setVer(null)}>Cerrar</button></div>
-          {items.length===0?<div style={{fontSize:11,color:"#475569"}}>Sin contactos.</div>:items.map(c=><div key={c.id} style={{padding:"7px 0",borderTop:"1px solid #14141f"}}><div style={{fontSize:12,fontWeight:700}}>{c.nombreCompleto}</div><div style={{fontSize:10,color:"#64748b",marginTop:2}}>{c.etapaEspecifica||c.etapaPrincipal||"—"}{c.fechaUltimoContacto?" · últ. "+c.fechaUltimoContacto:""}</div></div>)}
-        </div>;
-      return <div style={S.sec}>
-        <div style={{...S.card(),cursor:"pointer",borderColor:"#a78bfa44"}} onClick={()=>setVer({t:"cand"})}>
-          <div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Candidatos en Proceso</div>
-          <div style={{fontSize:26,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#a78bfa",lineHeight:1.1}}>{candProceso.length}</div>
-          <div style={{fontSize:10,color:"#475569"}}>En la mira para lograr contacto · toca para ver</div>
-        </div>
-        <div style={{...S.card(),marginTop:10,borderColor:GOLD+"33"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:10}}>
-            <div><div style={{fontSize:9,color:"#64748b",textTransform:"uppercase",letterSpacing:1}}>Contactos (trabajando)</div>
-              <div onClick={()=>setVer({t:"cont"})} style={{fontSize:26,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD,cursor:"pointer",lineHeight:1.1}}>{enContacto.length}<span style={{fontSize:13,color:"#64748b"}}> / {Number(metaContactos)||0}</span></div></div>
-            <div style={{width:96}}><div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Meta global</div><input type="number" style={{...S.inp,fontSize:13,padding:"6px 8px"}} value={metaContactos||""} onChange={e=>{const v=e.target.value===""?0:(Number(e.target.value)||0);setMetaContactos(v);saveLS("metaProspContactos",v);}}/></div>
-          </div>
-          {barra(enContacto.length,Number(metaContactos)||0,GOLD)}
-        </div>
-        <div style={{...S.sTit,marginTop:16}}>Prospectos por solución</div>
-        <div style={{fontSize:10,color:"#64748b",marginBottom:8}}>Contactos con oportunidad activa (excluye Concretada/Rechazada). Toca el número para ver quiénes.</div>
-        {solList.length===0&&<div style={{fontSize:11,color:"#475569"}}>No hay soluciones en el catálogo.</div>}
-        {solList.map(s=>{const val=Object.keys(prospBySol[s.id]||{}).length;const meta=Number(s.metaProspeccion)||0;return (
-          <div key={s.id} style={{...S.card(),marginBottom:8,padding:"10px 12px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-              <div style={{fontSize:12,fontWeight:700,flex:1,minWidth:0}}>{s.nombre}</div>
-              <div onClick={()=>setVer({t:"sol",sid:s.id,nom:s.nombre})} style={{fontSize:19,fontWeight:800,fontFamily:"'Cinzel',serif",color:"#2dd4bf",cursor:"pointer",minWidth:24,textAlign:"right"}}>{val}</div>
-              <div style={{width:66}}><input type="number" placeholder="meta" style={{...S.inp,fontSize:12,padding:"5px 7px"}} value={s.metaProspeccion!=null?s.metaProspeccion:""} onChange={e=>setMetaProsp(s.id,e.target.value)}/></div>
-            </div>
-            {meta>0&&barra(val,meta,"#2dd4bf")}
-          </div>);})}
-        {solList.length>0&&<div style={{...S.card(),marginTop:2,borderColor:GOLD+"44",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontSize:13,fontWeight:800}}>Total prospectos</div>
-          <div style={{fontSize:19,fontWeight:800,fontFamily:"'Cinzel',serif",color:GOLD}}>{totalProsp}<span style={{fontSize:12,color:"#64748b"}}> / {totalMeta}</span></div>
-        </div>}
-        {ver&&ver.t==="cand"&&<Lista titulo="Candidatos en Proceso" items={candProceso}/>}
-        {ver&&ver.t==="cont"&&<Lista titulo="Contactos (trabajando)" items={enContacto}/>}
-        {ver&&ver.t==="sol"&&<Lista titulo={"Prospectos · "+ver.nom} items={prospContactosSol(ver.sid)}/>}
-      </div>;
-    })()}
+    {modo==="prospeccion"&&<PipelineProspeccion contactos={contactos} oportunidades={oportunidades} catalogos={catalogos} productos={productos}/>}
     {modo==="matriz"&&<div style={S.sec}>
       <div style={S.g2}>
         <div><div style={S.fl}>Mes inicial</div><input type="month" style={S.inp} value={ini} onChange={e=>setIni(e.target.value||ini)}/></div>
@@ -1078,15 +1180,16 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               <div style={{padding:"7px 10px",background:"#0d1420",borderBottom:"1px solid #1e293b",fontSize:11,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</div>
               {g.prods.map(p=><div key={p.id} style={{display:"flex",alignItems:"center",padding:"0 0 0 10px",borderBottom:"1px solid #14141f"}}>
                 <div style={{width:WCOL,flexShrink:0,padding:"6px 6px 6px 0"}}>
-                  <div style={{fontSize:11,fontWeight:600,lineHeight:1.2}}>{p.tipo}</div>
-                  <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{p.recurrente?" · recur.":" · único"}</div>
+                  <div style={{fontSize:11,fontWeight:600,lineHeight:1.2}}>{p.tipo}{p.categoria&&<span style={{fontSize:9,color:"#64748b",fontWeight:400}}> · {p.categoria}</span>}</div>
+                  <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{({mensual:" · mensual",anual:" · anual",único:" · único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||" · único"}</div>
                 </div>
                 {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
-                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"5px 6px"}}/>
+                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"4px 4px",marginBottom:2}}/>
+                  <input type="text" inputMode="decimal" value={(p.logrado||{})[m]??""} onChange={e=>setLogrado(p.id,m,e.target.value)} placeholder="✓" style={{width:"100%",background:"#0a140a",border:"1px solid #22c55e44",borderRadius:6,color:"#22c55e",fontSize:10,textAlign:"center",padding:"3px 4px"}}/>
                 </div>)}
               </div>)}
               <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14"}}>
-                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"5px 0"}}>Cierres $</div>
+                <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"5px 0"}}>Cierres $ (rest.)</div>
                 {meses.map(m=><div key={m} style={cellNum}>{money(sumProds(g.prods,m,cierreProd))}</div>)}
               </div>
               <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14",borderBottom:"1px solid #1e293b"}}>
@@ -1123,20 +1226,26 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
                 <span style={{fontSize:12,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</span>
                 <span style={{fontSize:13,fontWeight:800,color:GOLD}}>{money(g.sub)}</span>
               </div>
-              {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
+              {g.items.map(it=>{const logr=Number((it.p.logrado||{})[mesRep])||0;const rest=Math.max(0,it.meta-logr);return <div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
-                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{it.p.tipo}</div>
-                  <div style={{fontSize:9,color:"#64748b"}}>{it.meta>0?it.meta+" u. meta":(it.p.recurrente?"acumulado":"—")} · {money(comResultProd(it.p))}/u · {it.p.recurrente?"recurrente":"único"}</div>
+                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,wordBreak:"break-word"}}>{it.p.tipo}{it.p.categoria&&<span style={{fontSize:9,color:"#64748b",fontWeight:400}}> · {it.p.categoria}</span>}</div>
+                  <div style={{display:"flex",gap:6,marginTop:2,flexWrap:"wrap"}}>
+                    {it.meta>0&&<span style={{fontSize:9,color:"#94a3b8"}}>Meta: {it.meta}</span>}
+                    {logr>0&&<span style={{fontSize:9,color:"#22c55e",fontWeight:700}}>✓ {logr}</span>}
+                    {it.meta>0&&rest>0&&<span style={{fontSize:9,color:"#f87171"}}>Falta: {rest}</span>}
+                    {it.meta>0&&rest===0&&logr>0&&<span style={{fontSize:9,color:"#22c55e"}}>✓ Cubierta</span>}
+                  </div>
+                  <div style={{fontSize:9,color:"#64748b"}}>{money(comResultProd(it.p))}/u · {({mensual:"mensual",anual:"anual",único:"único"})[it.p.recurrencia||(it.p.recurrente===true?"mensual":"único")]||"único"}</div>
                 </div>
                 <div style={{fontSize:13,fontWeight:700,color:"#2dd4bf",whiteSpace:"nowrap"}}>{money(it.ing)}</div>
-              </div>)}
+              </div>;})}
             </div>)}
         <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Incluye productos con meta del mes y recurrentes con acumulado vivo. El total coincide con el Ingreso Nexus Proyectado que alimenta el presupuesto del CFP.</div>
       </div>;
     })()}
     {modo==="productos"&&(()=>{
       const shiftMes=(mk,d)=>{let a=mk.split("-").map(Number),y=a[0],m=a[1];m+=d;while(m<1){m+=12;y--;}while(m>12){m-=12;y++;}return y+"-"+String(m).padStart(2,"0");};
-      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
+      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0,logr:Number((p.logrado||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
       return <div style={S.sec}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"8px 10px",marginBottom:12}}>
           <button onClick={()=>setMesRep(shiftMes(mesRep,-1))} style={{background:"transparent",border:"none",color:GOLD,fontSize:20,cursor:"pointer",padding:"0 12px"}}>‹</button>
@@ -1147,13 +1256,17 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
           ? <div style={{...S.card(),textAlign:"center",color:"#475569",fontSize:12,padding:"24px 12px"}}>Sin productos con meta este mes.</div>
           : grupos.map(g=><div key={g.s.id} style={{...S.card(),marginBottom:10,padding:0}}>
               <div style={{padding:"9px 12px",borderBottom:"1px solid #1e293b",fontSize:12,fontWeight:800,color:"#2dd4bf"}}>{g.s.nombre}</div>
-              {g.items.map(it=><div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
+              {g.items.map(it=>{const rest=Math.max(0,it.meta-it.logr);return <div key={it.p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,padding:"8px 12px",borderBottom:"1px solid #14141f"}}>
                 <div style={{minWidth:0,flex:1}}>
-                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,whiteSpace:"pre-wrap"}}>{it.p.tipo}</div>
+                  <div style={{fontSize:12,color:"#e2e8f0",fontWeight:600,wordBreak:"break-word"}}>{it.p.tipo}{it.p.categoria&&<span style={{fontSize:9,color:"#64748b",fontWeight:400}}> · {it.p.categoria}</span>}</div>
                   <div style={{fontSize:10,color:"#94a3b8"}}>{[it.p.categoria,(it.p.montoNegocio?money(it.p.montoNegocio):null)].filter(Boolean).join(" · ")||"—"}</div>
+                  {it.logr>0&&<div style={{fontSize:9,color:"#22c55e",marginTop:2}}>✓ {it.logr} logrado{it.logr>=it.meta?" — Cubierta":""}</div>}
                 </div>
-                <div style={{textAlign:"right",flexShrink:0}}><div style={{fontSize:16,fontWeight:800,color:"#a78bfa"}}>{it.meta}</div><div style={{fontSize:8,color:"#64748b"}}>cantidad</div></div>
-              </div>)}
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:16,fontWeight:800,color:rest===0?"#22c55e":"#a78bfa"}}>{rest}</div>
+                  <div style={{fontSize:8,color:"#64748b"}}>restante</div>
+                </div>
+              </div>;})}
             </div>)}
         <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Síntesis de venta del mes: producto, categoría, monto de producción y unidades meta. Sin comisiones ni proyección de ingreso.</div>
       </div>;
@@ -1167,7 +1280,7 @@ function BienesInmuebles({bienes,setBienes,catalogos,contactos,onBack}){
   const TIPO=["Venta directa","Coinversión"];
   const EST_COL={"Disponible":"#22c55e","En proceso":"#fbbf24","Vinculado":"#60a5fa","Cerrado":"#94a3b8","No disponible":"#64748b"};
   const money=n=>"$"+Math.round(n||0).toLocaleString("es-MX");
-  const aliadosOpts=contactos.filter(c=>(c.tiposAliado||[]).length>0).map(c=>({id:c.id,label:c.nombreCompleto})).sort((a,b)=>(a.label||"").localeCompare(b.label||""));
+  const aliadosOpts=contactos.filter(c=>(c.tiposAliado||[]).length>0).map(c=>({id:c.id,label:nombreDisplay(c)})).sort((a,b)=>(a.label||"").localeCompare(b.label||""));
   const nomAliado=(id)=>{const c=contactos.find(x=>x.id===id);return c?c.nombreCompleto:"";};
   const calcCom=(f)=>((parseFloat(f.valorPropiedad)||0)*(parseFloat(f.comProp)||0)/100)+((parseFloat(f.valorInversion)||0)*(parseFloat(f.comInv)||0)/100);
   const[modal,setModal]=useState(null);
@@ -1343,12 +1456,159 @@ function Configuracion({data,onRestore,onExcel,go}){
 }
 
 /* ════════ INICIO (shell) ════════ */
+function PipelineProspeccion({contactos,oportunidades,catalogos,productos}){
+  const[mes,setMes]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const[modo,setModo]=useState("meta"); // "todas" | "ancladas" | "meta"
+  const[etapaExpP,setEtapaExpP]=useState(null);
+  const[expandTag,setExpandTag]=useState({}); // {solId_tipo: bool}
+  const toggleTag=(key)=>setExpandTag(p=>({...p,[key]:!p[key]}));
+  // Funnel global
+  const FUNNEL=["Candidato","Contacto","Prospecto","Cliente"].map(et=>({
+    label:et, n:contactos.filter(c=>c.etapaPrincipal===et).length, color:ec(et), prin:et
+  }));
+  const maxF=Math.max(...FUNNEL.map(f=>f.n),1);
+  // Filas por solución según modo
+  const allRows=(catalogos.solucion||[]).map(s=>{
+    const prods=(productos||[]).filter(p=>p.solucionId===s.id&&Number((p.metas||{})[mes])>0);
+    const metaUnid=prods.reduce((t,p)=>t+Number((p.metas||{})[mes]),0);
+    const opps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id);
+    const ctosAnc=contactos.filter(c=>{if(!(c.solucionesAncla||[]).includes(s.id))return false;const ep=c.etapaPrincipal,ee=c.etapaEspecifica||"";return ["Contacto","Prospecto"].includes(ep)||["Cliente Cerrado en Reproceso","Cliente Activo en Reproceso"].includes(ee);});
+    const candAnc=contactos.filter(c=>c.etapaEspecifica==="Candidato en Proceso"&&(c.solucionesAncla||[]).includes(s.id));
+    const reprocesoAnc=contactos.filter(c=>["Cliente Cerrado en Reproceso","Cliente Activo en Reproceso"].includes(c.etapaEspecifica)&&(c.solucionesAncla||[]).includes(s.id));
+    const esAnclada=!!(catalogos.solucion||[]).find(x=>x.id===s.id)?.ancla;
+    if(!reprocesoAnc.length&&!prods.length&&!opps.length&&!ctosAnc.length&&!candAnc.length)return null;
+    return{s,metaUnid,opps,ctosAnc,candAnc,reprocesoAnc,esAnclada,hasMeta:prods.length>0};
+  });
+  const pipeRows=allRows.filter(Boolean).filter(r=>{
+    if(modo==="meta")return r.hasMeta;
+    if(modo==="ancladas")return r.esAnclada;
+    return true;
+  });
+  return <div style={S.sec}>
+    <div style={S.card()}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div style={S.sTit}>Embudo de Prospección</div>
+        <input type="month" value={mes} onChange={e=>setMes(e.target.value)} style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"3px 7px",color:"#e2e8f0",fontSize:10,outline:"none"}}/>
+      </div>
+      {/* Embudo interactivo igual que Dashboard */}
+      <div style={{marginBottom:12}}>
+        {FUNNEL.map(({label,n,color,prin})=>{
+          const key=prin;const isExp=etapaExpP===key;
+          const subEtapas=(catalogos.etapaEspecifica||[]).filter(e=>e.principal===prin);
+          return <div key={key} style={{marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2,cursor:subEtapas.length?"pointer":"default"}} onClick={()=>subEtapas.length&&setEtapaExpP(isExp?null:key)}>
+              <span style={{color:"#94a3b8"}}>{label}{subEtapas.length?<span style={{color:"#475569",fontSize:9}}> {isExp?"▲":"▾"}</span>:""}</span>
+              <span style={{color,fontWeight:700}}>{n}</span>
+            </div>
+            <div style={{height:4,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:Math.round(n/maxF*100)+"%",background:color,borderRadius:3}}/></div>
+            {isExp&&<div style={{marginTop:6,paddingLeft:10,borderLeft:`2px solid ${color}44`}}>
+              {subEtapas.map(se=>{const ns=contactos.filter(c=>c.etapaEspecifica===se.nombre).length;if(!ns)return null;
+                return <div key={se.id} style={{marginBottom:5}}><div style={{display:"flex",justifyContent:"space-between",fontSize:9,marginBottom:1}}><span style={{color:"#64748b"}}>{se.nombre}</span><span style={{color,fontWeight:600}}>{ns}</span></div><div style={{height:3,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:Math.round(ns/n*100)+"%",background:color+"99",borderRadius:3}}/></div></div>;
+              })}
+            </div>}
+          </div>;
+        })}
+      </div>
+      {/* Filtros de modo */}
+      <div style={{display:"flex",gap:5,marginBottom:10}}>
+        {[["meta","🎯 Con meta","#fbbf24"],["ancladas","⭐ Ancladas","#C9A84C"],["todas","Todas","#64748b"]].map(([v,l,c])=>(
+          <span key={v} style={{...S.chip(modo===v,c),fontSize:9,padding:"3px 8px",cursor:"pointer",flex:1,textAlign:"center"}} onClick={()=>setModo(v)}>{l}</span>
+        ))}
+      </div>
+      <div style={{fontSize:9,color:"#475569",fontWeight:700,letterSpacing:.5,textTransform:"uppercase",marginBottom:8}}>Por Solución — {mes.split("-").reverse().join("/")}</div>
+      {pipeRows.length===0&&<div style={{fontSize:10,color:"#475569",textAlign:"center",padding:"10px 0"}}>Sin soluciones para el filtro seleccionado</div>}
+      {pipeRows.map(({s,metaUnid,opps,ctosAnc,candAnc,reprocesoAnc,esAnclada})=>{
+        const kO=s.id+"_opps",kC=s.id+"_ctos",kP=s.id+"_cand";
+        return <div key={s.id} style={{padding:"10px 0",borderTop:"1px solid #1e293b"}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",marginBottom:6}}>{esAnclada?"⭐ ":""}{s.nombre}</div>
+          {(()=>{
+            const OPO_RANK={"Propuesta Presentada":0,"Oportunidad en Preparación":1,"Oportunidad Identificada":2};
+            const PROB_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
+            const EXCLUIR=["Oportunidad Aceptada","Oportunidad Concretada","Oportunidad Liquidada","Oportunidad Rechazada"];
+            const oppsVis=opps.filter(o=>!EXCLUIR.includes(o.etapa)&&!((o.etapa||"").toLowerCase().includes("espera")))
+              .sort((a,b)=>{let r=(OPO_RANK[a.etapa]??9)-(OPO_RANK[b.etapa]??9);if(r===0)r=(a.fechaEstimadaCierre||"9999").localeCompare(b.fechaEstimadaCierre||"9999");if(r===0)r=(PROB_RANK[a.probabilidad]??9)-(PROB_RANK[b.probabilidad]??9);return r;});
+            const CTOS_RANK={"Cliente Activo en Reproceso":0,"Cliente Cerrado en Reproceso":1,"Oportunidad Activa":2,"Encuentro Concretado":3,"Encuentro Programado":4,"Encuentro Inicial Previo":5,"Contacto en Avance":6,"Contacto":7};
+            const ctosOrd=[...ctosAnc].sort((a,b)=>(CTOS_RANK[a.etapaEspecifica]??9)-(CTOS_RANK[b.etapaEspecifica]??9));
+            return <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {metaUnid>0&&<span style={{...S.tag(GOLD),fontSize:9}}>🎯 Meta: {metaUnid} u.</span>}
+              <span style={{...S.chip(expandTag[kO],"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kO)}>🚀 {oppsVis.length} oportunidad{oppsVis.length!==1?"es":""}</span>
+              {ctosAnc.length>0&&<span style={{...S.chip(expandTag[kC],"#a78bfa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kC)}>👤 {ctosAnc.length} contacto{ctosAnc.length!==1?"s":""}</span>}
+              {candAnc.length>0&&<span style={{...S.chip(expandTag[kP],"#60a5fa"),fontSize:9,padding:"3px 8px",cursor:"pointer"}} onClick={()=>toggleTag(kP)}>⏳ {candAnc.length} en proceso</span>}
+              {metaUnid>0&&oppsVis.length<metaUnid&&<span style={{...S.tag("#f87171"),fontSize:9}}>⚠ Faltan {metaUnid-oppsVis.length}</span>}
+              {expandTag[kO]&&<div style={{width:"100%",marginTop:6,paddingLeft:8,borderLeft:"2px solid #60a5fa44"}}>
+                {oppsVis.length===0?<div style={{fontSize:10,color:"#475569"}}>Sin oportunidades en pipeline</div>:oppsVis.map(o=><div key={o.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
+                  <div style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{o.concepto}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>{(o.etapa||"").replace("Oportunidad ","")} {o.fechaEstimadaCierre?" · "+o.fechaEstimadaCierre.split("-").reverse().join("/"):""}{o.probabilidad?" · "+o.probabilidad:""}</div>
+                </div>)}
+              </div>}
+              {expandTag[kC]&&<div style={{width:"100%",marginTop:6,paddingLeft:8,borderLeft:"2px solid #a78bfa44"}}>
+                {ctosOrd.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
+                  <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
+                  <div style={{fontSize:9,color:["Cliente Activo en Reproceso","Cliente Cerrado en Reproceso"].includes(c.etapaEspecifica)?"#f97316":"#64748b"}}>{c.etapaEspecifica||c.etapaPrincipal}</div>
+                </div>)}
+              </div>}
+              {expandTag[kP]&&<div style={{width:"100%",marginTop:6,paddingLeft:8,borderLeft:"2px solid #60a5fa44"}}>
+                {candAnc.map(c=><div key={c.id} style={{padding:"4px 0",borderBottom:"1px solid #0f172a"}}>
+                  <div style={{fontSize:11,color:"#e2e8f0"}}>{nombreDisplay(c)}</div>
+                  <div style={{fontSize:9,color:"#64748b"}}>{c.etapaEspecifica}</div>
+                </div>)}
+              </div>}
+            </div>;
+          })()}
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+function ObjetivoMes({productos,oportunidades,catalogos}){
+  const[mes,setMes]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const rows=(catalogos.solucion||[]).map(s=>{
+    const prods=(productos||[]).filter(p=>p.solucionId===s.id&&Number((p.metas||{})[mes])>0);
+    if(!prods.length)return null;
+    const metaUnid=prods.reduce((t,p)=>t+Number((p.metas||{})[mes]),0);
+    const metaCom=prods.reduce((t,p)=>t+Number((p.metas||{})[mes])*comResultProd(p),0);
+    const devOpps=(oportunidades||[]).filter(o=>ABIERTA(o)&&o.solucionId===s.id&&(o.fechaEstimadaCierre||"").slice(0,7)===mes);
+    const devCom=devOpps.reduce((t,o)=>t+(Number(o.comisionEstimada)||0),0);
+    const pct=metaCom>0?Math.min(100,Math.round(devCom/metaCom*100)):0;
+    return{s,metaUnid,metaCom,devOpps,devCom,pct};
+  }).filter(Boolean);
+  if(!rows.length&&!productos?.length)return null;
+  return <div style={S.card()}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <div style={S.sTit}>🎯 Objetivo del Mes</div>
+      <input type="month" value={mes} onChange={e=>setMes(e.target.value)} style={{background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"4px 8px",color:"#e2e8f0",fontSize:11,outline:"none"}}/>
+    </div>
+    {rows.length===0
+      ?<div style={{fontSize:10,color:"#475569",textAlign:"center",padding:"12px 0"}}>Sin metas definidas para este mes</div>
+      :rows.map(({s,metaUnid,metaCom,devOpps,devCom,pct})=><div key={s.id} style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid #1e293b"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+          <div style={{fontSize:11,fontWeight:700,color:"#e2e8f0",flex:1,paddingRight:8}}>{s.nombre}</div>
+          <div style={{fontSize:13,fontWeight:800,color:pct>=100?"#22c55e":pct>=60?"#fbbf24":"#f87171",flexShrink:0}}>{pct}%</div>
+        </div>
+        <div style={{height:5,background:"#1a1a2e",borderRadius:3,marginBottom:6}}>
+          <div style={{height:"100%",width:pct+"%",background:pct>=100?"#22c55e":pct>=60?"#fbbf24":"#f87171",borderRadius:3}}/>
+        </div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#64748b"}}>
+          <span>En desarrollo: {devOpps.length} opp · <span style={{color:"#e2e8f0",fontWeight:600}}>{money(devCom)}</span></span>
+          <span>Meta: {metaUnid} u. · {money(metaCom)}</span>
+        </div>
+        {metaCom>0&&devCom<metaCom&&<div style={{fontSize:9,color:"#f87171",marginTop:3}}>
+          Faltan {money(metaCom-devCom)} en comisión esperada
+        </div>}
+        {pct>=100&&<div style={{fontSize:9,color:"#22c55e",marginTop:3}}>✓ Meta cubierta</div>}
+      </div>)
+    }
+  </div>;
+}
 function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView,catalogos,productos}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   const[limite,setLimite]=useState("");
   const[proxOpen,setProxOpen]=useState(false);
-  const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>{let r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");return r;});
-  const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada");
+  const[etapaExp,setEtapaExp]=useState(null);
+  const[mesPipe,setMesPipe]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const[showObjetivoInicio,setShowObjetivoInicio]=useState(false);
+  const prox=(actividades||[]).filter(a=>a.estatus==="Programada"&&a.fecha&&(!limite||a.fecha<=limite)).sort((a,b)=>{const hK=(h)=>h||"99:99";let r=(a.fecha||"").localeCompare(b.fecha||"");if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));return r;});
+  const opAb=(oportunidades||[]).filter(o=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&!((o.etapa||"").toLowerCase().includes("espera")));
   const opComision=opAb.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
   const opCuant=opAb.filter(o=>(Number(o.comisionEstimada)||0)>0);
   const opPorCuant=opAb.length-opCuant.length;
@@ -1362,27 +1622,54 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
     <div style={S.sec}>
       <div style={S.sTit}>Resumen comercial</div>
       <div style={S.g2}>
-        <div style={S.card()}><div style={S.lbl}>Contactos</div><div style={S.big()}>{contactos.length}</div></div>
-        <div style={S.card()}><div style={S.lbl}>Empresas</div><div style={S.big("#3b82f6")}>{empresas.length}</div></div>
+        <div style={S.card()}><div style={S.lbl}>Contactos</div><div style={{fontSize:18,fontWeight:800,color:GOLD}}>{contactos.length}</div></div>
+        <div style={S.card()}><div style={S.lbl}>Empresas</div><div style={{fontSize:18,fontWeight:800,color:"#3b82f6"}}>{empresas.length}</div></div>
       </div>
       <div style={{...S.card(),cursor:"pointer"}} onClick={()=>setView("oportunidades")}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end"}}>
-          <div><div style={S.lbl}>Comisión estimada</div><div style={S.big("#fbbf24")}>{money(opComision)}</div></div>
-          <div style={{textAlign:"right"}}><div style={S.lbl}>Oportunidades</div><div style={{fontSize:18,fontWeight:800,color:"#e2e8f0"}}>{opAb.length}</div></div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div><div style={S.lbl}>Comisión estimada (activas)</div><div style={{fontSize:18,fontWeight:800,color:"#fbbf24"}}>{money(opComision)}</div></div>
+          <div style={{textAlign:"right"}}><div style={S.lbl}>Oportunidades</div><div style={{fontSize:16,fontWeight:800,color:"#e2e8f0"}}>{opAb.length}</div></div>
         </div>
-        <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
           <span style={S.tag("#fbbf24")}>{opCuant.length} cuantificada{opCuant.length===1?"":"s"}</span>
           {opPorCuant>0&&<span style={S.tag("#64748b")}>{opPorCuant} por cuantificar</span>}
         </div>
       </div>
       <div style={S.card()}>
         <div style={S.sTit}>Por etapa</div>
-        {["Candidato","Contacto","Prospecto","Cliente"].map(et=>{const n=stat(et);const pct=contactos.length?Math.round(n/contactos.length*100):0;
-          return <div key={et} style={{marginBottom:8}}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3}}><span style={{color:"#94a3b8"}}>{et}</span><span style={{color:ec(et),fontWeight:700}}>{n}</span></div>
+        {["Candidato","Contacto","Prospecto","Cliente"].map(et=>{
+          const n=stat(et);const pct=contactos.length?Math.round(n/contactos.length*100):0;
+          const isExp=etapaExp===et;
+          const subEtapas=(catalogos.etapaEspecifica||[]).filter(e=>e.principal===et);
+          return <div key={et} style={{marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:3,cursor:"pointer"}} onClick={()=>setEtapaExp(isExp?null:et)}>
+              <span style={{color:"#94a3b8"}}>{et}{subEtapas.length?<span style={{color:"#475569",fontSize:9}}> {isExp?"▲":"▾"}</span>:""}</span>
+              <span style={{color:ec(et),fontWeight:700}}>{n}</span>
+            </div>
             <div style={{height:5,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:pct+"%",background:ec(et),borderRadius:3}}/></div>
-          </div>;})}
+            {isExp&&<div style={{marginTop:7,paddingLeft:10,borderLeft:`2px solid ${ec(et)}44`}}>
+              {subEtapas.map(se=>{
+                const ns=contactos.filter(c=>c.etapaEspecifica===se.nombre).length;
+                if(ns===0)return null;
+                const pcts=n?Math.round(ns/n*100):0;
+                return <div key={se.id} style={{marginBottom:6}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10,marginBottom:2}}>
+                    <span style={{color:"#64748b"}}>{se.nombre}</span>
+                    <span style={{color:ec(et),fontWeight:600}}>{ns}</span>
+                  </div>
+                  <div style={{height:3,background:"#1a1a2e",borderRadius:3}}><div style={{height:"100%",width:pcts+"%",background:ec(et)+"99",borderRadius:3}}/></div>
+                </div>;
+              })}
+              {subEtapas.every(se=>contactos.filter(c=>c.etapaEspecifica===se.nombre).length===0)&&
+                <div style={{fontSize:9,color:"#475569"}}>Sin etapas específicas asignadas</div>}
+            </div>}
+          </div>;
+        })}
       </div>
+    </div>
+    <div style={S.sec}>
+      <button style={{...S.chip(showObjetivoInicio,"#a78bfa"),fontSize:9,padding:"3px 10px",width:"100%",cursor:"pointer",textAlign:"center",marginBottom:showObjetivoInicio?8:0}} onClick={()=>setShowObjetivoInicio(v=>!v)}>🎯 Objetivo del Mes {showObjetivoInicio?"▲":"▾"}</button>
+      {showObjetivoInicio&&<ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/>}
     </div>
     <div style={S.sec}>
       <div onClick={()=>setProxOpen(o=>!o)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",marginBottom:proxOpen?8:0}}>
@@ -1396,7 +1683,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
 
 /* ════════ ACTIVIDADES ════════ */
 const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
-const hoyISO=()=>new Date().toISOString().slice(0,10);
+const hoyISO=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");};
 
 /* ── Helpers de modo interno ── */
 function ChecklistEditor({items,onChange}){
@@ -1457,7 +1744,7 @@ function SubtareasEditor({subtareas,onChange,onIndependizar}){
   </div>;
 }
 const proyFecha=(a)=>{if(a.modoTarea!=="proyecto"||!(a.subtareas||[]).length)return a.fecha||"";const pend=(a.subtareas||[]).filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();return ds[0]||(a.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";};
-const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return "Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return "En Proceso";return "Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){const done=(a.items||[]).filter(i=>i.done).length;if(done===(a.items||[]).length)return "Cerrada";if(done>0)return "En Proceso";return "Programada";}return a.estatus||"Programada";};
+const proyEstatus=(a)=>{if(a.modoTarea==="proyecto"&&(a.subtareas||[]).length){const sts=(a.subtareas||[]).map(s=>s.estatus||"Programada");if(sts.every(s=>s==="Cerrada"))return "Cerrada";if(sts.some(s=>s==="En Proceso"||s==="Cerrada"))return "En Proceso";return "Programada";}if(a.modoTarea==="checklist"&&(a.items||[]).length){if(a.estatus==="Cerrada")return "Cerrada";const done=(a.items||[]).filter(i=>i.done).length;if(done===(a.items||[]).length)return "Cerrada";if(done>0)return "En Proceso";return "Programada";}return a.estatus||"Programada";};
 const proyPrioridad=(a)=>{if(a.modoTarea!=="proyecto"||(!(a.subtareas||[]).length))return a.prioridad||"Media";const rank={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};let best=3;(a.subtareas||[]).forEach(s=>{const r=rank[s.prioridad||"Media"];if(r<best)best=r;});return Object.keys(rank).find(k=>rank[k]===best)||"Media";};
 const MODO_NEXT_EST={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Programada"};
 
@@ -1471,19 +1758,19 @@ function BuscaCtoEmpCFC({contactos,empresas,value,onChange,placeholder,onAdd}){
   const results=useMemo(()=>{
     if(q.trim().length<2)return[];
     const ql=q.toLowerCase();const items=[];const addedEmp=new Set();
-    contactos.forEach(c=>{if((c.nombreCompleto||"").toLowerCase().includes(ql)){items.push({kind:"cto",id:c.id,label:c.nombreCompleto,sub:empName(c)});}});
+    contactos.forEach(c=>{if((c.nombreCompleto||"").toLowerCase().includes(ql)){items.push({kind:"cto",id:c.id,label:nombreDisplay(c),sub:empName(c)});}});
     empresas.forEach(emp=>{
       if((emp.nombre||"").toLowerCase().includes(ql)&&!addedEmp.has(emp.id)){
         const linked=contactos.filter(c=>getEmpIds(c).includes(emp.id));
         if(linked.length===0){items.push({kind:"emp",id:null,empId:emp.id,label:emp.nombre,sub:"(sin contacto)"});}
-        else{linked.forEach(c=>items.push({kind:"cto_emp",id:c.id,label:c.nombreCompleto,sub:emp.nombre}));}
+        else{linked.forEach(c=>items.push({kind:"cto_emp",id:c.id,label:nombreDisplay(c),sub:emp.nombre}));}
         addedEmp.add(emp.id);
       }
     });
     return items.slice(0,10);
   },[q,contactos,empresas]);
   if(sel)return <div style={{display:"flex",gap:6,alignItems:"center"}}>
-    <div style={{...S.inp,flex:1,fontSize:13}}>{sel.nombreCompleto}{empName(sel)&&<span style={{color:"#60a5fa",fontSize:11}}> · {empName(sel)}</span>}</div>
+    <div style={{...S.inp,flex:1,fontSize:13}}>{nombreDisplay(sel)}{empName(sel)&&<span style={{color:"#60a5fa",fontSize:11}}> · {empName(sel)}</span>}</div>
     <button style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px 10px",cursor:"pointer",fontSize:12}} onClick={()=>onChange(null)}>✕</button>
   </div>;
   return <div style={{position:"relative"}}>
@@ -1514,8 +1801,13 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   const cont=cid?contactos.find(c=>c.id===cid):null;
   const opsCont=!esInterno?(oportunidades||[]).filter(o=>
     o.contactoPrincipalId===cid||o.contactoId===cid||
-    (o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(cid)
+    (o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).includes(cid)||
+    o.aliadoEstrategicoId===cid||o.aliadoComercialId===cid
   ):[];
+  // Siempre mostrar todas las activas; las del contacto van primero destacadas
+  const opsActivas=(oportunidades||[]).filter(ABIERTA);
+  const opsOtras=opsActivas.filter(o=>!opsCont.find(x=>x.id===o.id));
+  const opsDisp=[...opsCont.filter(ABIERTA),...opsOtras];
   const save=()=>{
     const modo=f.modoTarea||"unica";
     // ── Mover a proyecto ──
@@ -1538,7 +1830,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
     if(!esInterno){
       const cid=f.contactoId||fixedContacto;
       if(!cid){alert("Selecciona un contacto");return;}
-      if(!f.fecha){alert("Indica la fecha");return;}
+      
       if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
       onSave({...f,contactoId:cid,asunto:null});
     } else {
@@ -1549,15 +1841,17 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         const compFecha=ds[0]||(f.subtareas||[]).map(s=>s.fecha).filter(Boolean).sort()[0]||"";
         const sts=(f.subtareas||[]).map(s=>s.estatus||"Programada");
         const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";
-        onSave({...f,contactoId:null,oportunidadId:null,servicioSolucion:null,fecha:compFecha,estatus:compEst});
+        onSave({...f,contactoId:f.contactoId||null,oportunidadId:f.oportunidadId||null,servicioSolucion:null,fecha:compFecha,estatus:compEst});
       } else {
         if(modo==="checklist"){
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
-          const compEst=total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada";
-          if(!f.fecha){alert("Indica la fecha");return;}
+          // Si el usuario forzó "Cerrada" explícitamente, respetarlo con advertencia
+          const usuarioCerro=f.estatus==="Cerrada";
+          const compEst=usuarioCerro?"Cerrada":(total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada");
+          if(usuarioCerro&&done<total&&!window.confirm(`Hay ${total-done} subactividad${total-done!==1?"es":""} sin concluir. ¿Cerrar de todas formas?`))return;
           onSave({...f,servicioSolucion:null,estatus:compEst});
         } else {
-          if(!f.fecha){alert("Indica la fecha");return;}
+          
           if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
           onSave({...f,servicioSolucion:null});
         }
@@ -1572,7 +1866,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   };
   const cerrarSinRespuesta=()=>{
     if(!cid){alert("Selecciona un contacto");return;}
-    if(!f.fecha){alert("Indica la fecha");return;}
+    
     if(!f.tipoAccion){alert("Indica el tipo de acción");return;}
     onSave({...f,contactoId:cid,estatus:"Cerrada",resultado:f.resultado||"Sin respuesta"});
     if(window.confirm("Cerrada sin respuesta. ¿Agendar la siguiente acción para este contacto?")){
@@ -1598,7 +1892,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
     {/* ── CAMPOS COMERCIALES ── */}
     {!esInterno&&(<>
       {fixedContacto
-        ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?cont.nombreCompleto:"—"}</b>{cont&&cont.etapaPrincipal?` · ${cont.etapaPrincipal}`:""}</div>
+        ? <div style={{fontSize:11,color:"#64748b",marginBottom:12,padding:"9px 11px",background:"#13131f",borderRadius:8}}>Contacto: <b style={{color:"#e2e8f0"}}>{cont?nombreDisplay(cont):"—"}</b>{cont&&cont.etapaPrincipal?` · ${cont.etapaPrincipal}`:""}</div>
         : <Field label="Contacto">
             <BuscaCtoEmpCFC contactos={contactos||[]} empresas={empresas||[]} value={f.contactoId} onChange={v=>{set("contactoId",v||null);}} placeholder="🔍 Buscar nombre o empresa…" onAdd={(nombre)=>{setNuevoCto({nombre:nombre||null});}}/>
             {nuevoCto&&<div onClick={e=>e.stopPropagation()}><ContactoModal init={nuevoCto} catalogos={catalogos} empresas={empresas} onCreateEmpresa={onCreateEmpresa} onSave={(d)=>{const id=onCreateContacto(d);set("contactoId",id);setNuevoCto(null);}} onClose={()=>setNuevoCto(null)}/></div>}
@@ -1615,8 +1909,8 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
           ))}
         </div>
       </Field>
-      <Field label="Asunto / Tarea">
-        <textarea style={{...S.ta,minHeight:72}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
+      <Field label={LblVoz("Asunto / Tarea",v=>set("asunto",(f.asunto||"")+" "+v))}>
+        <textarea style={{...S.ta}} value={f.asunto||""} onChange={e=>set("asunto",e.target.value)} placeholder="Ej. Revisar portal AMIS, Preparar propuesta Copachisa…"/>
       </Field>
       {(f.modoTarea||"unica")==="checklist"&&<ChecklistEditor items={f.items||[]} onChange={v=>set("items",v)}/>}
       {(f.modoTarea||"unica")==="proyecto"&&<SubtareasEditor subtareas={f.subtareas||[]} onChange={v=>set("subtareas",v)}
@@ -1659,9 +1953,9 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
 
       {!esInterno&&(<>
         <Field label="Servicio / solución en seguimiento"><CatSelect cat={catalogos.solucion} value={f.servicioSolucion} onChange={v=>set("servicioSolucion",v)} placeholder="— Opcional —"/></Field>
-        {opsCont.length>0&&<Field label="Oportunidad ligada (opcional)">
-          {/* Aviso si hay oportunidades abiertas sin vincular */}
-          {!f.oportunidadId&&opsCont.filter(ABIERTA).length>0&&(
+        <Field label="Oportunidad ligada (opcional)">
+          {/* Aviso si hay oportunidades directas del contacto sin vincular */}
+          {cid&&!f.oportunidadId&&opsCont.filter(ABIERTA).length>0&&(
             <div style={{display:"flex",alignItems:"center",gap:7,background:"#fbbf2411",border:"1px solid #fbbf2444",borderRadius:8,padding:"7px 10px",marginBottom:7,cursor:"pointer"}} onClick={()=>{if(opsCont.filter(ABIERTA).length===1)set("oportunidadId",opsCont.filter(ABIERTA)[0].id);}}>
               <span style={{fontSize:14}}>💡</span>
               <div style={{flex:1}}>
@@ -1674,16 +1968,22 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
               </div>
             </div>
           )}
+          {opsCont.length===0&&<div style={{fontSize:9,color:"#64748b",marginBottom:5}}>Este contacto no aparece en ninguna oportunidad directamente — puedes vincular a cualquiera.</div>}
           <select style={{...S.sel,borderColor:!f.oportunidadId&&opsCont.filter(ABIERTA).length>0?"#fbbf2466":undefined}} value={f.oportunidadId||""} onChange={e=>set("oportunidadId",e.target.value||null)}>
-            <option value="">— Seguimiento de contacto —</option>
-            {opsCont.map(o=><option key={o.id} value={o.id}>{ABIERTA(o)?"🎯 ":"✓ "}{o.concepto}</option>)}
+            <option value="">— Sin vincular a oportunidad —</option>
+            {opsCont.filter(ABIERTA).length>0&&<optgroup label="── Del contacto ──">
+              {opsCont.filter(ABIERTA).map(o=><option key={o.id} value={o.id}>🎯 {o.concepto}</option>)}
+            </optgroup>}
+            {opsOtras.length>0&&<optgroup label="── Otras activas ──">
+              {opsOtras.map(o=><option key={o.id} value={o.id}>{o.concepto}</option>)}
+            </optgroup>}
           </select>
-        </Field>}
+        </Field>
       </>)}
 
-    <Field label={esInterno?"Descripción / objetivo":"Intención (al programar)"}><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder={esInterno?"Qué se va a hacer o revisar…":"Qué se busca lograr…"}/></Field>
-    {(f.estatus==="En Proceso"||f.estatus==="Cerrada"||f.accionProceso)&&<Field label="Acción ejecutada (en proceso)"><textarea style={S.ta} value={f.accionProceso||""} onChange={e=>set("accionProceso",e.target.value||null)} placeholder="Qué se hizo…"/></Field>}
-    {(f.estatus==="Cerrada"||f.resultado)&&<Field label="Resultado (al concluir)"><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
+    <Field label={LblVoz(esInterno?"Descripción / objetivo":"Intención (al programar)",v=>set("intencion",(f.intencion||f.intencionResultado||"")+" "+v))}><textarea style={S.ta} value={f.intencion||f.intencionResultado||""} onChange={e=>set("intencion",e.target.value||null)} placeholder={esInterno?"Qué se va a hacer o revisar…":"Qué se busca lograr…"}/></Field>
+    {(f.estatus==="En Proceso"||f.estatus==="Cerrada"||f.accionProceso)&&<Field label={LblVoz("Acción ejecutada (en proceso)",v=>set("accionProceso",(f.accionProceso||"")+" "+v))}><textarea style={S.ta} value={f.accionProceso||""} onChange={e=>set("accionProceso",e.target.value||null)} placeholder="Qué se hizo…"/></Field>}
+    {(f.estatus==="Cerrada"||f.resultado)&&<Field label={LblVoz("Resultado (al concluir)",v=>set("resultado",(f.resultado||"")+" "+v))}><textarea style={S.ta} value={f.resultado||""} onChange={e=>set("resultado",e.target.value||null)} placeholder="Qué resultó…"/></Field>}
 
     {!esInterno&&cont&&<button style={{...S.cancB,color:"#a78bfa",borderColor:"#a78bfa55"}} onClick={()=>setShowAvance(v=>!v)}>{showAvance?"▾ Ocultar avance del contacto":"▸ Avance del contacto"}</button>}
     {!esInterno&&showAvance&&cont&&<div style={{...S.card("#a78bfa44"),marginBottom:12}}>
@@ -1713,7 +2013,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         <div style={{fontSize:11,fontWeight:700,color:"#7dd3fc",marginBottom:8}}>🔗 Vincular a contacto / oportunidad</div>
         {ctoVinc
           ? <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:f.oportunidadId||opsDelCto.length>0?8:0}}>
-              <div style={{...S.inp,flex:1,fontSize:12}}>{ctoVinc.nombreCompleto}</div>
+              <div style={{...S.inp,flex:1,fontSize:12}}>{nombreDisplay(ctoVinc)}</div>
               <button style={{background:"none",border:"1px solid #334155",borderRadius:8,color:"#64748b",padding:"8px 10px",cursor:"pointer",fontSize:12}} onClick={()=>{set("contactoId",null);set("oportunidadId",null);}}>✕</button>
             </div>
           : <BuscaCtoEmpCFC contactos={contactos||[]} empresas={empresas||[]} value={null} onChange={v=>set("contactoId",v||null)} placeholder="🔍 Buscar contacto a vincular…"/>
@@ -1747,41 +2047,53 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   </div></div>;
 }
 
-function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct,featTagA}){
-  const[expandidos,setExpandidos]=useState(new Set());
+function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct,featTag}){
+  const[expandidos,setExpandidos]=useState(new Set());  // mecanismo 2: subtareas Proyecto/Checklist
+  const[expandDesc,setExpandDesc]=useState(new Set());  // mecanismo 1: descripción en TODAS las tarjetas
   const[selSub,setSelSub]=useState({});     // {actId: Set<subId>}
   const[batchSub,setBatchSub]=useState(null); // {actId, fecha, estatus, prioridad}
-  const[historial,setHistorial]=useState({}); // {actId: "contacto"|"oportunidad"|null}
+  const[historial,setHistorial]=useState({}); // mecanismo 3: {actId: "contacto"|"oportunidad"|null}
   const toggleExp=(id)=>setExpandidos(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  const toggleDesc=(id)=>setExpandDesc(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
   const toggleHist=(actId,nivel)=>setHistorial(p=>({...p,[actId]:p[actId]===nivel?null:nivel}));
   const toggleSubSel=(actId,subId)=>setSelSub(p=>{const prev=new Set(p[actId]||[]);prev.has(subId)?prev.delete(subId):prev.add(subId);return{...p,[actId]:prev};});
   const selSubCount=(actId)=>(selSub[actId]||new Set()).size;
-  const sorted=noSort?acts:acts.slice().sort((a,b)=>{const fa=(proyFecha(a)||a.fecha||"")+(a.hora||""),fb=(proyFecha(b)||b.fecha||"")+(b.hora||"");return asc?fa.localeCompare(fb):fb.localeCompare(fa);});
+  const sorted=noSort?acts:acts.slice().sort((a,b)=>{const hK=(h)=>h||"99:99";const fa=(proyFecha(a)||a.fecha||"")+hK(a.hora),fb=(proyFecha(b)||b.fecha||"")+hK(b.hora);return asc?fa.localeCompare(fb):fb.localeCompare(fa);});
   let hoyIdx=-1;if(hoy){for(let i=0;i<sorted.length;i++){const fx=proyFecha(sorted[i])||sorted[i].fecha||"";if(asc?(fx>=hoy):(fx<=hoy)){hoyIdx=i;break;}}}
   if(sorted.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades registradas.</div>;
-  return <div>{sorted.map((a,i)=>{const c=contactos.find(x=>x.id===a.contactoId);const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";const _hoy=hoyISO();const _pend=(efEst==="Programada"||efEst==="En Proceso");const efFech=proyFecha(a)||a.fecha||"";const _rez=(_pend&&efFech&&efFech<_hoy)?Math.max(0,Math.round((Date.parse(_hoy)-Date.parse(efFech))/86400000)):0;const _rezC=_rez>=7?"#ef4444":_rez>=3?"#fb923c":_rez>=1?"#fbbf24":null;const esInterno=a.enfoque!=="Contactar";const esContactarA=a.enfoque==="Contactar";const modo=a.modoTarea||"unica";const tituloCard=esInterno?(a.asunto||a.tipoAccion||"Actividad"):(showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad"));const isFeatA=featTagA&&(a.etiquetasAgenda||[]).includes(featTagA);const toggleFeatCard=(ev)=>{ev.stopPropagation();if(!featTagA||!onPatchAct)return;const cur=a.etiquetasAgenda||[];const has=cur.includes(featTagA);onPatchAct(a.id,{etiquetasAgenda:has?cur.filter(x=>x!==featTagA):[...cur,featTagA]});};const toggleStarCard=(ev)=>{ev.stopPropagation();if(onPatchAct)onPatchAct(a.id,{starred:!a.starred});};
-    const isExp=expandidos.has(a.id);
+  return <div>{sorted.map((a,i)=>{const c=contactos.find(x=>x.id===a.contactoId);const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";const _hoy=hoyISO();const _pend=(efEst==="Programada"||efEst==="En Proceso");const efFech=proyFecha(a)||a.fecha||"";const _rez=(_pend&&efFech&&efFech<_hoy)?Math.max(0,Math.round((Date.parse(_hoy)-Date.parse(efFech))/86400000)):0;const _rezC=_rez>=7?"#ef4444":_rez>=3?"#fb923c":_rez>=1?"#fbbf24":null;const esInterno=a.enfoque!=="Contactar";const esContactarA=a.enfoque==="Contactar";const modo=a.modoTarea||"unica";const tituloCard=esInterno?(a.asunto||a.tipoAccion||"Actividad"):(showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad"));
+    const isExp=expandidos.has(a.id);     // mecanismo 2: expand subtareas
+    const isDescExp=expandDesc.has(a.id); // mecanismo 1: expand descripción
+    // hasDesc: ¿hay texto de descripción para el estatus efectivo actual?
+    const hasDesc=esContactarA
+      ?(efEst==="Programada"?!!(a.intencion||a.intencionResultado):efEst==="En Proceso"?!!a.accionProceso:!!a.resultado)
+      :!!(a.intencion||a.intencionResultado);
     /* Progress para checklist y proyecto */
     const prog=(()=>{if(modo==="checklist"&&(a.items||[]).length){const d=(a.items||[]).filter(x=>x.done).length;return {done:d,total:a.items.length};}if(modo==="proyecto"&&(a.subtareas||[]).length){const d=(a.subtareas||[]).filter(x=>x.estatus==="Cerrada").length;return {done:d,total:a.subtareas.length};}return null;})();
     const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
+    const toggleFeatTag=(e)=>{e.stopPropagation();if(!onPatchAct||!featTag)return;const cur=a.etiquetasAgenda||[];const has=cur.includes(featTag.nombre);onPatchAct(a.id,{etiquetasAgenda:has?cur.filter(x=>x!==featTag.nombre):[...cur,featTag.nombre]});};
+    const isFeat=featTag&&(a.etiquetasAgenda||[]).includes(featTag.nombre);
     return <div key={a.id} id={i===hoyIdx?"ag-hoy":undefined} style={{background:isSel?"#16213a":"#10101e",border:isSel?"1px solid "+GOLD:(_rezC?("1px solid "+_rezC+(_rez>=7?"":"66")):`1px solid ${col}33`),borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`,borderRadius:9,padding:"9px 11px",marginBottom:6}}>
       {esContactarA
         ? <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(onTap&&onTap(a))}>
-            {/* R1: Contacto · Empresa ………… atraso + fecha */}
+            {/* R1: Contacto · Empresa ………… 💰 + fecha */}
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
               <div style={{display:"flex",alignItems:"center",gap:7,minWidth:0,flex:1}}>
                 {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-                <div style={{fontSize:13,fontWeight:800,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                  {showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad")}
+                <div style={{fontSize:13,fontWeight:800,minWidth:0,wordBreak:"break-word",lineHeight:1.3}}>
+                  {showContacto&&c?nombreDisplay(c):(a.tipoAccion||"Actividad")}
                   {showContacto&&c&&empN&&<span style={{color:"#475569",fontWeight:400}}> │ </span>}
                   {showContacto&&empN&&<span style={{color:"#7dd3fc",fontWeight:700}}>{empN}</span>}
                 </div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
-                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-                {featTagA&&<span onClick={toggleFeatCard} title="Pronta recuperación" style={{cursor:"pointer",fontSize:14,filter:isFeatA?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
-                <span onClick={toggleStarCard} title="Destacada" style={{cursor:"pointer",fontSize:14,filter:a.starred?"none":"grayscale(1) opacity(0.3)"}}>⭐</span>
-                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech||"sin fecha"}</span>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+                  {featTag&&<span onClick={toggleFeatTag} style={{cursor:"pointer",fontSize:14,filter:isFeat?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
+                  <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
+                  {hasDesc&&!selectable&&<span style={{fontSize:12,color:isDescExp?"#94a3b8":"#475569",lineHeight:1,padding:"2px 3px",cursor:"pointer"}} onClick={e=>{e.stopPropagation();toggleDesc(a.id);}}>{isDescExp?"▲":"▾"}</span>}
+                </div>
+                {a.hora&&<span style={{fontSize:10,color:"#94a3b8",marginTop:1,textAlign:"right"}}>{a.hora}</span>}
               </div>
             </div>
             {/* R2: enfoque · etapa · prioridad · tipo acción · orientación */}
@@ -1790,7 +2102,7 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:8}}>{a.prioridad}</span>}
               {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:8}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
             </div>
             {/* R3: etapa contacto · etapa oportunidad · solución (formato chip) */}
             {(c||op||a.servicioSolucion)&&<div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginTop:5}}>
@@ -1798,10 +2110,10 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
               {op&&<span style={{...S.tag(oc(op.etapa)),fontSize:8}}>🎯 {(op.etapa||"").replace("Oportunidad ","")}</span>}
               {a.servicioSolucion&&<span style={{...S.tag(GOLD),fontSize:8}}>{a.servicioSolucion}</span>}
             </div>}
-            {/* R4: texto según estatus */}
-            {(a.intencion||a.intencionResultado)&&efEst==="Programada"&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
-            {a.accionProceso&&efEst==="En Proceso"&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
-            {a.resultado&&efEst==="Cerrada"&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4}}>→ {a.resultado}</div>}
+            {/* R4: texto según estatus — visible sólo cuando isDescExp (toggle ▾ en R1) */}
+            {isDescExp&&(a.intencion||a.intencionResultado)&&efEst==="Programada"&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
+            {isDescExp&&a.accionProceso&&efEst==="En Proceso"&&<div style={{fontSize:11,color:"#60a5fa",marginTop:4,lineHeight:1.4}}>▸ {a.accionProceso}</div>}
+            {isDescExp&&a.resultado&&efEst==="Cerrada"&&<div style={{fontSize:11,color:"#22c55e",marginTop:4,lineHeight:1.4}}>→ {a.resultado}</div>}
           </div>
         : <div style={{cursor:"pointer"}} onClick={()=>selectable?(onToggleSel&&onToggleSel(a.id)):(modo!=="unica"?toggleExp(a.id):(onTap&&onTap(a)))}>
 
@@ -1811,34 +2123,38 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
                 {selectable&&<span style={{width:16,height:16,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",marginTop:1}}>{isSel?"✓":""}</span>}
                 {modo==="proyecto"&&<span style={{fontSize:11,flexShrink:0,marginTop:1}}>📁</span>}
                 {modo==="checklist"&&<span style={{fontSize:11,flexShrink:0,marginTop:1}}>☑</span>}
-                <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>{tituloCard}</div>
+                <div style={{fontSize:13,fontWeight:800,wordBreak:"break-word",lineHeight:1.3}}>{tituloCard}</div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0}}>
-                {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
-                {featTagA&&<span onClick={toggleFeatCard} title="Pronta recuperación" style={{cursor:"pointer",fontSize:14,filter:isFeatA?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
-                <span onClick={toggleStarCard} title="Destacada" style={{cursor:"pointer",fontSize:14,filter:a.starred?"none":"grayscale(1) opacity(0.3)"}}>⭐</span>
-                <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech||"sin fecha"}</span>
-                {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569"}}>{isExp?"▲":"▾"}</span>}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
+                <div style={{display:"flex",alignItems:"center",gap:5}}>
+                  {_rezC&&<span style={S.tag(_rezC)}>⚠ {_rez}d</span>}
+                  {featTag&&<span onClick={toggleFeatTag} style={{cursor:"pointer",fontSize:14,filter:isFeat?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
+                  <span style={{fontSize:10,color:"#8a93a3",fontWeight:600}}>{efFech?efFech.split("-").reverse().join("/"):"sin fecha"}</span>
+                  {modo!=="unica"&&!selectable&&<span style={{fontSize:10,color:"#475569"}}>{isExp?"▲":"▾"}</span>}
+                </div>
+                {a.hora&&<span style={{fontSize:10,color:"#94a3b8",marginTop:1,textAlign:"right"}}>{a.hora}</span>}
               </div>
             </div>
-            {/* R2: enfoque · etapa · prioridad · tipo acción · orientación */}
+            {/* R2: enfoque · etapa · prioridad · tipo acción · etiquetas · toggle-desc */}
             <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginTop:5}}>
               <span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque||"—"}</span>
               <span style={{...S.tag(col),fontSize:8}}>{efEst}</span>
               {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:8}}>{efPrio}</span>}
               {a.tipoAccion&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#a78bfa"),fontSize:8}}>{a.tipoAccion}</span>}
-              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag("#f472b6"),fontSize:8}}>🏷 {et}</span>)}
+              {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
+              {hasDesc&&!selectable&&<span style={{fontSize:12,color:isDescExp?"#94a3b8":"#475569",lineHeight:1,padding:"2px 3px",cursor:"pointer",marginLeft:2}} onClick={e=>{e.stopPropagation();toggleDesc(a.id);}}>{isDescExp?"▲":"▾"}</span>}
             </div>
             {/* R3: contacto vinculado (si aplica) */}
-            {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {ct.nombreCompleto}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
-            {/* R4: descripción */}
-            {(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
+            {a.contactoId&&(()=>{const ct=contactos.find(x=>x.id===a.contactoId);return ct?<div style={{fontSize:10,color:"#7dd3fc",marginTop:4}}>👤 {nombreDisplay(ct)}{op?` · 🎯 ${op.etapa}`:""}</div>:null;})()}
+            {/* R4: descripción — visible sólo cuando isDescExp (toggle ▾ en R2) */}
+            {isDescExp&&(a.intencion||a.intencionResultado)&&<div style={{fontSize:11,color:"#94a3b8",marginTop:4,lineHeight:1.4}}>{a.intencion||a.intencionResultado}</div>}
           </div>
       }
       {/* Historial de contacto / oportunidad */}
-      {a.contactoId&&(()=>{
-        const histCto=(acts||[]).filter(x=>x.id!==a.id&&x.contactoId===a.contactoId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||""));
-        const histOpo=a.oportunidadId?(acts||[]).filter(x=>x.id!==a.id&&x.oportunidadId===a.oportunidadId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||"")):[];
+      {esContactarA&&a.contactoId&&(()=>{
+        const _src=allActs||acts||[];
+        const histCto=_src.filter(x=>x.id!==a.id&&x.contactoId===a.contactoId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||""));
+        const histOpo=a.oportunidadId?_src.filter(x=>x.id!==a.id&&x.oportunidadId===a.oportunidadId).sort((x,y)=>(y.fecha||"").localeCompare(x.fecha||"")):[];
         if(histCto.length===0&&histOpo.length===0)return null;
         const nivel=historial[a.id];
         const histActivo=nivel==="oportunidad"?histOpo:histCto;
@@ -1858,24 +2174,21 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
             {histActivo.map(h=>{
               const hCol=EST_COLOR[h.estatus||"Programada"]||"#64748b";
               const hCto=nivel==="oportunidad"&&h.contactoId?contactos.find(x=>x.id===h.contactoId):null;
-              const hInt=h.intencion||h.intencionResultado||"";
-              const hAcc=h.accionProceso||"";
-              const hRes=h.resultado||"";
-              const hayTexto=hInt||hAcc||hRes;
+              const hTexto=h.resultado||h.accionProceso||h.intencion||h.intencionResultado||"";
               return <div key={h.id} style={{padding:"6px 0",borderBottom:"1px solid #1e293b22",display:"flex",gap:8,alignItems:"flex-start"}}>
                 <div style={{flexShrink:0,minWidth:62}}>
                   <div style={{fontSize:9,color:"#8a93a3",fontWeight:600}}>{(h.fecha||"—").split("-").reverse().join("/")}</div>
                   {h.hora&&<div style={{fontSize:8,color:"#475569"}}>{h.hora}</div>}
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  {hCto&&<div style={{fontSize:9,color:"#7dd3fc",marginBottom:2}}>👤 {hCto.nombreCompleto}</div>}
-                  <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center",marginBottom:hayTexto?3:0}}>
+                  {hCto&&<div style={{fontSize:9,color:"#7dd3fc",marginBottom:2}}>👤 {nombreDisplay(hCto)}</div>}
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap",alignItems:"center",marginBottom:hTexto?3:0}}>
                     {h.tipoAccion&&<span style={{fontSize:8,color:"#60a5fa",background:"#60a5fa11",border:"1px solid #60a5fa33",borderRadius:4,padding:"1px 5px"}}>{h.tipoAccion}</span>}
                     <span style={{...S.tag(hCol),fontSize:8}}>{h.estatus||"Programada"}</span>
                   </div>
-                  {hInt&&<div style={{fontSize:10,color:"#94a3b8",lineHeight:1.3,wordBreak:"break-word"}}>{hInt.slice(0,100)}{hInt.length>100?"…":""}</div>}
-                  {hAcc&&<div style={{fontSize:10,color:"#60a5fa",lineHeight:1.3,wordBreak:"break-word",marginTop:2}}>▸ {hAcc.slice(0,100)}{hAcc.length>100?"…":""}</div>}
-                  {hRes&&<div style={{fontSize:10,color:"#22c55e",lineHeight:1.3,wordBreak:"break-word",marginTop:2}}>→ {hRes.slice(0,100)}{hRes.length>100?"…":""}</div>}
+                  {h.intencion&&<div style={{fontSize:9,color:"#94a3b8",marginTop:2,wordBreak:"break-word"}}>{h.intencion.slice(0,100)}{h.intencion.length>100?"…":""}</div>}
+              {h.accionProceso&&<div style={{fontSize:9,color:"#60a5fa",marginTop:1,wordBreak:"break-word"}}>▸ {h.accionProceso.slice(0,100)}{h.accionProceso.length>100?"…":""}</div>}
+              {h.resultado&&<div style={{fontSize:9,color:"#22c55e",marginTop:1,wordBreak:"break-word"}}>✓ {h.resultado.slice(0,100)}{h.resultado.length>100?"…":""}</div>}
                 </div>
               </div>;
             })}
@@ -1933,12 +2246,11 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
           const isSel=(selSub[a.id]||new Set()).has(st.id);
           return <div key={st.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 8px",marginBottom:4,background:isSel?"#1e1b4b":"#0f172a",borderRadius:7,border:`1px solid ${isSel?"#a78bfa":(EST_COLOR[st.estatus||"Programada"]||"#64748b")}33`}}>
             <input type="checkbox" checked={isSel} onChange={()=>toggleSubSel(a.id,st.id)} style={{width:15,height:15,flexShrink:0,accentColor:"#a78bfa",marginTop:2,cursor:"pointer"}}/>
-            <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>{if(!onPatchAct)return;const nst=(a.subtareas||[]).map((x,j)=>j===origIdx?{...x,estatus:MODO_NEXT_EST[x.estatus||"Programada"]}:x);const sts=nst.map(s=>s.estatus||"Programada");const compEst=sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada";const pend=nst.filter(s=>s.estatus!=="Cerrada");const ds=pend.map(s=>s.fecha).filter(Boolean).sort();const compFecha=ds[0]||nst.map(s=>s.fecha).filter(Boolean).sort()[0]||"";onPatchAct(a.id,{subtareas:nst,estatus:compEst,fecha:compFecha});}}>
+            <div style={{flex:1,minWidth:0}}>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center",marginBottom:2}}>
                 <span style={{...S.tag(EST_COLOR[st.estatus||"Programada"]||"#64748b"),fontSize:8}}>{st.estatus||"Programada"}</span>
                 {st.prioridad&&st.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[st.prioridad]||"#64748b"),fontSize:7}}>{st.prioridad}</span>}
                 {st.fecha&&<span style={{fontSize:9,color:"#64748b"}}>{st.fecha.split("-").reverse().join("/")}</span>}
-                <span style={{fontSize:9,color:"#475569"}}>tap→cicla</span>
               </div>
               <div style={{fontSize:12,fontWeight:700,color:st.estatus==="Cerrada"?"#475569":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",lineHeight:1.3}}>{st.titulo||"Subtarea sin nombre"}</div>
               {st.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,lineHeight:1.4}}>{st.descripcion}</div>}
@@ -1983,9 +2295,9 @@ function ActividadesList({acts,contactos,oportunidades,empresas,showContacto,onT
 }
 
 function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
-  const[filtros,setFiltros]=useState([]);
+  const[filtros,setFiltros]=useState(["Programada","En Proceso"]);
   const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
-  const[modo,setModo]=useState("lista");
+  const[modo,setModo]=useState("rptCom");
   const[desde,setDesde]=useState("");
   const[hasta,setHasta]=useState("");
   const[showFil,setShowFil]=useState(false);
@@ -2002,9 +2314,9 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[selMode,setSelMode]=useState(false);
   const[sel,setSel]=useState([]);
   const[fEnfoque,setFEnfoque]=useState("");
+  const[fSinFecha,setFSinFecha]=useState(false);
+  const[fFeat,setFFeat]=useState(false);
   const[fEtiqAgenda,setFEtiqAgenda]=useState("");
-  const[fFeatA,setFFeatA]=useState(false);
-  const[fStarred,setFStarred]=useState(false);
   const[batch,setBatch]=useState(null);
   const toggleSel=(id)=>setSel(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id]);
   const fmtF=(f)=>f?f.split("-").reverse().join("/"):"—";
@@ -2025,81 +2337,81 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     if(fTipos.length&&!fTipos.includes(a.tipoAccion))return false;
     if(fEtC){const c=ctById(a.contactoId);if(!c||c.etapaEspecifica!==fEtC)return false;}
     if(fEtO){const o=opById(a.oportunidadId);if(!o||o.etapa!==fEtO)return false;}
+    if(fSinFecha){if(efFech)return false;}
+    if(fFeat){const ft=(catalogos.etiqAgenda||[])[0];if(ft&&!(a.etiquetasAgenda||[]).includes(ft.nombre))return false;}
     if(fEnfoque&&(a.enfoque||"Contactar")!==fEnfoque)return false;
     if(fEtiqAgenda&&!(a.etiquetasAgenda||[]).includes(fEtiqAgenda))return false;
-    if(fFeatA){const ft=(catalogos.etiqAgenda||[])[0];if(!ft||!(a.etiquetasAgenda||[]).includes(ft.nombre))return false;}
-    if(fStarred&&!a.starred)return false;
     if(ql){const c=ctById(a.contactoId);const hay=[a.tipoAccion,a.intencion,a.intencionResultado,a.accionProceso,a.resultado,a.asunto,c&&c.nombreCompleto].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
   });
   const ordenadas=base.slice().sort((a,b)=>{
     const fa=proyFecha(a)||a.fecha||"", fb=proyFecha(b)||b.fecha||"";
+    const hK=(h)=>h||"99:99"; // sin hora → siempre al final dentro de la misma fecha
     let r;
-    if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=(fa+(a.hora||"")).localeCompare(fb+(b.hora||""));}
-    else if(ordCampo==="fecha"){r=fa.localeCompare(fb);if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
-    else {r=fa.localeCompare(fb);if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=(a.hora||"").localeCompare(b.hora||"");}
+    if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=(fa+hK(a.hora)).localeCompare(fb+hK(b.hora));}
+    else if(ordCampo==="fecha"){r=fa.localeCompare(fb);if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));}
+    else {r=fa.localeCompare(fb);if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));}
     return ordDir==="asc"?r:-r;
   });
   const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
-  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(fEnfoque?1:0)+(filtros.length?1:0)+(fFeatA?1:0)+(fStarred?1:0);
-  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFiltros([]);setFFeatA(false);setFStarred(false);};
+  const sinFechaCount=(actividades||[]).filter(a=>!(proyFecha(a)||a.fecha||"")).length;
+  const featTag=(catalogos.etiqAgenda||[])[0];
+  const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(filtros.length?1:0)+(fSinFecha?1:0)+(fFeat?1:0);
+  const limpiar=()=>{setFContacto("");setFEmpresa("");setFPrioridad([]);setFTipos([]);setFEtC("");setFEtO("");setDesde("");setHasta("");setQ("");setFRezago(false);setSelMode(false);setSel([]);setFEnfoque("");setFSinFecha(false);setFiltros([]);setFFeat(false);};
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Agenda</div><div style={S.sub}>{base.length} de {actividades.length} actividades</div></div></div>
+    <div style={S.hdr}><div><div style={S.logo}>Agenda de Trabajo</div></div><div style={{display:"flex",alignItems:"center",gap:6}}>
+      {sinFechaCount>0&&<span onClick={()=>{setFSinFecha(v=>!v);setDesde("");setHasta("");}} style={{...S.pill(fSinFecha,"#fbbf24"),padding:"6px 10px",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>📌 {sinFechaCount} sin fecha</span>}
+    </div></div>
     <div style={S.line}/>
     {/* ── BARRA STICKY COMPACTA ── */}
     <div style={{position:"sticky",top:0,zIndex:20,background:"#0c0c16",borderBottom:"1px solid #1e293b",padding:"8px 12px 8px"}}>
       {/* Fila 1: tabs */}
       <div style={{display:"flex",gap:5,marginBottom:7}}>
-        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:12}} onClick={()=>setModo("lista")}>Lista</button>
-        <button style={{...S.pill(modo==="rptCom","#60a5fa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptCom")}>📞 Contactar</button>
-        <button style={{...S.pill(modo==="rptTar","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptTar")}>📋 Tareas</button>
-        <button style={{...S.pill(modo==="rptAcc","#2dd4bf"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptAcc")}>⚡ Acciones</button>
+        <button style={{...S.pill(modo==="lista",GOLD),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("lista")}>Vista General</button>
+        <button style={{...S.pill(modo==="rptCom","#60a5fa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptCom")}>📞 Seguimiento</button>
+        <button style={{...S.pill(modo==="rptTar","#a78bfa"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptTar")}>📋 Mis Tareas</button>
+        <button style={{...S.pill(modo==="rptAcc","#2dd4bf"),flex:1,padding:"6px 0",fontWeight:700,fontSize:11}} onClick={()=>setModo("rptAcc")}>⚡ Mis Acciones</button>
       </div>
-      {/* Fila 2: chips estatus + marcadores */}
-      <div style={{display:"flex",gap:5,flexWrap:"nowrap",marginBottom:7,alignItems:"center"}}>
+      {/* Fila 2: Enfoque — siempre visible, igual que APersonal */}
+      <div style={{display:"flex",gap:4,marginBottom:6,alignItems:"center",flexWrap:"nowrap"}}>
+        <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Enfoque:</span>
+        {[["","Todos","#64748b"],["Contactar","📞","#60a5fa"],["Tareas","📋","#a78bfa"],["Acciones","⚡","#2dd4bf"]].map(([v,ic,c])=>(
+          <span key={v} style={{...S.chip(fEnfoque===v,c),fontSize:10,padding:"3px 8px",whiteSpace:"nowrap"}} onClick={()=>setFEnfoque(fEnfoque===v&&v!==""?"":v)}>{v?`${ic} ${v}`:ic}</span>
+        ))}
+      </div>
+      {/* Fila 3: chips estatus + 💰 al extremo derecho */}
+      <div style={{display:"flex",gap:4,marginBottom:7,alignItems:"center",flexWrap:"nowrap"}}>
+        <span style={{fontSize:9,color:"#64748b",fontWeight:700,flexShrink:0}}>Etapa:</span>
         {["Programada","En Proceso","Cerrada"].map(t=><span key={t} style={{...S.chip(filtros.includes(t),EST_COLOR[t]||GOLD),fontSize:10,padding:"3px 8px"}} onClick={()=>toggleFiltro(t)}>{t}</span>)}
         {filtros.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:10,padding:"3px 8px",opacity:.8}} onClick={()=>setFiltros([])}>✕</span>}
-        <span style={{marginLeft:"auto",cursor:"pointer",fontSize:16,filter:fFeatA?"none":"grayscale(1) opacity(0.4)"}} title="Pronta recuperación" onClick={()=>setFFeatA(v=>!v)}>💰</span>
-        <span style={{cursor:"pointer",fontSize:16,filter:fStarred?"none":"grayscale(1) opacity(0.4)"}} title="Destacadas" onClick={()=>setFStarred(v=>!v)}>⭐</span>
+        {featTag&&<span style={{marginLeft:"auto",flexShrink:0,cursor:"pointer",fontSize:16,filter:fFeat?"none":"grayscale(1) opacity(0.4)"}} title={featTag.nombre} onClick={()=>setFFeat(v=>!v)}>💰</span>}
       </div>
       {/* Fila 3: búsqueda + filtros */}
       <div style={{display:"flex",gap:6,alignItems:"center"}}>
-        <input style={{...S.inp,flex:1,padding:"7px 10px",fontSize:12}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <input style={{...S.inp,flex:1,fontSize:12}} placeholder="🔍 Buscar…" value={q} onChange={e=>setQ(e.target.value)}/>
         <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 12px",fontWeight:700,whiteSpace:"nowrap",fontSize:12}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` ${nFil}`:""} {showFil?"▲":"▾"}</button>
+        {(q||nFil>0)&&<button style={{...S.pill(false,"#f87171"),padding:"0 10px",fontWeight:700,fontSize:12}} onClick={()=>{setQ("");limpiar();}}>✕</button>}
       </div>
     </div>
     {/* ── PANEL DE FILTROS ── */}
     <div style={{...S.sec,paddingTop:4}}>
-      {showFil&&<div style={{...S.card(),marginTop:6,padding:"10px 12px"}}>
-        {/* 1 Enfoque */}
-        <div style={{display:"flex",gap:5,marginBottom:8}}>
-          {[["","Todos","#64748b"],["Contactar","📞 Contactar","#60a5fa"],["Tareas","📋 Tareas","#a78bfa"],["Acciones","⚡ Acciones","#2dd4bf"]].map(([v,l,c])=>(
-            <button key={v} style={{...S.pill(fEnfoque===v,c),flex:1,padding:"5px 0",fontWeight:700,fontSize:11}} onClick={()=>setFEnfoque(v)}>{l}</button>
-          ))}
-        </div>
-        {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{marginBottom:8}}>
-          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orientación</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            {catalogos.etiqAgenda.map(et=><span key={et.id} style={{...S.chip(fEtiqAgenda===et.nombre,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et.nombre?"":et.nombre)}>🏷 {et.nombre}</span>)}
-          </div>
-        </div>}
-        {/* 2 Selección múltiple */}
-        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+      {showFil&&<div style={{...S.card(),marginTop:0,padding:"10px 12px"}}>
+        {/* Selección múltiple + Rezago — primero, igual que APersonal */}
+        <div style={{display:"flex",gap:6,marginBottom:8,alignItems:"center"}}>
           {!selMode
-            ? <button style={{...S.pill(false,GOLD),padding:"5px 12px",fontWeight:700,width:"100%",fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
-            : <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-                <span style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
-                <button style={{...S.pill(false,"#60a5fa"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
-                <button style={{...S.pill(false,"#64748b"),padding:"4px 8px",fontSize:11}} onClick={()=>setSel([])}>Ninguna</button>
-                <button style={{...S.pill(false,GOLD),padding:"4px 8px",fontWeight:700,fontSize:11,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
-                <button style={{...S.pill(false,"#f87171"),padding:"4px 8px",fontSize:11}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
+            ? <button style={{...S.pill(false,GOLD),padding:"5px 10px",fontWeight:700,flex:1,fontSize:11}} onClick={()=>{setSelMode(true);setSel([]);}}>☑ Selección múltiple</button>
+            : <div style={{display:"flex",gap:4,flex:1,flexWrap:"wrap",alignItems:"center"}}>
+                <span style={{fontSize:10,color:"#94a3b8",fontWeight:700}}>{sel.length} sel.</span>
+                <button style={{...S.pill(false,"#60a5fa"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel(ordenadas.map(a=>a.id))}>Todas</button>
+                <button style={{...S.pill(false,"#64748b"),padding:"3px 7px",fontSize:10}} onClick={()=>setSel([])}>Ninguna</button>
+                <button style={{...S.pill(false,GOLD),padding:"3px 7px",fontWeight:700,fontSize:10,opacity:sel.length?1:.4}} onClick={()=>{if(sel.length)setBatch({fecha:"",estatus:"",tipoAccion:"",prioridad:""});}}>Editar</button>
+                <button style={{...S.pill(false,"#f87171"),padding:"3px 7px",fontSize:10}} onClick={()=>{setSelMode(false);setSel([]);}}>Salir</button>
               </div>}
+          <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 12px",fontWeight:700,fontSize:11,flexShrink:0}} onClick={()=>setFRezago(v=>!v)}>⚠ Rezago</button>
         </div>
-        {/* 3 Rezago */}
-        <button style={{...S.pill(fRezago,"#ef4444"),padding:"5px 12px",width:"100%",fontWeight:700,fontSize:11,marginBottom:8}} onClick={()=>setFRezago(v=>!v)}>⚠ Solo rezagados{fRezago?" ✓":""}</button>
-        {/* 4 Orden */}
-        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ORDEN</div>
+        {/* ORDEN */}
+        <div style={{marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orden</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
             <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
             <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
@@ -2107,71 +2419,98 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
             <button style={{...S.pill(false,"#60a5fa"),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
           </div>
         </div>
-        {/* 5 Prioridad */}
+        {/* PRIORIDAD */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>PRIORIDAD</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{PRIOR.map(p=><span key={p} style={{...S.chip(fPrioridad.includes(p),PRIOR_COLOR[p]),fontSize:10}} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Prioridad</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{PRIOR.map(p=><span key={p} style={{...S.chip(fPrioridad.includes(p),PRIOR_COLOR[p]),fontSize:10,cursor:"pointer"}} onClick={()=>setFPrioridad(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>{p}</span>)}</div>
         </div>
-        {/* 6 Contacto */}
+        {/* ORIENTACIÓN */}
+        {catalogos.etiqAgenda&&catalogos.etiqAgenda.length>0&&<div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orientación</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {catalogos.etiqAgenda.map(et=><span key={et.id} style={{...S.chip(fEtiqAgenda===et.nombre,"#f472b6"),fontSize:10,cursor:"pointer"}} onClick={()=>setFEtiqAgenda(fEtiqAgenda===et.nombre?"":et.nombre)}>🏷 {et.nombre}</span>)}
+          </div>
+        </div>}
+        {/* TIPO DE ACCIÓN */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>CONTACTO</div>
-          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Tipo de acción</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={{...S.chip(fTipos.includes(t.nombre),GOLD),fontSize:10,cursor:"pointer"}} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
         </div>
-        {/* 7 Empresa */}
+        {/* CONTACTO */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>EMPRESA</div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Contacto</div>
+          <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:nombreDisplay(c)}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        </div>
+        {/* EMPRESA */}
+        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Empresa</div>
           <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         </div>
-        {/* 8 Tipo de acción */}
-        <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>TIPO DE ACCIÓN</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{(catalogos.tipoAccion||[]).map(t=><span key={t.id} style={{...S.chip(fTipos.includes(t.nombre),GOLD),fontSize:10}} onClick={()=>toggleTipo(t.nombre)}>{t.nombre}</span>)}</div>
-        </div>
-        {/* 9 Etapas */}
+        {/* ETAPAS */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
           <div style={S.g2}>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ETAPA CONTACTO</div><select style={{...S.sel,fontSize:11}} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>ETAPA OPO.</div><select style={{...S.sel,fontSize:11}} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+            <div><div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:5,textTransform:"uppercase",letterSpacing:.5}}>Etapa contacto</div><select style={{...S.sel,fontSize:11}} value={fEtC} onChange={e=>setFEtC(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaEspecifica||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
+            <div><div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:5,textTransform:"uppercase",letterSpacing:.5}}>Etapa opo.</div><select style={{...S.sel,fontSize:11}} value={fEtO} onChange={e=>setFEtO(e.target.value)}><option value="">— Cualquiera —</option>{(catalogos.etapaOportunidad||[]).map(et=><option key={et.id} value={et.nombre}>{et.nombre}</option>)}</select></div>
           </div>
         </div>
-        {/* 10 Fechas */}
+        {/* FECHAS — Todas / Hoy / Rango */}
         <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
-          <div style={S.g2}>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>DESDE</div><input type="date" style={{...S.inp,fontSize:11}} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
-            <div><div style={{fontSize:10,color:"#64748b",fontWeight:700,marginBottom:5}}>HASTA</div><input type="date" style={{...S.inp,fontSize:11}} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+          <div style={{fontSize:9,color:"#64748b",marginBottom:6,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Fechas</div>
+          <div style={{display:"flex",gap:5,marginBottom:6}}>
+            <button style={{...S.pill(!desde&&!hasta,GOLD),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>{setDesde("");setHasta("");}}>Todas</button>
+            <button style={{...S.pill(desde===hoyISO()&&hasta===hoyISO(),"#60a5fa"),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>{setDesde(hoyISO());setHasta(hoyISO());}}>Hoy</button>
+            <button style={{...S.pill(!!(desde||hasta)&&!(desde===hoyISO()&&hasta===hoyISO()),"#a78bfa"),flex:1,padding:"5px 0",fontSize:11}} onClick={()=>{}}>Rango</button>
           </div>
+          {(desde||hasta)&&<div style={S.g2}>
+            <div><div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Desde</div><input type="date" style={{...S.inp,fontSize:11}} value={desde} onChange={e=>{setDesde(e.target.value);if(e.target.value&&!hasta)setHasta(e.target.value);}}/></div>
+            <div><div style={{fontSize:9,color:"#64748b",marginBottom:3}}>Hasta</div><input type="date" style={{...S.inp,fontSize:11}} value={hasta} onChange={e=>setHasta(e.target.value)}/></div>
+          </div>}
         </div>
-        {/* Limpiar */}
         {nFil>0&&<button style={{...S.pill(false,"#f87171"),width:"100%",padding:"6px 0",fontWeight:700,fontSize:11}} onClick={limpiar}>✕ Limpiar filtros ({nFil})</button>}
       </div>}
     </div>
     {/* ── CONTENIDO ── */}
     <div id="ag-top" style={{...S.sec,paddingTop:4}}>
-      {modo==="lista"&&<ActividadesList acts={ordenadas} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)} featTagA={(catalogos.etiqAgenda||[])[0]?.nombre||""}/>}
+      <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{base.length} de {actividades.length} actividades</div>
+      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)} featTag={featTag}/>}
       {(modo==="rptCom"||modo==="rptTar"||modo==="rptAcc")&&(()=>{
         const esCom=modo==="rptCom";
         const enfRpt=modo==="rptCom"?"Contactar":modo==="rptTar"?"Tareas":"Acciones";
         const rptActs=ordenadas.filter(a=>(a.enfoque||"Contactar")===enfRpt);
         if(rptActs.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades {esCom?"comerciales":"internas"} en el rango y filtros elegidos.</div>;
         return <div style={{...S.card(),padding:0,overflow:"hidden"}}>
-          <div style={{display:"flex",fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:0.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
-            <div style={{width:58,flexShrink:0}}>Fecha</div>
-            <div style={{flex:1,minWidth:0}}>{esCom?"Acción":"Actividad / Asunto"}</div>
-            <div style={{flex:1,minWidth:0}}>{esCom?"Contacto":"Descripción"}</div>
-            <div style={{width:60,flexShrink:0,textAlign:"right"}}>Estatus</div>
+          {/* Encabezado — mismo patrón que APersonal Reporte */}
+          <div style={{display:"flex",gap:8,fontSize:9,fontWeight:800,color:"#64748b",letterSpacing:.5,textTransform:"uppercase",padding:"7px 10px",borderBottom:"1px solid #1e293b"}}>
+            <div style={{width:20,flexShrink:0}}></div>
+            <div style={{width:62,flexShrink:0}}>Fecha</div>
+            <div style={{flex:esCom?1.6:2.4,minWidth:0}}>{esCom?"Contacto/Empresa":"Asunto"}</div>
+            {esCom&&<div style={{flex:1,minWidth:0}}>Tipo</div>}
+            <div style={{width:62,flexShrink:0,textAlign:"right"}}>Estatus</div>
           </div>
           {rptActs.map((a,i)=>{
             const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
             const efFech=proyFecha(a)||a.fecha||"";
             const isSel=selMode&&sel.indexOf(a.id)>-1;
-            const desc=esCom?cn(a.contactoId):(a.intencion||a.intencionResultado||a.resultado||"—");
-            const accion=esCom?(a.tipoAccion||"Actividad"):(a.asunto||a.tipoAccion||"Actividad");
-            return <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${esCom?col:"#a78bfa"}`}}>
-              {selMode&&<span style={{width:14,height:14,flexShrink:0,marginRight:6,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
-              <div style={{width:58,flexShrink:0,color:"#94a3b8",fontSize:10}}>{efFech?efFech.split("-").reverse().join("/"):"—"}</div>
-              <div style={{flex:1,minWidth:0,fontWeight:600,paddingRight:4,wordBreak:"break-word",fontSize:11}}>{accion}</div>
-              <div style={{flex:1,minWidth:0,color:"#94a3b8",paddingRight:4,wordBreak:"break-word",fontSize:10,lineHeight:1.3}}>{desc}</div>
-              <div style={{width:60,flexShrink:0,textAlign:"right"}}>{a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
+            const ctoObj=contactos.find(x=>x.id===a.contactoId);
+            const empObj=esCom&&ctoObj?(empresas||[]).find(e=>e.id===(cEmpresas(ctoObj)[0]||{}).empresaId):null;
+            const principal=esCom?((nombreDisplay(ctoObj))||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
+            const isFeatRow=featTag&&(a.etiquetasAgenda||[]).includes(featTag.nombre);
+            return <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`}}>
+              {selMode&&<span style={{width:14,height:14,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
+              <div style={{width:20,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {featTag&&<span onClick={e=>{e.stopPropagation();onEditActs([a.id],{etiquetasAgenda:isFeatRow?(a.etiquetasAgenda||[]).filter(x=>x!==featTag.nombre):[...(a.etiquetasAgenda||[]),featTag.nombre]});}} style={{cursor:"pointer",fontSize:13,filter:isFeatRow?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
+              </div>
+              <div style={{width:62,flexShrink:0,display:"flex",flexDirection:"column"}}>
+                <span style={{color:"#94a3b8",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{efFech?efFech.split("-").reverse().join("/"):"—"}</span>
+                {a.hora&&<span style={{color:"#64748b",fontSize:9,marginTop:1}}>{a.hora}</span>}
+              </div>
+              <div style={{flex:esCom?1.6:2.4,minWidth:0}}>
+                <div style={{fontWeight:600,fontSize:11,wordBreak:"break-word"}}>{principal}</div>
+                {esCom&&nombreDisplay(ctoObj)&&empObj?.nombre&&<div style={{fontSize:9,color:"#7dd3fc",marginTop:1,wordBreak:"break-word"}}>{empObj.nombre}</div>}
+                {!esCom&&ctoObj&&<div style={{fontSize:9,color:"#7dd3fc",marginTop:1}}>👤 {nombreDisplay(ctoObj)}</div>}
+              </div>
+              {esCom&&<div style={{flex:1,minWidth:0,color:"#94a3b8",fontSize:10,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.tipoAccion||"—"}</div>}
+              <div style={{width:62,flexShrink:0,textAlign:"right"}}>{a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:7,display:"block",marginBottom:2}}>{a.prioridad}</span>}<span style={{...S.tag(col),fontSize:8}}>{efEst}</span></div>
             </div>;
           })}
         </div>;
@@ -2224,7 +2563,7 @@ const ENF_CFC_COLOR={Contactar:"#60a5fa",Tareas:"#a78bfa",Acciones:"#2dd4bf"};
 const ENF_CFC_ICON={Contactar:"📞",Tareas:"📋",Acciones:"⚡"};
 const PRIOR_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
 const PROB_COLOR={Alta:"#22c55e",Media:"#fbbf24",Baja:"#f87171"};
-const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada";
+const ABIERTA=(o)=>o.etapa!=="Oportunidad Concretada"&&o.etapa!=="Oportunidad Rechazada"&&o.etapa!=="Oportunidad Liquidada"&&!((o.etapa||"").toLowerCase().includes("espera"));
 const money=(n)=>"$"+(Number(n)||0).toLocaleString("es-MX");
 
 function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedContacto,onSave,onDelete,onClose,onCreateContacto,onCreateEmpresa}){
@@ -2261,16 +2600,16 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
     <div style={S.mTit}>{init&&init.id?"Editar oportunidad":"Nueva oportunidad"}</div>
     <Field label="Concepto"><input style={S.inp} value={f.concepto||""} onChange={e=>set("concepto",e.target.value)} placeholder="Ej. Fianza de cumplimiento…"/></Field>
     <Field label="Contacto principal">
-      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:c.nombreCompleto}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={(nombre)=>{setNuevoCto({field:"contactoPrincipalId",nombre:nombre||null});}}/>
+      <BuscaSelect opciones={csort.map(c=>({id:c.id,label:nombreDisplay(c)}))} value={f.contactoPrincipalId} onChange={v=>set("contactoPrincipalId",v)} placeholder="— Selecciona contacto —" vacioLabel="— Sin contacto —" onAdd={(nombre)=>{setNuevoCto({field:"contactoPrincipalId",nombre:nombre||null});}}/>
     </Field>
     <Field label="Contactos operativos (opcionales)">
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:6}}>
         {(f.contactosOperativosIds||[]).map(id=>{const ct=contactos.find(x=>x.id===id);return ct?<span key={id} style={{...S.tag("#64748b"),display:"flex",alignItems:"center",gap:4,fontSize:10}}>
-          {ct.nombreCompleto}
+          {nombreDisplay(ct)}
           <button style={{background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:11,padding:0,lineHeight:1}} onClick={()=>set("contactosOperativosIds",(f.contactosOperativosIds||[]).filter(x=>x!==id))}>✕</button>
         </span>:null;})}
       </div>
-      <BuscaSelect opciones={csort.filter(c=>!(f.contactosOperativosIds||[]).includes(c.id)).map(c=>({id:c.id,label:c.nombreCompleto}))} value="" onChange={v=>{if(v)set("contactosOperativosIds",[...(f.contactosOperativosIds||[]),v]);}} placeholder="+ Agregar operativo" vacioLabel="+ Agregar operativo"/>
+      <BuscaSelect opciones={csort.filter(c=>!(f.contactosOperativosIds||[]).includes(c.id)).map(c=>({id:c.id,label:nombreDisplay(c)}))} value="" onChange={v=>{if(v)set("contactosOperativosIds",[...(f.contactosOperativosIds||[]),v]);}} placeholder="+ Agregar operativo" vacioLabel="+ Agregar operativo"/>
     </Field>
     <Field label="Empresa (opcional)">
       <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={f.empresaId} onChange={v=>set("empresaId",v)} placeholder="— Sin empresa —" vacioLabel="— Sin empresa —" onAdd={(nombre)=>{setNuevaEmp({nombre:nombre||null});}} addLabel="empresa"/>
@@ -2300,13 +2639,13 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
           <Field label="Aliado estratégico">
             <select style={S.sel} value={f.aliadoEstrategicoId||""} onChange={e=>set("aliadoEstrategicoId",e.target.value||null)}>
               <option value="">— Ninguno —</option>
-              {est.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+              {est.map(c=><option key={c.id} value={c.id}>{nombreDisplay(c)}</option>)}
             </select>
           </Field>
           <Field label="Aliado comercial">
             <select style={S.sel} value={f.aliadoComercialId||""} onChange={e=>set("aliadoComercialId",e.target.value||null)}>
               <option value="">— Ninguno —</option>
-              {com.map(c=><option key={c.id} value={c.id}>{c.nombreCompleto}</option>)}
+              {com.map(c=><option key={c.id} value={c.id}>{nombreDisplay(c)}</option>)}
             </select>
           </Field>
         </div>
@@ -2337,16 +2676,23 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
+function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades,onToggleFav}){
+  const[showActs,setShowActs]=useState(false);
+  const[selAct,setSelAct]=useState(null);
   const c=contactos.find(x=>x.id===(o.contactoPrincipalId||o.contactoId));
   const op=contactos.find(x=>x.id===o.contactoOperativoId);
   const e=empresas.find(x=>x.id===o.empresaId);const col=oc(o.etapa);
   const monto=o.comisionEstimada||o.montoEstimado;
-  return <div onClick={()=>onTap&&onTap(o)} style={{...S.cCard(col),borderLeft:sinAct?`3px solid #ef4444`:`3px solid ${col}44`}}>
+  const actsOpo=(actividades||[]).filter(a=>a.oportunidadId===o.id).sort((a,b)=>(b.fecha||"").localeCompare(a.fecha||""));
+  return <div style={{...S.cCard(col),borderLeft:sinAct?`3px solid #ef4444`:`3px solid ${col}44`}}>
+    <div onClick={()=>onTap&&onTap(o)} style={{cursor:"pointer"}}>
     <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
-      <div style={{fontSize:14,fontWeight:700}}>{o.concepto}</div>
+      <div style={{fontSize:14,fontWeight:700,flex:1,minWidth:0}}>{o.concepto}</div>
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4,flexShrink:0}}>
-        {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
+        <div style={{display:"flex",alignItems:"center",gap:6}}>
+          <span onClick={ev=>{ev.stopPropagation();onToggleFav&&onToggleFav(o.id);}} style={{fontSize:16,cursor:"pointer",filter:o.fav?"none":"grayscale(1) opacity(0.22)",transition:"filter 0.15s"}} title={o.fav?"Quitar de favoritas":"Marcar como favorita"}>⭐</span>
+          {monto?<div style={{fontSize:13,fontWeight:800,color:GOLD,whiteSpace:"nowrap"}}>{money(monto)}</div>:null}
+        </div>
         {sinAct&&<span style={{fontSize:9,fontWeight:700,color:"#ef4444",background:"#ef444411",border:"1px solid #ef444433",borderRadius:6,padding:"1px 6px",whiteSpace:"nowrap"}}>⚠ Sin seguimiento</span>}
       </div>
     </div>
@@ -2354,21 +2700,77 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct}){
       <span style={S.tag(col)}>{(o.etapa||"").replace("Oportunidad ","")}</span>
       {o.recurrencia&&<span style={S.tag("#a78bfa")}>{o.recurrencia}</span>}
       {o.probabilidad&&<span style={S.tag(PROB_COLOR[o.probabilidad])}>{o.probabilidad}</span>}
-      {c&&<span style={S.tag("#94a3b8")}>{c.nombreCompleto}</span>}
+      {c&&<span style={S.tag("#94a3b8")}>{nombreDisplay(c)}</span>}
       {(()=>{const ops=(o.contactosOperativosIds||[o.contactoOperativoId].filter(Boolean)).map(id=>contactos.find(x=>x.id===id)).filter(Boolean);
         if(ops.length===0)return null;
-        if(ops.length===1)return <span style={S.tag("#64748b")}>op: {ops[0].nombreCompleto}</span>;
+        if(ops.length===1)return <span style={S.tag("#64748b")}>op: {nombreDisplay(ops[0])}</span>;
         return <span style={S.tag("#64748b")}>{ops.length} operativos</span>;
       })()}
       {e&&<span style={S.tag("#3b82f6")}>{e.nombre}</span>}
       {(()=>{const nm=(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===o.solucionId)||{}).nombre||o.solucionNexus;return nm?<span style={S.tag(GOLD)}>{nm.length>22?nm.slice(0,22)+"…":nm}</span>:null;})()}
       {o.aliadoEstrategicoId&&(()=>{const ae=contactos.find(x=>x.id===o.aliadoEstrategicoId);return ae?<span style={S.tag("#2dd4bf")}>🤝 {ae.nombreCompleto}</span>:null;})()}
     </div>
+    </div>
+    {actsOpo.length>0&&<button style={{...S.pill(showActs,"#a78bfa"),padding:"3px 10px",fontSize:10,fontWeight:700,marginTop:8,width:"100%"}} onClick={e=>{e.stopPropagation();setShowActs(v=>!v);}}>📋 {actsOpo.length} actividad{actsOpo.length!==1?"es":""} {showActs?"▲":"▾"}</button>}
+    {showActs&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
+      {actsOpo.map(a=>{const col2=EST_COLOR[a.estatus||"Programada"]||"#64748b";const cto=contactos.find(x=>x.id===a.contactoId);return<div key={a.id} style={{padding:"6px 0",borderBottom:"1px solid #0f172a",cursor:"pointer"}} onClick={e=>{e.stopPropagation();setSelAct(a);}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{a.asunto||a.tipoAccion||"Actividad"}</div>
+            <div style={{fontSize:9,color:"#64748b",marginTop:1}}>{a.fecha?a.fecha.split("-").reverse().join("/"):"sin fecha"}{a.hora?" · "+a.hora:""}{cto?" · "+nombreDisplay(cto):""}</div>
+          </div>
+          <span style={{...S.tag(col2),fontSize:8,flexShrink:0}}>{a.estatus||"Programada"}</span>
+        </div>
+      </div>;})}
+    </div>}
+    {/* Modal detalle actividad — solo lectura */}
+    {selAct&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setSelAct(null)}>
+      <div style={{background:"#0e0e1a",borderRadius:"16px 16px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <div style={{fontSize:13,fontWeight:800,color:GOLD}}>DETALLE ACTIVIDAD</div>
+          <button style={{background:"none",border:"none",color:"#94a3b8",fontSize:20,cursor:"pointer",padding:"0 4px",lineHeight:1}} onClick={()=>setSelAct(null)}>✕</button>
+        </div>
+        {/* Campos del detalle */}
+        {(()=>{const a=selAct;const col2=EST_COLOR[a.estatus||"Programada"]||"#64748b";const cto=contactos.find(x=>x.id===a.contactoId);const efEst=proyEstatus(a);return(<>
+          <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0",marginBottom:10,lineHeight:1.3}}>{a.asunto||a.tipoAccion||"Sin asunto"}</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+            {a.enfoque&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:9}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque}</span>}
+            <span style={{...S.tag(col2),fontSize:9}}>{efEst}</span>
+            {a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:9}}>{a.prioridad}</span>}
+            {a.tipoAccion&&<span style={{...S.tag("#64748b"),fontSize:9}}>{a.tipoAccion}</span>}
+          </div>
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{fontSize:9,color:"#64748b",fontWeight:700,width:70,flexShrink:0,paddingTop:1}}>FECHA</div>
+            <div style={{fontSize:12,color:"#e2e8f0"}}>{a.fecha?a.fecha.split("-").reverse().join("/"):"Sin fecha"}{a.hora?" · "+a.hora:""}</div>
+          </div>
+          {cto&&<div style={{display:"flex",gap:8,marginBottom:10}}>
+            <div style={{fontSize:9,color:"#64748b",fontWeight:700,width:70,flexShrink:0,paddingTop:1}}>CONTACTO</div>
+            <div style={{fontSize:12,color:"#94a3b8"}}>{nombreDisplay(cto)}</div>
+          </div>}
+          {(a.intencion||a.intencionResultado)&&<div style={{marginBottom:10}}>
+            <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>INTENCIÓN</div>
+            <div style={{fontSize:11,color:"#94a3b8",lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px"}}>{a.intencion||a.intencionResultado}</div>
+          </div>}
+          {a.accionProceso&&<div style={{marginBottom:10}}>
+            <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>ACCIÓN EJECUTADA</div>
+            <div style={{fontSize:11,color:"#60a5fa",lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px"}}>▸ {a.accionProceso}</div>
+          </div>}
+          {a.resultado&&<div style={{marginBottom:10}}>
+            <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>RESULTADO</div>
+            <div style={{fontSize:11,color:"#22c55e",lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px"}}>→ {a.resultado}</div>
+          </div>}
+          {(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+            {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
+          </div>}
+        </>);})()}
+      </div>
+    </div>}
   </div>;
 }
 
-function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,openOpo}){
-  const[fEt,setFEt]=useState("");
+function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,productos,openOpo,onToggleFav}){
+  const[fEts,setFEts]=useState([]);
+  const toggleEt=(v)=>setFEts(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
   const[showFil,setShowFil]=useState(false);
   const[fSol,setFSol]=useState([]);
   const[fContacto,setFContacto]=useState("");
@@ -2380,6 +2782,13 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   const[cHasta,setCHasta]=useState("");
   const[q,setQ]=useState("");
   const[fSinAct,setFSinAct]=useState(false);
+  const[fDestacadas,setFDestacadas]=useState(false);
+  const[fFavOpo,setFFavOpo]=useState(false);
+  const[fAlineado,setFAlineado]=useState(false);
+  const[mesAlineado,setMesAlineado]=useState(()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");});
+  const[showObjetivo,setShowObjetivo]=useState(false);
+  const[ord,setOrd]=useState("etapa");
+  const[ordDir,setOrdDir]=useState("asc");
   const solName=(id)=>(((catalogos&&catalogos.solucion)||[]).find(s=>s.id===id)||{}).nombre||"";
   const cn=(id)=>(contactos.find(c=>c.id===id)||{}).nombreCompleto||"";
   const en=(id)=>(empresas.find(e=>e.id===id)||{}).nombre||"";
@@ -2400,11 +2809,19 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
   };
   const abiertas=oportunidades.filter(ABIERTA);
   const sinSeguimiento=abiertas.filter(o=>!tieneSeg(o));
+  // solIdsConMeta debe declararse ANTES del filter de list
+  const solIdsConMeta=new Set((productos||[]).filter(p=>Number((p.metas||{})[mesAlineado])>0).map(p=>p.solucionId));
   const ql=q.trim().toLowerCase();
   const list=oportunidades.filter(o=>{
+    // Filtro base: excluir Concretadas/Rechazadas/En Espera a menos que el usuario las seleccione explícitamente
+    const userPickedClosed=fEts.length>0&&fEts.some(et=>!ABIERTA({etapa:et}));
+    if(!userPickedClosed&&!ABIERTA(o))return false;
     if(fSinAct&&tieneSeg(o))return false;
     if(fSinAct&&!ABIERTA(o))return false;
-    if(fEt&&o.etapa!==fEt)return false;
+    if(fFavOpo&&!o.fav)return false;
+    if(fAlineado){if(!ABIERTA(o)||!solIdsConMeta.has(o.solucionId)||(o.fechaEstimadaCierre||"").slice(0,7)!==mesAlineado)return false;}
+    if(fDestacadas){const sol=(catalogos.solucion||[]).find(s=>s.id===o.solucionId);if(!sol?.ancla||!ABIERTA(o))return false;}
+    if(fEts.length>0&&!fEts.includes(o.etapa||""))return false;
     if(fSol.length&&!fSol.includes(o.solucionId))return false;
     if(fContacto&&(o.contactoPrincipalId||o.contactoId)!==fContacto&&o.contactoOperativoId!==fContacto)return false;
     if(fEmpresa&&o.empresaId!==fEmpresa)return false;
@@ -2415,38 +2832,71 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
     if(cHasta&&(o.fechaEstimadaCierre||"")>cHasta)return false;
     if(ql){const hay=[o.concepto,cn(o.contactoPrincipalId||o.contactoId),cn(o.contactoOperativoId),en(o.empresaId),solName(o.solucionId)].filter(Boolean).join(" ").toLowerCase();if(!hay.includes(ql))return false;}
     return true;
-  }).sort((a,b)=>(b.id||"").localeCompare(a.id||""));
-  const nFil=(fEt?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0);
-  const limpiar=()=>{setFEt("");setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);};
-  const totalAb=abiertas.reduce((s,o)=>s+(Number(o.montoEstimado)||0),0);
-  const totalCom=abiertas.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0);
-  const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:a.nombreCompleto}));
+  }).sort((a,b)=>{
+    const PROB_RANK={"Muy Alta":0,"Alta":1,"Media":2,"Baja":3};
+    const etapas=(catalogos.etapaOportunidad||[]).map(e=>e.nombre);
+    let r=0;
+    if(ord==="etapa"){
+      r=(etapas.indexOf(a.etapa)>-1?etapas.indexOf(a.etapa):99)-(etapas.indexOf(b.etapa)>-1?etapas.indexOf(b.etapa):99);
+      if(r===0)r=((PROB_RANK[a.probabilidad]??9)-(PROB_RANK[b.probabilidad]??9));
+      if(r===0)r=(a.fechaEstimadaCierre||"9999").localeCompare(b.fechaEstimadaCierre||"9999");
+    }
+    else if(ord==="cierre") r=(a.fechaEstimadaCierre||"9999").localeCompare(b.fechaEstimadaCierre||"9999");
+    else if(ord==="prob")   r=((PROB_RANK[a.probabilidad]??9)-(PROB_RANK[b.probabilidad]??9));
+    else if(ord==="monto")  r=((Number(b.comisionEstimada)||Number(b.montoEstimado)||0))-((Number(a.comisionEstimada)||Number(a.montoEstimado)||0));
+    return ordDir==="asc"?r:-r;
+  });
+  const nFil=(fEts.length?1:0)+(fSol.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fAliado?1:0)+(fProb.length?1:0)+(fRecur.length?1:0)+((cDesde||cHasta)?1:0)+(fSinAct?1:0)+(fDestacadas?1:0)+(fAlineado?1:0)+(fFavOpo?1:0);
+  const limpiar=()=>{setFEts([]);setFSol([]);setFContacto("");setFEmpresa("");setFAliado("");setFProb([]);setFRecur([]);setCDesde("");setCHasta("");setQ("");setFSinAct(false);setFDestacadas(false);setFAlineado(false);setFFavOpo(false);};
+  const alineadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&solIdsConMeta.has(o.solucionId)&&(o.fechaEstimadaCierre||"").slice(0,7)===mesAlineado).length;
+  const destacadasCount=(oportunidades||[]).filter(o=>ABIERTA(o)&&(catalogos.solucion||[]).find(s=>s.id===o.solucionId)?.ancla).length;
+  const aliadoOpts=(aliados||[]).map(a=>({id:a.id,label:nombreDisplay(a)}));
   return <div>
-    <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div><div style={S.sub}>{oportunidades.length} en total · {abiertas.length} abiertas</div></div></div>
+    <div style={S.hdr}><div><div style={S.logo}>Oportunidades</div></div></div>
     <div style={S.line}/>
     <div style={S.sec}>
-      <div style={S.g2}>
-        <div style={S.card()}><div style={S.lbl}>Monto abierto</div><div style={S.big()}>{money(totalAb)}</div></div>
-        <div style={S.card()}><div style={S.lbl}>Comisión abierta</div><div style={S.big("#22c55e")}>{money(totalCom)}</div></div>
+      {/* Comisión esperada — compacta, con conteo inline */}
+      <div style={{...S.card(),padding:"8px 12px",marginBottom:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontSize:8,color:"#64748b",fontWeight:700,letterSpacing:.5}}>COMISIÓN ESPERADA{(fAlineado||fDestacadas||fFavOpo||fEts.length||fSol.length||fSinAct)?" · FILTRADO":""}</div>
+            <div style={{fontSize:18,fontWeight:800,color:GOLD}}>{money(list.reduce((s,o)=>s+(Number(o.comisionEstimada)||0),0))}</div>
+          </div>
+          <div style={{textAlign:"right",fontSize:9,color:"#475569"}}>{list.length} en vista</div>
+        </div>
       </div>
-      {/* Chip sin seguimiento */}
-      {sinSeguimiento.length>0&&<button
-        style={{...S.pill(fSinAct,"#ef4444"),width:"100%",padding:"8px 0",fontWeight:700,fontSize:12,marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}
-        onClick={()=>setFSinAct(v=>!v)}>
-        <span>⚠</span>
-        <span>{sinSeguimiento.length} oportunidad{sinSeguimiento.length!==1?"es":""} sin actividad de seguimiento</span>
-        {fSinAct&&<span style={{fontSize:10,opacity:.8}}>· Toca para ver todas</span>}
-      </button>}
-      <div style={{display:"flex",gap:6,marginTop:8,alignItems:"center"}}>
+      {/* Búsqueda + filtros elaborados */}
+      <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:8}}>
         <input style={{...S.inp,flex:1}} placeholder="🔍 Buscar concepto, contacto, empresa…" value={q} onChange={e=>setQ(e.target.value)}/>
-        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 14px",fontWeight:700,whiteSpace:"nowrap"}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""} {showFil?"▲":"▾"}</button>
-        <span style={{fontSize:9,color:"#475569",whiteSpace:"nowrap"}}>Act: {list.length}</span>
+        <button style={{...S.pill(showFil||nFil>0,"#2dd4bf"),padding:"0 12px",fontWeight:700,whiteSpace:"nowrap",fontSize:11}} onClick={()=>setShowFil(v=>!v)}>⚙{nFil>0?` (${nFil})`:""}</button>
       </div>
-      {showFil&&<div style={{...S.card(),marginTop:10}}>
+      {/* Orden — chips pequeños */}
+      <div style={{display:"flex",gap:4,marginBottom:8,alignItems:"center",flexWrap:"wrap"}}>
+        <span style={{fontSize:8,color:"#64748b",fontWeight:700,flexShrink:0}}>ORDEN</span>
+        {[["etapa","Etapa"],["cierre","Cierre"],["prob","Prob."],["monto","Monto"]].map(([v,l])=>(
+          <span key={v} style={{...S.chip(ord===v,GOLD),fontSize:9,padding:"2px 7px",whiteSpace:"nowrap",cursor:"pointer"}} onClick={()=>setOrd(v)}>{l}</span>
+        ))}
+        <span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"2px 7px",cursor:"pointer"}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑":"↓"}</span>
+      </div>
+      {/* Filtros rápidos — chips con labels descriptivos en una sola línea */}
+      <div style={{display:"flex",gap:5,marginBottom:8,alignItems:"center",flexWrap:"nowrap",overflowX:"auto"}}>
+        {(oportunidades||[]).filter(o=>o.fav).length>0&&<span style={{...S.chip(fFavOpo,"#fbbf24"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFFavOpo(v=>!v)}>⭐ Mis favoritas{fFavOpo?` (${(oportunidades||[]).filter(o=>o.fav).length})`:""}</span>}
+        {destacadasCount>0&&<span style={{...S.chip(fDestacadas,GOLD),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFDestacadas(v=>!v)}>★ Destacadas{fDestacadas?` (${destacadasCount})`:""}</span>}
+        <span style={{...S.chip(fAlineado,"#22c55e"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFAlineado(v=>!v)}>🎯 Objetivo{fAlineado&&alineadasCount>0?` (${alineadasCount})`:""}</span>
+        <input type="month" style={{background:"#13131f",border:`1px solid ${fAlineado?"#22c55e":"#1e293b"}`,borderRadius:8,padding:"2px 5px",color:"#e2e8f0",fontSize:9,outline:"none",width:100,flexShrink:0}} value={mesAlineado} onChange={e=>setMesAlineado(e.target.value)}/>
+        {sinSeguimiento.length>0&&<span style={{...S.chip(fSinAct,"#ef4444"),fontSize:9,padding:"3px 8px",cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}} onClick={()=>setFSinAct(v=>!v)}>⚠ Sin actividad{fSinAct?` (${sinSeguimiento.length})`:""}</span>}
+      </div>
+      {/* Objetivo del Mes — colapsable */}
+      <div style={{marginBottom:8}}>
+        <button style={{...S.chip(showObjetivo,"#a78bfa"),fontSize:9,padding:"3px 10px",width:"100%",cursor:"pointer",textAlign:"center"}} onClick={()=>setShowObjetivo(v=>!v)}>🎯 Objetivo del Mes {showObjetivo?"▲":"▾"}</button>
+        {showObjetivo&&<div style={{marginTop:6}}><ObjetivoMes productos={productos} oportunidades={oportunidades} catalogos={catalogos}/></div>}
+      </div>
+      {/* Panel de filtros elaborados */}
+      {showFil&&<div style={{...S.card(),marginBottom:8}}>
         <div style={S.fl}>Etapa</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
-          <span style={S.chip(!fEt)} onClick={()=>setFEt("")}>Todas</span>
-          {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEt===o.nombre,oc(o.nombre))} onClick={()=>setFEt(fEt===o.nombre?"":o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
+          {fEts.length>0&&<span style={{...S.chip(false,"#64748b"),fontSize:9,padding:"3px 8px"}} onClick={()=>setFEts([])}>✕ Todas</span>}
+          {(catalogos.etapaOportunidad||[]).map(o=><span key={o.id} style={S.chip(fEts.includes(o.nombre),oc(o.nombre))} onClick={()=>toggleEt(o.nombre)}>{o.nombre.replace("Oportunidad ","")}</span>)}
         </div>
         <div style={{...S.fl,marginTop:10}}>Probabilidad</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>
@@ -2459,20 +2909,20 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
         <div style={{...S.fl,marginTop:10}}>Solución</div>
         <div style={{...S.chips,flexWrap:"wrap",overflowX:"visible"}}>{(catalogos.solucion||[]).map(s=><span key={s.id} style={S.chip(fSol.includes(s.id),GOLD)} onClick={()=>toggleSol(s.id)}>{s.nombre}</span>)}</div>
         <div style={{...S.fl,marginTop:10}}>Contacto</div>
-        <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:c.nombreCompleto}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
+        <BuscaSelect opciones={contactos.slice().sort((a,b)=>(a.nombreCompleto||"").localeCompare(b.nombreCompleto||"")).map(c=>({id:c.id,label:nombreDisplay(c)}))} value={fContacto} onChange={v=>setFContacto(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={{...S.fl,marginTop:10}}>Empresa</div>
         <BuscaSelect opciones={empresas.slice().sort((a,b)=>(a.nombre||"").localeCompare(b.nombre||"")).map(e=>({id:e.id,label:e.nombre}))} value={fEmpresa} onChange={v=>setFEmpresa(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={{...S.fl,marginTop:10}}>Aliado</div>
         <BuscaSelect opciones={aliadoOpts} value={fAliado} onChange={v=>setFAliado(v)} placeholder="— Cualquiera —" vacioLabel="— Cualquiera —"/>
         <div style={S.g2}>
-          <div><div style={{...S.fl,marginTop:10}}>Cierre estimado desde</div><input type="date" style={S.inp} value={cDesde} onChange={e=>{setCDesde(e.target.value);if(e.target.value&&!cHasta)setCHasta(e.target.value);}}/></div>
-          <div><div style={{...S.fl,marginTop:10}}>Cierre estimado hasta</div><input type="date" style={S.inp} value={cHasta} onChange={e=>setCHasta(e.target.value)}/></div>
+          <div><div style={{...S.fl,marginTop:10}}>Cierre desde</div><input type="date" style={S.inp} value={cDesde} onChange={e=>{setCDesde(e.target.value);if(e.target.value&&!cHasta)setCHasta(e.target.value);}}/></div>
+          <div><div style={{...S.fl,marginTop:10}}>Cierre hasta</div><input type="date" style={S.inp} value={cHasta} onChange={e=>setCHasta(e.target.value)}/></div>
         </div>
         {nFil>0&&<div style={{textAlign:"right",marginTop:10}}><button style={S.pill(false,"#f87171")} onClick={limpiar}>Limpiar filtros</button></div>}
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} actividades={actividades} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)} onToggleFav={onToggleFav}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
@@ -2508,6 +2958,10 @@ function App(){
     if(!localStorage.getItem(PFX+"migAliadoTipo")){
       cs=cs.map(c=>{ if(c.tipoAliado&&!c.tiposAliado){const{tipoAliado,...rest}=c;return {...rest,tiposAliado:[tipoAliado]};} return c; });
       try{localStorage.setItem(PFX+"migAliadoTipo","1");}catch(e){}
+    }
+    if(!localStorage.getItem(PFX+"migCandProc")){
+      cs=cs.map(c=>c.etapaEspecifica==="Candidato en Proceso"?{...c,etapaEspecifica:"Candidato Identificado"}:c);
+      try{localStorage.setItem(PFX+"migCandProc","1");}catch(e){}
     }
     return cs;
   });
@@ -2641,7 +3095,7 @@ function App(){
     {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
     {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
-    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} openOpo={openOpo}/>}
+    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} productos={productos} openOpo={openOpo} onToggleFav={(id)=>setOportunidades(p=>p.map(o=>o.id===id?{...o,fav:!o.fav}:o))}/>}
     {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
