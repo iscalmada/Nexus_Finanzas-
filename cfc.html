@@ -2739,8 +2739,13 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades,onTogg
             <div style={{fontSize:11,fontWeight:600,color:"#e2e8f0"}}>{a.asunto||a.tipoAccion||"Actividad"}</div>
             <div style={{fontSize:9,color:"#64748b",marginTop:1}}>{a.fecha?a.fecha.split("-").reverse().join("/"):"sin fecha"}{a.hora?" · "+a.hora:""}{cto?" · "+nombreDisplay(cto):""}</div>
           </div>
-          <span style={{...S.tag(col2),fontSize:8,flexShrink:0}}>{a.estatus||"Programada"}</span>
+          <span style={{...S.tag(col2),fontSize:8,flexShrink:0}}>{proyEstatus(a)}</span>
         </div>
+        {(()=>{const hInt=a.intencion||a.intencionResultado||"";const hAcc=a.accionProceso||"";const hRes=a.resultado||"";const cut=(t)=>t.length>220?t.slice(0,220)+"…":t;return(<>
+          {hInt&&<div style={{fontSize:10,color:"#94a3b8",lineHeight:1.35,wordBreak:"break-word",marginTop:4}}>{cut(hInt)}</div>}
+          {hAcc&&<div style={{fontSize:10,color:"#60a5fa",lineHeight:1.35,wordBreak:"break-word",marginTop:3}}>▸ {cut(hAcc)}</div>}
+          {hRes&&<div style={{fontSize:10,color:"#22c55e",lineHeight:1.35,wordBreak:"break-word",marginTop:3}}>→ {cut(hRes)}</div>}
+        </>);})()}
       </div>;})}
     </div>}
     {/* Modal detalle actividad — solo lectura */}
