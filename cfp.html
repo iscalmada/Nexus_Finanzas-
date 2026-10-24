@@ -325,7 +325,8 @@ function calcConsolidado(movs,pI,pE,cuentasRef,incluirProy,excludedIds){
       if(r.tipoOp==="Ingreso"&&r.prioridad<=(pI||3))cuenta=true;
       // Para egresos: pE 1-4 filtra por prioridad, pE=5 incluye todos
       if(r.tipoOp==="Egreso"&&!r.usaTarjeta&&((pE||5)>=5||r.prioridad<=(pE||5)))cuenta=true;
-      if(r.tipoOp==="Pago Tarjeta")cuenta=true;
+      // Pago Tarjeta: respeta el mismo filtro de prioridad que los egresos (los PT antiguos quedaron en prioridad 1 = Esencial, siempre entran)
+      if(r.tipoOp==="Pago Tarjeta"&&((pE||5)>=5||(parseInt(r.prioridad)||1)<=(pE||5)))cuenta=true;
     }
     // Simulación: excluir del cálculo aunque cumpla las reglas
     const simExcluido=excl.has(r.id);
@@ -679,6 +680,14 @@ const ModalMov=memo(function ModalMov({
           <div style={S.fg}><label style={S.fl}>Estatus</label>
             <select style={S.sel} value={formMov.estatus} onChange={e=>handleEstatus(e.target.value)}>{estatusOpts.map(e=><option key={e} value={e}>{e}</option>)}</select>
           </div>
+          {formMov.estatus!=="PAGADO"&&<div style={S.fg}>
+            <label style={S.fl}>Prioridad <span style={{fontSize:8,color:"#64748b",fontWeight:400}}>(define si entra al escenario proyectado)</span></label>
+            <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+              {[[1,PRIO_EG_LBL[1],"#22c55e"],[2,PRIO_EG_LBL[2],"#60a5fa"],[3,PRIO_EG_LBL[3],"#fbbf24"],[4,PRIO_EG_LBL[4],"#f87171"]].map(([v,l,c])=>(
+                <button key={v} style={{...S.prioB2(formMov.prioridad===v,c),flex:1,minWidth:60,padding:"7px 4px",fontSize:9}} onClick={()=>set("prioridad",v)}>{l}</button>
+              ))}
+            </div>
+          </div>}
           {ptNecesitaCuenta&&(<>
             <div style={S.fg} ref={tarjetaRef}><label style={S.fl}>Tarjeta a pagar</label>
               <select style={fieldErrors?.tarjetaId?S.selErr:S.sel} value={formMov.tarjetaId||""} onChange={e=>set("tarjetaId",parseInt(e.target.value)||null)}>
@@ -1667,14 +1676,14 @@ function App(){
         const hasEgFilt=filterPrioEg.size>0;
         if(!hasIngFilt&&!hasEgFilt) return true;
         // Si hay filtro activo en algún lado, Traspasos y PagoTC se ocultan
-        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia"||r.tipoOp==="Pago Tarjeta") return false;
+        if(r.tipoOp==="Traspaso"||r.tipoOp==="Transferencia") return false;
         if(r.tipoOp==="Ingreso"){
           if(!hasIngFilt) return false; // hay filtro de Eg pero no de Ing → ocultar ingresos
           // Asegurar comparación numérica
           const pI=parseInt(r.prioridad)||1;
           return filterProbIng.has(pI);
         }
-        if(r.tipoOp==="Egreso"){
+        if(r.tipoOp==="Egreso"||r.tipoOp==="Pago Tarjeta"){
           if(!hasEgFilt) return false; // hay filtro de Ing pero no de Eg → ocultar egresos
           const pE2=parseInt(r.prioridad)||3;
           return filterPrioEg.has(pE2);
@@ -2129,7 +2138,7 @@ function App(){
         else if(r.tipoOp==="Pago Tarjeta"&&est!=="INGRESADO")u.estatus=est;
         else if(r.tipoOp==="Traspaso")u.estatus=est;
       }
-      if(multiForm.prioridad&&r.tipoOp!=="Traspaso"&&r.tipoOp!=="Pago Tarjeta"){
+      if(multiForm.prioridad&&r.tipoOp!=="Traspaso"){
         u.prioridad=parseInt(multiForm.prioridad);
       }
       return u;
@@ -2982,7 +2991,7 @@ function App(){
               const cDest=cuentas.find(c=>c.id===row.cuentaDestinoId)?.nombre;
               const tcNom=tarjetas.find(t=>t.id===row.tarjetaId)?.nombre;
               const esProg=["PENDIENTE","PROYECTADO","PROGRAMADO"].includes(row.estatus);
-              const isEg=row.tipoOp==="Egreso";
+              const isEg=row.tipoOp==="Egreso"||row.tipoOp==="Pago Tarjeta";
               const prioColor=isEg?(PRIO_EG_COLOR[row.prioridad]||"#94a3b8"):(row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8");
               const prioLabel=isEg?(PRIO_EG_LBL[row.prioridad]||""):PRIO_LBL[row.prioridad]||"";
               const catNom=(row.tipoOp==="Ingreso"?catIng:catEg).find(c=>c.id===row.cat)?.nombre;
@@ -4863,7 +4872,7 @@ function App(){
                       </select>
                     </div>
                   )}
-                  {soloEg&&(
+                  {(soloEg||soloPT)&&(
                     <div style={S.fg}><label style={S.fl}>Prioridad</label>
                       <select style={S.sel} value={multiForm.prioridad} onChange={e=>setMultiForm(f=>({...f,prioridad:e.target.value}))}>
                         <option value="">— Sin cambio —</option>
@@ -5173,7 +5182,7 @@ function App(){
           const cNom2=cuentas.find(c=>c.id===row.cuentaId)?.nombre||"";
           const cDest2=cuentas.find(c=>c.id===row.cuentaDestinoId)?.nombre||"";
           const tcNom2=tarjetas.find(t=>t.id===row.tarjetaId)?.nombre||"";
-          const isEgMov=row.tipoOp==="Egreso";
+          const isEgMov=row.tipoOp==="Egreso"||row.tipoOp==="Pago Tarjeta";
           const prioColor=isEgMov?(PRIO_EG_COLOR[row.prioridad]||"#94a3b8"):(row.prioridad===1?"#22c55e":row.prioridad===2?"#fbbf24":"#94a3b8");
           const prioLabelMov=isEgMov?(PRIO_EG_LBL[row.prioridad]||""):(PRIO_LBL[row.prioridad]||"");
           return(
@@ -5197,7 +5206,7 @@ function App(){
                   {[
                     ["Fecha", row.fecha?fmtDate(row.fecha):"Sin fecha"],
                     ["Categoría", [catNom,subNom].filter(Boolean).join(" › ")||"—"],
-                    row.tipoOp!=="Traspaso"&&row.tipoOp!=="Pago Tarjeta"?["Prioridad/Prob.", PRIO_LBL[row.prioridad]||"—"]:null,
+                    row.tipoOp!=="Traspaso"?["Prioridad/Prob.", prioLabelMov||"—"]:null,
                     cNom2?["Cuenta", cDest2?`${cNom2} → ${cDest2}`:cNom2]:null,
                     tcNom2?["Tarjeta", tcNom2]:null,
                     row.obs?["Observaciones", row.obs]:null,
