@@ -413,7 +413,7 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
 }
 
 /* ════════ DETALLE CONTACTO ════════ */
-function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidades,onAddAct,onEditAct,onAddOpo,onEditOpo,onEdit,onDelete,onBack}){
+function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidades,onAddAct,onEditAct,onEditActForm,onAddOpo,onEditOpo,onEdit,onDelete,onBack}){
   const emp=empresas.find(e=>e.id===c.empresaId);
   const[showOpps,setShowOpps]=useState(false);
   const[showActs,setShowActs]=useState(false);
@@ -524,7 +524,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
           <button style={S.pill(true,GOLD)} onClick={()=>onAddAct(c.id)}>+ Registrar</button>
         </div>
         {showActs&&<div style={{marginTop:10}}>
-          <ActividadesList acts={(actividades||[]).filter(a=>a.contactoId===c.id)} contactos={[c]} showContacto={false} onTap={(a)=>onEditAct(a)}/>
+          <ActividadesList acts={(actividades||[]).filter(a=>a.contactoId===c.id)} contactos={[c]} showContacto={false} onTap={(a)=>onEditAct(a)} onEdit={onEditActForm}/>
         </div>}
       </div>
       {(()=>{
@@ -554,7 +554,7 @@ function ContactoDetalle({c,contactos,catalogos,empresas,actividades,oportunidad
 }
 
 /* ════════ LISTA CONTACTOS ════════ */
-function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct,oportunidades,openOpo,aliadosOnly,onBack}){
+function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpresas,setContactos,actividades,openAct,verAct,oportunidades,openOpo,aliadosOnly,onBack}){
   const[q,setQ]=useState("");
   const[fEtapa,setFEtapa]=useState([]);
   const[fEsp,setFEsp]=useState([]);
@@ -639,7 +639,7 @@ function Contactos({initialSel,contactos,catalogos,setCatalogos,empresas,setEmpr
     return <>
       <ContactoDetalle c={c} contactos={contactos} catalogos={catalogos} empresas={empresas} actividades={actividades} oportunidades={oportunidades}
         onAddAct={(cid)=>openAct({contactoId:cid,estatus:"Programada",fecha:hoyISO()},cid)}
-        onEditAct={(a)=>openAct(a,a.contactoId)}
+        onEditAct={(a)=>verAct?verAct(a):openAct(a,a.contactoId)} onEditActForm={(a)=>openAct(a,a.contactoId)}
         onAddOpo={(cid)=>openOpo({contactoPrincipalId:cid},cid)}
         onEditOpo={(o)=>openOpo(o,o.contactoPrincipalId||o.contactoId)}
         onEdit={()=>setModal(c)} onDelete={()=>del(c.id)} onBack={()=>setSel(null)}/>
@@ -1673,7 +1673,7 @@ function ObjetivoMes({productos,oportunidades,catalogos}){
     }
   </div>;
 }
-function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,setView,catalogos,productos}){
+function Inicio({contactos,empresas,actividades,oportunidades,openAct,verAct,openOpo,setView,catalogos,productos}){
   const stat=(et)=>contactos.filter(c=>c.etapaPrincipal===et).length;
   const[limite,setLimite]=useState("");
   const[proxOpen,setProxOpen]=useState(false);
@@ -1749,7 +1749,7 @@ function Inicio({contactos,empresas,actividades,oportunidades,openAct,openOpo,se
         <div style={S.sTit}>{proxOpen?"\u25BE ":"\u25B8 "}Próximas actividades{prox.length?` (${prox.length})`:""}</div>
         {proxOpen&&<input type="date" onClick={e=>e.stopPropagation()} style={{width:"auto",background:"#13131f",border:"1px solid #1e293b",borderRadius:8,padding:"5px 8px",color:"#e2e8f0",fontSize:11,outline:"none"}} value={limite} onChange={e=>setLimite(e.target.value)} title="Hasta fecha"/>}
       </div>
-      {proxOpen&&<ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} noSort={true} onTap={(a)=>openAct(a,a.contactoId)}/>}
+      {proxOpen&&<ActividadesList acts={prox} contactos={contactos} showContacto={true} asc={true} noSort={true} onTap={(a)=>verAct?verAct(a):openAct(a,a.contactoId)} onEdit={(a)=>openAct(a,a.contactoId)}/>}
     </div>
   </div>;
 }
@@ -2129,7 +2129,90 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   </div></div>;
 }
 
-function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct,featTag}){
+/* ════════ DETALLE DE ACTIVIDAD (solo lectura, hoja inferior) ════════ */
+function ActividadDetalle({a,contactos,empresas,oportunidades,catalogos,onEdit,onClose}){
+  const featTag=((catalogos&&catalogos.etiqAgenda)||[])[0];
+  const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
+  const efFech=proyFecha(a)||a.fecha||"";
+  const efPrio=proyPrioridad(a);
+  const cto=(contactos||[]).find(x=>x.id===a.contactoId);
+  const empObj=cto?(empresas||[]).find(e=>e.id===((cEmpresas(cto)[0])||{}).empresaId):null;
+  const opo=a.oportunidadId?(oportunidades||[]).find(o=>o.id===a.oportunidadId):null;
+  const sol=a.servicioSolucion?((((catalogos&&catalogos.solucion)||[]).find(x=>x.id===a.servicioSolucion))||{}).nombre||a.servicioSolucion:"";
+  const modo=a.modoTarea||"unica";
+  const items=a.items||[];const subs=a.subtareas||[];
+  const fmtF=(f)=>f?f.split("-").reverse().join("/"):"";
+  const fila=(l,v)=>v?<div style={{display:"flex",gap:8,marginBottom:10}}>
+    <div style={{fontSize:9,color:"#64748b",fontWeight:700,width:76,flexShrink:0,paddingTop:2}}>{l}</div>
+    <div style={{fontSize:12,color:"#e2e8f0",flex:1,minWidth:0,wordBreak:"break-word"}}>{v}</div>
+  </div>:null;
+  const caja=(l,t,c,pre)=>t?<div style={{marginBottom:10}}>
+    <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>{l}</div>
+    <div style={{fontSize:11,color:c,lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px",whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{pre}{t}</div>
+  </div>:null;
+  const esCom=a.enfoque==="Contactar";
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+    <div style={{background:"#0e0e1a",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 16px 10px"}}>
+        <div style={{fontSize:13,fontWeight:800,color:GOLD}}>DETALLE ACTIVIDAD</div>
+        <button style={{background:"none",border:"none",color:"#94a3b8",fontSize:20,cursor:"pointer",padding:"0 4px",lineHeight:1}} onClick={onClose}>✕</button>
+      </div>
+      <div style={{overflowY:"auto",padding:"0 16px 12px",flex:1}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0",marginBottom:10,lineHeight:1.3,wordBreak:"break-word"}}>{a.asunto||(esCom&&cto?nombreDisplay(cto):"")||a.tipoAccion||"Sin asunto"}</div>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+          {a.enfoque&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:9}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque}</span>}
+          <span style={{...S.tag(col),fontSize:9}}>{efEst}{a.cierreForzado?" · cierre forzado":""}</span>
+          {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:9}}>{efPrio}</span>}
+          {a.tipoAccion&&<span style={{...S.tag("#64748b"),fontSize:9}}>{a.tipoAccion}</span>}
+          {modo!=="unica"&&<span style={{...S.tag("#a78bfa"),fontSize:9}}>{modo==="checklist"?"☑ Checklist":"📁 Proyecto"}</span>}
+        </div>
+        {fila("FECHA",efFech?fmtF(efFech)+(a.hora?" · "+a.hora:""):"Sin fecha")}
+        {fila("CONTACTO",cto?nombreDisplay(cto):"")}
+        {fila("EMPRESA",empObj?empObj.nombre:"")}
+        {fila("OPORTUNIDAD",opo?opo.concepto:"")}
+        {fila("SERVICIO",sol)}
+        {caja(esCom?"INTENCIÓN":"DESCRIPCIÓN",a.intencion||a.intencionResultado,"#94a3b8","")}
+        {caja("ACCIÓN EJECUTADA",a.accionProceso,"#60a5fa","▸ ")}
+        {caja("RESULTADO",a.resultado,"#22c55e","→ ")}
+        {modo==="checklist"&&items.length>0&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>CHECKLIST · {items.filter(i=>i.done).length}/{items.length}</div>
+          <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
+            {items.map((it,i)=><div key={it.id||i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:i<items.length-1?"1px solid #14141f":"none"}}>
+              <span style={{fontSize:12,color:it.done?"#22c55e":"#475569",flexShrink:0}}>{it.done?"☑":"☐"}</span>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontSize:11,color:it.done?"#64748b":"#e2e8f0",textDecoration:it.done?"line-through":"none",wordBreak:"break-word"}}>{it.texto||"—"}</div>
+                {it.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,wordBreak:"break-word"}}>{it.descripcion}</div>}
+              </div>
+              {it.prioridad&&it.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[it.prioridad]||"#64748b"),fontSize:8,flexShrink:0,alignSelf:"flex-start"}}>{it.prioridad}</span>}
+            </div>)}
+          </div>
+        </div>}
+        {modo==="proyecto"&&subs.length>0&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>SUBTAREAS · {subs.filter(x=>x.estatus==="Cerrada").length}/{subs.length}</div>
+          <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
+            {subs.map((st,i)=>{const sc=EST_COLOR[st.estatus||"Programada"]||"#64748b";return <div key={st.id||i} style={{padding:"6px 0",borderBottom:i<subs.length-1?"1px solid #14141f":"none"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                <div style={{fontSize:11,color:st.estatus==="Cerrada"?"#64748b":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",flex:1,minWidth:0,wordBreak:"break-word"}}>{st.titulo||"—"}</div>
+                <span style={{...S.tag(sc),fontSize:8,flexShrink:0}}>{st.estatus||"Programada"}</span>
+              </div>
+              <div style={{fontSize:9,color:"#64748b",marginTop:2}}>{st.fecha?fmtF(st.fecha):"sin fecha"}{st.prioridad?" · "+st.prioridad:""}</div>
+              {st.descripcion&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,wordBreak:"break-word"}}>{st.descripcion}</div>}
+            </div>;})}
+          </div>
+        </div>}
+        {(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+          {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
+        </div>}
+      </div>
+      <div style={{display:"flex",gap:8,padding:"10px 16px 20px",borderTop:"1px solid #1e293b"}}>
+        <button style={{...S.pill(false,"#64748b"),flex:1,padding:"10px 0",fontWeight:700}} onClick={onClose}>Cerrar</button>
+        {onEdit&&<button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={onEdit}>✏ Editar</button>}
+      </div>
+    </div>
+  </div>;
+}
+
+function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,onEdit,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct,featTag}){
   const[expandidos,setExpandidos]=useState(new Set());  // mecanismo 2: subtareas Proyecto/Checklist
   const[expandDesc,setExpandDesc]=useState(new Set());  // mecanismo 1: descripción en TODAS las tarjetas
   const[selSub,setSelSub]=useState({});     // {actId: Set<subId>}
@@ -2293,7 +2376,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
         </div>
       </div>}
       {/* Botón editar para no-única */}
-      {esInterno&&modo!=="unica"&&!selectable&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();onTap&&onTap(a);}}>✏ Editar {modo==="proyecto"?"proyecto":"Checklist"}</button>}
+      {esInterno&&modo!=="unica"&&!selectable&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();const fn=onEdit||onTap;fn&&fn(a);}}>✏ Editar {modo==="proyecto"?"proyecto":"Checklist"}</button>}
       {/* Panel expandido checklist */}
       {isExp&&modo==="checklist"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
         {[...(a.items||[])].sort((x,y)=>{
@@ -2381,7 +2464,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
     </div>;})}</div>;
 }
 
-function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,onEditActs,onCopyActs,onSinRespuesta}){
+function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,verAct,onEditActs,onCopyActs,onSinRespuesta}){
   const[filtros,setFiltros]=useState(["Programada","En Proceso"]);
   const toggleFiltro=(t)=>setFiltros(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]);
   const[modo,setModo]=useState("rptCom");
@@ -2562,7 +2645,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     {/* ── CONTENIDO ── */}
     <div id="ag-top" style={{...S.sec,paddingTop:4}}>
       <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{base.length} de {actividades.length} actividades</div>
-      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>openAct(a,a.contactoId)} featTag={featTag}/>}
+      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>verAct?verAct(a):openAct(a,a.contactoId)} onEdit={(a)=>openAct(a,a.contactoId)} featTag={featTag}/>}
       {(modo==="rptCom"||modo==="rptTar"||modo==="rptAcc")&&(()=>{
         const esCom=modo==="rptCom";
         const enfRpt=modo==="rptCom"?"Contactar":modo==="rptTar"?"Tareas":"Acciones";
@@ -2586,7 +2669,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
             const empObj=esCom&&ctoObj?(empresas||[]).find(e=>e.id===(cEmpresas(ctoObj)[0]||{}).empresaId):null;
             const principal=esCom?((nombreDisplay(ctoObj))||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
             const isFeatRow=featTag&&(a.etiquetasAgenda||[]).includes(featTag.nombre);
-            return <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):openAct(a,a.contactoId)} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`}}>
+            return <div key={a.id} id={i===repHoyIdx?"ag-hoy":undefined} onClick={()=>selMode?toggleSel(a.id):(verAct?verAct(a):openAct(a,a.contactoId))} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_CFC_COLOR[a.enfoque]||col}`}}>
               {selMode&&<span style={{width:14,height:14,flexShrink:0,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
               <div style={{width:20,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                 {featTag&&<span onClick={e=>{e.stopPropagation();onEditActs([a.id],{etiquetasAgenda:isFeatRow?(a.etiquetasAgenda||[]).filter(x=>x!==featTag.nombre):[...(a.etiquetasAgenda||[]),featTag.nombre]});}} style={{cursor:"pointer",fontSize:13,filter:isFeatRow?"none":"grayscale(1) opacity(0.3)"}}>💰</span>}
@@ -2768,7 +2851,7 @@ function OportunidadModal({init,contactos,empresas,catalogos,productos,fixedCont
   </div></div>;
 }
 
-function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades,onToggleFav}){
+function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades,onToggleFav,onEditAct}){
   const featTag=((catalogos&&catalogos.etiqAgenda)||[])[0];
   const[showActs,setShowActs]=useState(false);
   const[selAct,setSelAct]=useState(null);
@@ -2821,52 +2904,11 @@ function OpoCard({o,contactos,empresas,catalogos,onTap,sinAct,actividades,onTogg
         </>);})()}
       </div>;})}
     </div>}
-    {/* Modal detalle actividad — solo lectura */}
-    {selAct&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={()=>setSelAct(null)}>
-      <div style={{background:"#0e0e1a",borderRadius:"16px 16px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480,maxHeight:"80vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div style={{fontSize:13,fontWeight:800,color:GOLD}}>DETALLE ACTIVIDAD</div>
-          <button style={{background:"none",border:"none",color:"#94a3b8",fontSize:20,cursor:"pointer",padding:"0 4px",lineHeight:1}} onClick={()=>setSelAct(null)}>✕</button>
-        </div>
-        {/* Campos del detalle */}
-        {(()=>{const a=selAct;const col2=EST_COLOR[a.estatus||"Programada"]||"#64748b";const cto=contactos.find(x=>x.id===a.contactoId);const efEst=proyEstatus(a);return(<>
-          <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0",marginBottom:10,lineHeight:1.3}}>{a.asunto||a.tipoAccion||"Sin asunto"}</div>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
-            {a.enfoque&&<span style={{...S.tag(ENF_CFC_COLOR[a.enfoque]||"#60a5fa"),fontSize:9}}>{ENF_CFC_ICON[a.enfoque]||"●"} {a.enfoque}</span>}
-            <span style={{...S.tag(col2),fontSize:9}}>{efEst}</span>
-            {a.prioridad&&<span style={{...S.tag(PRIOR_COLOR[a.prioridad]||"#64748b"),fontSize:9}}>{a.prioridad}</span>}
-            {a.tipoAccion&&<span style={{...S.tag("#64748b"),fontSize:9}}>{a.tipoAccion}</span>}
-          </div>
-          <div style={{display:"flex",gap:8,marginBottom:10}}>
-            <div style={{fontSize:9,color:"#64748b",fontWeight:700,width:70,flexShrink:0,paddingTop:1}}>FECHA</div>
-            <div style={{fontSize:12,color:"#e2e8f0"}}>{a.fecha?a.fecha.split("-").reverse().join("/"):"Sin fecha"}{a.hora?" · "+a.hora:""}</div>
-          </div>
-          {cto&&<div style={{display:"flex",gap:8,marginBottom:10}}>
-            <div style={{fontSize:9,color:"#64748b",fontWeight:700,width:70,flexShrink:0,paddingTop:1}}>CONTACTO</div>
-            <div style={{fontSize:12,color:"#94a3b8"}}>{nombreDisplay(cto)}</div>
-          </div>}
-          {(a.intencion||a.intencionResultado)&&<div style={{marginBottom:10}}>
-            <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>INTENCIÓN</div>
-            <div style={{fontSize:11,color:"#94a3b8",lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px"}}>{a.intencion||a.intencionResultado}</div>
-          </div>}
-          {a.accionProceso&&<div style={{marginBottom:10}}>
-            <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>ACCIÓN EJECUTADA</div>
-            <div style={{fontSize:11,color:"#60a5fa",lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px"}}>▸ {a.accionProceso}</div>
-          </div>}
-          {a.resultado&&<div style={{marginBottom:10}}>
-            <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>RESULTADO</div>
-            <div style={{fontSize:11,color:"#22c55e",lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px"}}>→ {a.resultado}</div>
-          </div>}
-          {(a.etiquetasAgenda||[]).length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
-            {(a.etiquetasAgenda||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag.nombre?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag.nombre?"💰":"🏷"} {et}</span>)}
-          </div>}
-        </>);})()}
-      </div>
-    </div>}
+    {selAct&&<ActividadDetalle a={selAct} contactos={contactos} empresas={empresas} oportunidades={[o]} catalogos={catalogos} onClose={()=>setSelAct(null)} onEdit={onEditAct?()=>{const x=selAct;setSelAct(null);onEditAct(x);}:undefined}/>}
   </div>;
 }
 
-function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,productos,openOpo,onToggleFav}){
+function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,actividades,productos,openOpo,openAct,onToggleFav}){
   const[fEts,setFEts]=useState([]);
   const toggleEt=(v)=>setFEts(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
   const[showFil,setShowFil]=useState(false);
@@ -3020,7 +3062,7 @@ function Oportunidades({oportunidades,contactos,empresas,aliados,catalogos,activ
       </div>}
     </div>
     <div style={{...S.sec,paddingTop:4}}>
-      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} actividades={actividades} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)} onToggleFav={onToggleFav}/>)}
+      {list.map(o=><OpoCard key={o.id} o={o} contactos={contactos} empresas={empresas} catalogos={catalogos} actividades={actividades} sinAct={ABIERTA(o)&&!tieneSeg(o)} onTap={(x)=>openOpo(x,x.contactoId)} onToggleFav={onToggleFav} onEditAct={openAct?(x)=>openAct(x,x.contactoId):undefined}/>)}
       {list.length===0&&<div style={{textAlign:"center",color:"#475569",fontSize:12,padding:"30px 0"}}>Sin oportunidades.</div>}
     </div>
     <button style={S.fab} onClick={()=>openOpo({},null)}>+</button>
@@ -3152,6 +3194,8 @@ function App(){
   useEffect(()=>{const l=document.getElementById("loading");if(l){l.classList.add("fade-out");setTimeout(()=>l.remove(),350);}},[]);
 
   const openAct=(init,fixed)=>setActModal({init,fixed:fixed||null});
+  const[detAct,setDetAct]=useState(null);
+  const verAct=(a)=>setDetAct(a.id);
   const saveAct=(data)=>{
     setActividades(prev=>{
       if(data.id)return prev.map(a=>a.id===data.id?data:a);
@@ -3189,12 +3233,12 @@ function App(){
   };
   const NAV=[["inicio","Inicio","🏠"],["contactos","Contactos","👥"],["empresas","Empresas","🏢"],["oportunidades","Oport.","🎯"],["agenda","Agenda","🗓"],["objetivos","Metas","📊"],["configuracion","Config.","⚙"]];
   return <div style={S.app}>
-    {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} actividades={actividades} oportunidades={oportunidades} openAct={openAct} openOpo={openOpo} setView={go} catalogos={catalogos} productos={productos}/>}
-    {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
+    {view==="inicio"&&<Inicio contactos={contactos} empresas={empresas} actividades={actividades} oportunidades={oportunidades} openAct={openAct} verAct={verAct} openOpo={openOpo} setView={go} catalogos={catalogos} productos={productos}/>}
+    {view==="contactos"&&<Contactos key={openContacto||"list"} initialSel={openContacto} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} verAct={verAct} oportunidades={oportunidades} openOpo={openOpo}/>}
     {view==="empresas"&&<Empresas empresas={empresas} setEmpresas={setEmpresas} contactos={contactos} catalogos={catalogos} goContacto={(id)=>{setOpenContacto(id);setView("contactos");}}/>}
-    {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} oportunidades={oportunidades} openOpo={openOpo}/>}
-    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} productos={productos} openOpo={openOpo} onToggleFav={(id)=>setOportunidades(p=>p.map(o=>o.id===id?{...o,fav:!o.fav}:o))}/>}
-    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
+    {view==="aliados"&&<Contactos key="aliados-list" aliadosOnly onBack={()=>go("configuracion")} contactos={contactos} catalogos={catalogos} setCatalogos={setCatalogos} empresas={empresas} setEmpresas={setEmpresas} setContactos={setContactos} actividades={actividades} openAct={openAct} verAct={verAct} oportunidades={oportunidades} openOpo={openOpo}/>}
+    {view==="oportunidades"&&<Oportunidades oportunidades={oportunidades} contactos={contactos} empresas={empresas} aliados={contactos.filter(c=>c.tiposAliado&&c.tiposAliado.length>0)} catalogos={catalogos} actividades={actividades} productos={productos} openOpo={openOpo} openAct={openAct} onToggleFav={(id)=>setOportunidades(p=>p.map(o=>o.id===id?{...o,fav:!o.fav}:o))}/>}
+    {view==="agenda"&&<Agenda actividades={actividades} contactos={contactos} catalogos={catalogos} oportunidades={oportunidades} empresas={empresas} openAct={openAct} verAct={verAct} onEditActs={onEditActs} onCopyActs={onCopyActs} onSinRespuesta={sinRespuesta}/>}
     {view==="catalogos"&&<Catalogos catalogos={catalogos} setCatalogos={setCatalogos} contactos={contactos} setContactos={setContactos} onProductos={()=>go("productos")} onBack={()=>go("configuracion")}/>}
     {view==="productos"&&<Productos productos={productos} setProductos={setProductos} catalogos={catalogos} onBack={()=>go("configuracion")}/>}
     {view==="bienes"&&<BienesInmuebles bienes={bienes} setBienes={setBienes} catalogos={catalogos} contactos={contactos} onBack={()=>go("configuracion")}/>}
@@ -3204,6 +3248,7 @@ function App(){
       {NAV.map(([k,lab,ico])=>{const act=view===k||(k==="configuracion"&&(view==="catalogos"||view==="productos"||view==="aliados"||view==="bienes"));return <button key={k} style={S.navB(act)} onClick={()=>go(k)}>
         <span style={S.navIco}>{ico}</span><span>{lab}</span></button>;})}
     </div>
+    {detAct&&(()=>{const da=actividades.find(x=>x.id===detAct);if(!da)return null;return <ActividadDetalle a={da} contactos={contactos} empresas={empresas} oportunidades={oportunidades} catalogos={catalogos} onClose={()=>setDetAct(null)} onEdit={()=>{setDetAct(null);openAct(da,da.contactoId);}}/>;})()}
     {actModal&&<ActividadModal init={actModal.init} fixedContacto={actModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} oportunidades={oportunidades} actividades={actividades} onUpdateContacto={(id,patch)=>setContactos(prev=>prev.map(c=>c.id===id?{...c,...patch}:c))} onUpdateOportunidad={(id,patch)=>setOportunidades(prev=>prev.map(o=>o.id===id?{...o,...patch}:o))} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setActModal(null)}/>}
     {opoModal&&<OportunidadModal init={opoModal.init} fixedContacto={opoModal.fixed} contactos={contactos} empresas={empresas} catalogos={catalogos} productos={productos} onSave={saveOpo} onDelete={delOpo} onCreateContacto={(d)=>{const id="c"+Date.now();setContactos(prev=>[...prev,{...d,id}]);return id;}} onCreateEmpresa={(d)=>{const id="e"+Date.now();setEmpresas(prev=>[...prev,{...d,id}]);return id;}} onClose={()=>setOpoModal(null)}/>}
   </div>;

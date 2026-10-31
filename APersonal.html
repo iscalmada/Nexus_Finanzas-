@@ -422,7 +422,89 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
   </div>;
 }
 /* ── Tarjeta de actividad ── */
-function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onToggleExp,onPatch,catEtiquetas,actividades}){
+/* ════════ DETALLE DE ACTIVIDAD (solo lectura, hoja inferior) ════════ */
+function ActividadDetalle({a,cfcContactos,cfcEmpresas,cfcOportunidades,catEtiquetas,onEdit,onClose}){
+  const featTag=(catEtiquetas||[])[0];
+  const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";
+  const efFech=proyFecha(a)||a.fecha||"";
+  const modo=a.modoTarea||"unica";
+  const efPrio=modo==="proyecto"?proyPrioridad(a):(a.prioridad||"Media");
+  const esCom=a.enfoque==="Contactar";
+  const ctoObj=a.contactoId?(cfcContactos||[]).find(x=>x.id===a.contactoId):null;
+  const empObj=a.empresaId?(cfcEmpresas||[]).find(x=>x.id===a.empresaId):null;
+  const ctNombre=ctoObj&&ctoObj.nombreCompleto?((ctoObj.prefijo?ctoObj.prefijo+" ":"")+ctoObj.nombreCompleto):"";
+  const opo=a.oportunidadId?(cfcOportunidades||[]).find(o=>o.id===a.oportunidadId):null;
+  const items=a.items||[];const subs=a.subtareas||[];
+  const fmtF=(f)=>f?f.split("-").reverse().join("/"):"";
+  const fila=(l,v)=>v?<div style={{display:"flex",gap:8,marginBottom:10}}>
+    <div style={{fontSize:9,color:"#64748b",fontWeight:700,width:76,flexShrink:0,paddingTop:2}}>{l}</div>
+    <div style={{fontSize:12,color:"#e2e8f0",flex:1,minWidth:0,wordBreak:"break-word"}}>{v}</div>
+  </div>:null;
+  const caja=(l,t,c,pre)=>t?<div style={{marginBottom:10}}>
+    <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>{l}</div>
+    <div style={{fontSize:11,color:c,lineHeight:1.5,background:"#0a0a14",borderRadius:8,padding:"8px 10px",whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{pre}{t}</div>
+  </div>:null;
+  return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:900,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+    <div style={{background:"#0e0e1a",borderRadius:"16px 16px 0 0",width:"100%",maxWidth:480,maxHeight:"88vh",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 16px 10px"}}>
+        <div style={{fontSize:13,fontWeight:800,color:GOLD}}>DETALLE ACTIVIDAD</div>
+        <button style={{background:"none",border:"none",color:"#94a3b8",fontSize:20,cursor:"pointer",padding:"0 4px",lineHeight:1}} onClick={onClose}>✕</button>
+      </div>
+      <div style={{overflowY:"auto",padding:"0 16px 12px",flex:1}}>
+        <div style={{fontSize:15,fontWeight:700,color:"#e2e8f0",marginBottom:10,lineHeight:1.3,wordBreak:"break-word"}}>{esCom?(ctNombre||(empObj&&empObj.nombre)||a.tipoAccion||"Contacto no definido"):(a.asunto||a.tipoAccion||"Sin asunto")}</div>
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:12}}>
+          {a.enfoque&&<span style={{...S.tag(ENF_COLOR[a.enfoque]||"#60a5fa"),fontSize:9}}>{ENF_ICON[a.enfoque]||"●"} {a.enfoque}</span>}
+          <span style={{...S.tag(col),fontSize:9}}>{efEst}{a.cierreForzado?" · cierre forzado":""}</span>
+          {efPrio&&<span style={{...S.tag(PRIOR_COLOR[efPrio]||"#64748b"),fontSize:9}}>{efPrio}</span>}
+          {a.tipoAccion&&<span style={{...S.tag("#64748b"),fontSize:9}}>{a.tipoAccion}</span>}
+          {modo!=="unica"&&<span style={{...S.tag("#a78bfa"),fontSize:9}}>{modo==="checklist"?"☑ Checklist":"📁 Proyecto"}</span>}
+        </div>
+        {fila("FECHA",efFech?fmtF(efFech)+(a.hora?" · "+a.hora:""):"Sin fecha")}
+        {fila("CONTACTO",ctNombre)}
+        {fila("EMPRESA",empObj?empObj.nombre:"")}
+        {fila("OPORTUNIDAD",opo?opo.concepto:"")}
+        {caja(esCom?"INTENCIÓN":"DESCRIPCIÓN",a.intencion,"#94a3b8","")}
+        {caja("ACCIÓN EJECUTADA",a.accionEnProceso,"#60a5fa","▸ ")}
+        {caja("RESULTADO",a.conclusion,"#22c55e","→ ")}
+        {modo==="checklist"&&items.length>0&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>CHECKLIST · {items.filter(i=>i.done).length}/{items.length}</div>
+          <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
+            {items.map((it,i)=><div key={it.id||i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:i<items.length-1?"1px solid #14141f":"none"}}>
+              <span style={{fontSize:12,color:it.done?"#22c55e":"#475569",flexShrink:0}}>{it.done?"☑":"☐"}</span>
+              <div style={{minWidth:0,flex:1}}>
+                <div style={{fontSize:11,color:it.done?"#64748b":"#e2e8f0",textDecoration:it.done?"line-through":"none",wordBreak:"break-word"}}>{it.texto||"—"}</div>
+                {it.descripcion&&<div style={{fontSize:10,color:"#64748b",marginTop:2,wordBreak:"break-word"}}>{it.descripcion}</div>}
+              </div>
+              {it.prioridad&&it.prioridad!=="Media"&&<span style={{...S.tag(PRIOR_COLOR[it.prioridad]||"#64748b"),fontSize:8,flexShrink:0,alignSelf:"flex-start"}}>{it.prioridad}</span>}
+            </div>)}
+          </div>
+        </div>}
+        {modo==="proyecto"&&subs.length>0&&<div style={{marginBottom:10}}>
+          <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>SUBTAREAS · {subs.filter(x=>x.estatus==="Cerrada").length}/{subs.length}</div>
+          <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
+            {subs.map((st,i)=>{const sc=EST_COLOR[st.estatus||"Programada"]||"#64748b";return <div key={st.id||i} style={{padding:"6px 0",borderBottom:i<subs.length-1?"1px solid #14141f":"none"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
+                <div style={{fontSize:11,color:st.estatus==="Cerrada"?"#64748b":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",flex:1,minWidth:0,wordBreak:"break-word"}}>{st.titulo||"—"}</div>
+                <span style={{...S.tag(sc),fontSize:8,flexShrink:0}}>{st.estatus||"Programada"}</span>
+              </div>
+              <div style={{fontSize:9,color:"#64748b",marginTop:2}}>{st.fecha?fmtF(st.fecha):"sin fecha"}{st.prioridad?" · "+st.prioridad:""}</div>
+              {st.descripcion&&<div style={{fontSize:10,color:"#94a3b8",marginTop:2,wordBreak:"break-word"}}>{st.descripcion}</div>}
+            </div>;})}
+          </div>
+        </div>}
+        {(a.etiquetas||[]).length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginTop:4}}>
+          {(a.etiquetas||[]).map(et=><span key={et} style={{...S.tag(featTag&&et===featTag?"#fbbf24":"#f472b6"),fontSize:8}}>{featTag&&et===featTag?"💰":"🏷"} {et}</span>)}
+        </div>}
+      </div>
+      <div style={{display:"flex",gap:8,padding:"10px 16px 20px",borderTop:"1px solid #1e293b"}}>
+        <button style={{...S.pill(false,"#64748b"),flex:1,padding:"10px 0",fontWeight:700}} onClick={onClose}>Cerrar</button>
+        {onEdit&&<button style={{...S.pill(true,GOLD),flex:1,padding:"10px 0",fontWeight:700}} onClick={onEdit}>✏ Editar</button>}
+      </div>
+    </div>
+  </div>;
+}
+
+function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,onEdit,expanded,onToggleExp,onPatch,catEtiquetas,actividades}){
   const[selSub,setSelSub]=useState(new Set());
   const[batchSub,setBatchSub]=useState(null);
   const[showHist,setShowHist]=useState(false);
@@ -524,7 +606,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,expanded,onT
       <div style={{background:"#1e293b",borderRadius:4,height:5,overflow:"hidden"}}><div style={{background:prog.done===prog.total?"#22c55e":"#a78bfa",height:"100%",width:`${Math.round(prog.done/prog.total*100)}%`,borderRadius:4}}/></div>
     </div>}
     {/* Botón editar para proyectos/checklist */}
-    {modo!=="unica"&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();onTap(a);}}>✏ Editar {modo==="proyecto"?"proyecto":"Checklist"}</button>}
+    {modo!=="unica"&&<button style={{...S.pill(false,"#64748b"),padding:"3px 10px",fontSize:10,marginTop:6}} onClick={e=>{e.stopPropagation();(onEdit||onTap)(a);}}>✏ Editar {modo==="proyecto"?"proyecto":"Checklist"}</button>}
     {/* Panel expandido checklist */}
     {expanded&&modo==="checklist"&&<div style={{marginTop:8,borderTop:"1px solid #1e293b",paddingTop:8}}>
       {[...(a.items||[])].sort((x,y)=>{if(x.done!==y.done)return x.done?1:-1;return(PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);}).map((it,idx)=>{
@@ -707,6 +789,8 @@ function App(){
   // UI
   const[modo,setModo]=useState("rptContactar");
   const[modal,setModal]=useState(null);
+  const[detAct,setDetAct]=useState(null);
+  const verAct=(a)=>setDetAct(a.id);
   const[expandidos,setExpandidos]=useState(new Set());
   // Filtros
   const[filtros,setFiltros]=useState(["Programada","En Proceso"]);
@@ -849,7 +933,7 @@ function App(){
         const empObj=a.empresaId?cfcEmpresas.find(x=>x.id===a.empresaId):null;
         const principal=esCom?((ctoObj?.nombreCompleto&&(ctoObj?.prefijo?ctoObj.prefijo+" ":"")+ctoObj.nombreCompleto)||empObj?.nombre||"—"):(a.asunto||a.tipoAccion||"—");
         const isFeat=featTag&&(a.etiquetas||[]).includes(featTag);
-        return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>selMode?toggleSel(a.id):setModal(a)}>
+        return <div key={a.id} style={{display:"flex",gap:8,fontSize:11,padding:"7px 10px",borderBottom:"1px solid #14141f",cursor:"pointer",alignItems:"flex-start",background:isSel?"#16213a":"transparent",borderLeft:`3px solid ${ENF_COLOR[a.enfoque]||"#64748b"}`}} onClick={()=>selMode?toggleSel(a.id):verAct(a)}>
           {selMode&&<span style={{width:14,height:14,flexShrink:0,marginTop:1,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:9,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{isSel?"✓":""}</span>}
           {featTag&&<span onClick={(ev)=>toggleFeat(a,ev)} title={featTag} style={{width:18,flexShrink:0,fontSize:13,cursor:"pointer",filter:isFeat?"none":"grayscale(1) opacity(0.35)"}}>💰</span>}
           <span onClick={(ev)=>{ev.stopPropagation();patchAct(a.id,{starred:!a.starred});}} title="Destacada" style={{width:18,flexShrink:0,fontSize:13,cursor:"pointer",filter:a.starred?"none":"grayscale(1) opacity(0.35)"}}>⭐</span>
@@ -1005,7 +1089,7 @@ function App(){
             {selMode&&<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:-2}}>
               <span style={{width:16,height:16,borderRadius:"50%",border:isSel?"none":"1.5px solid #475569",background:isSel?GOLD:"transparent",color:"#0c0c16",fontSize:11,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel?"✓":""}</span>
             </div>}
-            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onTap={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas} actividades={actividades}/>
+            <ActCard a={a} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onTap={selMode?()=>toggleSel(a.id):verAct} onEdit={selMode?()=>toggleSel(a.id):setModal} expanded={expandidos.has(a.id)} onToggleExp={()=>toggleExp(a.id)} onPatch={patchAct} catEtiquetas={catEtiquetas} actividades={actividades}/>
           </div>;
         })}
         {modo==="rptContactar"&&<Reporte enfoque="Contactar"/>}
@@ -1023,6 +1107,7 @@ function App(){
       <button onClick={scrollBottom} style={{position:"fixed",bottom:140,right:14,width:36,height:36,borderRadius:"50%",background:"#1e293b",border:"1px solid #334155",color:"#94a3b8",fontSize:15,cursor:"pointer",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center"}}>↓</button>
     </>}
     {/* Modal */}
+    {detAct&&(()=>{const da=actividades.find(x=>x.id===detAct);if(!da)return null;return <ActividadDetalle a={da} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} catEtiquetas={catEtiquetas} onClose={()=>setDetAct(null)} onEdit={()=>{setDetAct(null);setModal(da);}}/>;})()}
     {modal&&<ActividadModal init={modal.id?modal:null} cfcContactos={cfcContactos} cfcEmpresas={cfcEmpresas} cfcOportunidades={cfcOportunidades} onCreateContacto={addCfcContacto} catContactar={catContactar} catTareas={catTareas} catAcciones={catAcciones} catEtiquetas={catEtiquetas} actividades={actividades} onSave={saveAct} onSaveExtra={saveAct} onDelete={delAct} onClose={()=>setModal(null)}/>}
     {/* Edición múltiple */}
     {batch&&<div onClick={()=>setBatch(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:200}}>
