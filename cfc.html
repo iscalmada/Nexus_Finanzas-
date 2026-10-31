@@ -1112,6 +1112,10 @@ function Productos({productos,setProductos,catalogos,onBack}){
 /* ════════ OBJETIVOS (metas mensuales y proyección) ════════ */
 const MESNOM=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 function mesesDesde(ini,n){const[y,m]=ini.split("-").map(Number);const a=[];let yy=y,mm=m;for(let i=0;i<n;i++){a.push(yy+"-"+String(mm).padStart(2,"0"));mm++;if(mm>12){mm=1;yy++;}}return a;}
+/* Escenarios de proyección: p.metasEsc={min,des,opt}; p.metas = espejo del escenario OFICIAL (lo que leen CFP y el resto de la app) */
+const ESCENARIOS=[{id:"min",nombre:"Mínimo",color:"#f87171"},{id:"des",nombre:"Deseable",color:"#60a5fa"},{id:"opt",nombre:"Optimista",color:"#22c55e"}];
+const metasDe=(p,e)=>p.metasEsc?(p.metasEsc[e]||{}):(e==="des"?(p.metas||{}):{});
+const asegEsc=(p)=>p.metasEsc?p.metasEsc:{min:{},des:{...(p.metas||{})},opt:{}};
 function etiquetaMes(k){const[y,m]=k.split("-").map(Number);return MESNOM[m-1]+" "+String(y).slice(2);}
 function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,oportunidades,onProductos}){
   const hoy=new Date();
@@ -1119,14 +1123,24 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
   const[nMeses,setNMeses]=useState(6);
   const[modo,setModo]=useState("matriz");
   const[ver,setVer]=useState(null);
+  const[escOficial,setEscOficial]=useState(()=>loadLS("escOficial","des"));
+  const[esc,setEsc]=useState(()=>loadLS("escOficial","des"));
+  const escNom=(ESCENARIOS.find(x=>x.id===esc)||{}).nombre||"";
+  const cambiaOficial=(e)=>{
+    const nom=(ESCENARIOS.find(x=>x.id===e)||{}).nombre;
+    if(!window.confirm(`CFP tomará las metas del escenario "${nom}" para su presupuesto de ingresos. ¿Continuar?`))return;
+    setProductos(prev=>prev.map(p=>{const me=asegEsc(p);return {...p,metasEsc:me,metas:{...(me[e]||{})}};}));
+    saveLS("escOficial",e);setEscOficial(e);
+  };
   const[metaContactos,setMetaContactos]=useState(()=>loadLS("metaProspContactos",0));
   const[mesRep,setMesRep]=useState(()=>hoy.getFullYear()+"-"+String(hoy.getMonth()+1).padStart(2,"0"));
   const meses=mesesDesde(ini,nMeses);
   const setMeta=(pid,mes,val)=>setProductos(prev=>prev.map(p=>{
     if(p.id!==pid)return p;
-    const metas={...(p.metas||{})};
+    const me=asegEsc(p);
+    const metas={...(me[esc]||{})};
     if(val===""||val===null)delete metas[mes];else metas[mes]=val;
-    return {...p,metas};
+    return {...p,metasEsc:{...me,[esc]:metas},...(esc===escOficial?{metas}:{})};
   }));
   const setLogrado=(pid,mes,val)=>setProductos(prev=>prev.map(p=>{
     if(p.id!==pid)return p;
@@ -1134,11 +1148,11 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
     if(val===""||val===null)delete logrado[mes];else logrado[mes]=val;
     return {...p,logrado};
   }));
-  const restanteMes=(p,mes)=>Math.max(0,(Number((p.metas||{})[mes])||0)-(Number((p.logrado||{})[mes])||0));
+  const restanteMes=(p,mes)=>Math.max(0,(Number(metasDe(p,esc)[mes])||0)-(Number((p.logrado||{})[mes])||0));
   const pRec=(p)=>p.recurrencia||(p.recurrente===true?"mensual":"único"); // backward compat
   const cierreProd=(p,mes)=>restanteMes(p,mes)*comResultProd(p);
   const ingresoProd=(p,mes)=>{
-    const com=comResultProd(p),metas=p.metas||{},logrado=p.logrado||{},rec=pRec(p);
+    const com=comResultProd(p),metas=metasDe(p,esc),logrado=p.logrado||{},rec=pRec(p);
     if(rec==="mensual"){let u=0;for(const k in metas){if(k<=mes)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
     if(rec==="anual"){const mesM=mes.slice(5),mesY=mes.slice(0,4);let u=0;for(const k in metas){if(k.slice(5)===mesM&&k.slice(0,4)<=mesY)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
     return restanteMes(p,mes)*com; // único
@@ -1157,6 +1171,15 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
       <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos</button>
       <button style={{...S.pill(modo==="prospeccion","#2dd4bf"),flex:1,fontSize:10,padding:"8px 4px"}} onClick={()=>setModo("prospeccion")}>Prospección</button>
     </div></div>
+    {modo!=="prospeccion"&&<div style={S.sec}>
+      <div style={{display:"flex",gap:5}}>
+        {ESCENARIOS.map(e=><button key={e.id} style={{...S.pill(esc===e.id,e.color),flex:1,fontSize:11,padding:"7px 4px",fontWeight:700}} onClick={()=>setEsc(e.id)}>{e.nombre}{escOficial===e.id?" ★":""}</button>)}
+      </div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginTop:6,fontSize:9,color:"#64748b",lineHeight:1.4}}>
+        <span>★ = escenario oficial: es el que alimenta el presupuesto de CFP. Lo logrado se compara contra el escenario que ves.</span>
+        {esc!==escOficial&&<button style={{...S.pill(false,"#fbbf24"),fontSize:9,padding:"3px 8px",flexShrink:0}} onClick={()=>cambiaOficial(esc)}>Hacer oficial</button>}
+      </div>
+    </div>}
     {modo==="prospeccion"&&<PipelineProspeccion contactos={contactos} oportunidades={oportunidades} catalogos={catalogos} productos={productos}/>}
     {modo==="matriz"&&<div style={S.sec}>
       <div style={S.g2}>
@@ -1184,7 +1207,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
                   <div style={{fontSize:8,color:"#64748b"}}>{money(comResultProd(p))}{({mensual:" · mensual",anual:" · anual",único:" · único"})[p.recurrencia||(p.recurrente===true?"mensual":"único")]||" · único"}</div>
                 </div>
                 {meses.map(m=><div key={m} style={{width:WMES,flexShrink:0,padding:"4px 4px 4px 0"}}>
-                  <input type="text" inputMode="decimal" value={(p.metas||{})[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"4px 4px",marginBottom:2}}/>
+                  <input type="text" inputMode="decimal" value={metasDe(p,esc)[m]??""} onChange={e=>setMeta(p.id,m,e.target.value)} placeholder="0" style={{width:"100%",background:"#10101e",border:"1px solid #1e293b",borderRadius:6,color:"#e2e8f0",fontSize:11,textAlign:"center",padding:"4px 4px",marginBottom:2}}/>
                   <input type="text" inputMode="decimal" value={(p.logrado||{})[m]??""} onChange={e=>setLogrado(p.id,m,e.target.value)} placeholder="✓" style={{width:"100%",background:"#0a140a",border:"1px solid #22c55e44",borderRadius:6,color:"#22c55e",fontSize:10,textAlign:"center",padding:"3px 4px"}}/>
                 </div>)}
               </div>)}
@@ -1207,7 +1230,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
       </div>)}
     {modo==="reporte"&&(()=>{
       const shiftMes=(mk,d)=>{let a=mk.split("-").map(Number),y=a[0],m=a[1];m+=d;while(m<1){m+=12;y--;}while(m>12){m-=12;y++;}return y+"-"+String(m).padStart(2,"0");};
-      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0,ing:ingresoProd(p,mesRep)})).filter(x=>x.meta>0||x.ing>0);const sub=items.reduce((a,x)=>a+x.ing,0);return {s:g.s,items,sub};}).filter(g=>g.items.length>0);
+      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number(metasDe(p,esc)[mesRep])||0,ing:ingresoProd(p,mesRep)})).filter(x=>x.meta>0||x.ing>0);const sub=items.reduce((a,x)=>a+x.ing,0);return {s:g.s,items,sub};}).filter(g=>g.items.length>0);
       const total=grupos.reduce((a,g)=>a+g.sub,0);
       return <div style={S.sec}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"8px 10px",marginBottom:12}}>
@@ -1216,7 +1239,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
           <button onClick={()=>setMesRep(shiftMes(mesRep,1))} style={{background:"transparent",border:"none",color:GOLD,fontSize:20,cursor:"pointer",padding:"0 12px"}}>›</button>
         </div>
         <div style={{background:"#1a1505",border:"1px solid "+GOLD+"55",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
-          <div style={{fontSize:9,color:GOLD,letterSpacing:1,fontWeight:700}}>INGRESO NEXUS PROYECTADO</div>
+          <div style={{fontSize:9,color:GOLD,letterSpacing:1,fontWeight:700}}>INGRESO NEXUS PROYECTADO · {escNom.toUpperCase()}</div>
           <div style={{fontSize:26,fontWeight:800,color:GOLD,fontFamily:"'Cinzel',serif",lineHeight:1.1}}>{money(total)}</div>
         </div>
         {grupos.length===0
@@ -1245,7 +1268,7 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
     })()}
     {modo==="productos"&&(()=>{
       const shiftMes=(mk,d)=>{let a=mk.split("-").map(Number),y=a[0],m=a[1];m+=d;while(m<1){m+=12;y--;}while(m>12){m-=12;y++;}return y+"-"+String(m).padStart(2,"0");};
-      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number((p.metas||{})[mesRep])||0,logr:Number((p.logrado||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
+      const grupos=sols.map(g=>{const items=g.prods.map(p=>({p,meta:Number(metasDe(p,esc)[mesRep])||0,logr:Number((p.logrado||{})[mesRep])||0})).filter(x=>x.meta>0);return {s:g.s,items};}).filter(g=>g.items.length>0);
       return <div style={S.sec}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#10101e",border:"1px solid #1e293b",borderRadius:11,padding:"8px 10px",marginBottom:12}}>
           <button onClick={()=>setMesRep(shiftMes(mesRep,-1))} style={{background:"transparent",border:"none",color:GOLD,fontSize:20,cursor:"pointer",padding:"0 12px"}}>‹</button>
