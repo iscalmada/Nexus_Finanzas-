@@ -709,7 +709,7 @@ function App(){
   const[modal,setModal]=useState(null);
   const[expandidos,setExpandidos]=useState(new Set());
   // Filtros
-  const[filtros,setFiltros]=useState(["Programada"]);
+  const[filtros,setFiltros]=useState(["Programada","En Proceso"]);
   const[fEnfoque,setFEnfoque]=useState("");
   const[fEtiqueta,setFEtiqueta]=useState([]);
   const[fFeat,setFFeat]=useState(false);
@@ -810,8 +810,9 @@ function App(){
     if(fc!==0)return fc;
     return horaCmp(a,b);
   });
-  const nFil=(filtros.length?1:0)+(fEnfoque?1:0)+(fEtiqueta.length?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0)+(fSinFecha?1:0)+(fFeat?1:0)+(fStarred?1:0);
-  const limpiar=()=>{setFiltros([]);setFEnfoque("");setFEtiqueta([]);setFFeat(false);setFStarred(false);setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setFSinFecha(false);setQ("");setModoFecha("todas");};
+  const esEstDef=filtros.length===2&&filtros.includes("Programada")&&filtros.includes("En Proceso");
+  const nFil=(filtros.length&&!esEstDef?1:0)+(fEnfoque?1:0)+(fEtiqueta.length?1:0)+(fPrioridad.length?1:0)+(fContacto?1:0)+(fEmpresa?1:0)+(fTipoAccion?1:0)+((fDesde||fHasta)?1:0)+(fRezago?1:0)+(fSinFecha?1:0)+(fFeat?1:0)+(fStarred?1:0);
+  const limpiar=()=>{setFiltros(["Programada","En Proceso"]);setFEnfoque("");setFEtiqueta([]);setFFeat(false);setFStarred(false);setFPrioridad([]);setFContacto("");setFEmpresa("");setFTipoAccion("");setFDesde("");setFHasta("");setFRezago(false);setFSinFecha(false);setQ("");setModoFecha("todas");};
   const sinFechaCount=actividades.filter(a=>!(proyFecha(a)||a.fecha||"")).length;
   // Catálogo unificado de tipos de acción
   const todosTipos=fEnfoque==="Contactar"?catContactar:fEnfoque==="Tareas"?catTareas:fEnfoque==="Acciones"?catAcciones:[...new Set([...catContactar,...catTareas,...catAcciones])];
