@@ -2129,6 +2129,19 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   </div></div>;
 }
 
+/* Orden por defecto de listas: Estatus (En Proceso, Programada, Cerrada) → Fecha (asc; en Cerradas desc) → Prioridad → Hora */
+const EST_RANK={"En Proceso":0,Programada:1,Cerrada:2};
+const nEFP=(a)=>({e:proyEstatus(a),f:proyFecha(a)||a.fecha||"",p:proyPrioridad(a),h:a.hora||""});
+const nEFPSub=(x)=>({e:x.estatus||"Programada",f:x.fecha||"",p:x.prioridad||"Media",h:""});
+const cmpEFP=(x,y,dir)=>{
+  const ra=EST_RANK[x.e]!=null?EST_RANK[x.e]:1,rb=EST_RANK[y.e]!=null?EST_RANK[y.e]:1;if(ra!==rb)return ra-rb;
+  if(x.f!==y.f){if(!x.f)return 1;if(!y.f)return -1;const asc=(dir!=="desc")!==(ra===2);const c=x.f.localeCompare(y.f);return asc?c:-c;}
+  const pa=PRIOR_RANK[x.p]!=null?PRIOR_RANK[x.p]:2,pb=PRIOR_RANK[y.p]!=null?PRIOR_RANK[y.p]:2;if(pa!==pb)return pa-pb;
+  return (x.h||"99:99").localeCompare(y.h||"99:99");
+};
+const cmpSubs=(x,y)=>cmpEFP(nEFPSub(x),nEFPSub(y),"asc");
+const cmpItems=(x,y)=>x.done!==y.done?(x.done?1:-1):((PRIOR_RANK[x.prioridad||"Media"]!=null?PRIOR_RANK[x.prioridad||"Media"]:2)-(PRIOR_RANK[y.prioridad||"Media"]!=null?PRIOR_RANK[y.prioridad||"Media"]:2));
+
 /* ════════ DETALLE DE ACTIVIDAD (solo lectura, hoja inferior) ════════ */
 function ActividadDetalle({a,contactos,empresas,oportunidades,catalogos,onEdit,onClose}){
   const featTag=((catalogos&&catalogos.etiqAgenda)||[])[0];
@@ -2177,7 +2190,7 @@ function ActividadDetalle({a,contactos,empresas,oportunidades,catalogos,onEdit,o
         {modo==="checklist"&&items.length>0&&<div style={{marginBottom:10}}>
           <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>CHECKLIST · {items.filter(i=>i.done).length}/{items.length}</div>
           <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
-            {items.map((it,i)=><div key={it.id||i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:i<items.length-1?"1px solid #14141f":"none"}}>
+            {[...items].sort(cmpItems).map((it,i)=><div key={it.id||i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:i<items.length-1?"1px solid #14141f":"none"}}>
               <span style={{fontSize:12,color:it.done?"#22c55e":"#475569",flexShrink:0}}>{it.done?"☑":"☐"}</span>
               <div style={{minWidth:0,flex:1}}>
                 <div style={{fontSize:11,color:it.done?"#64748b":"#e2e8f0",textDecoration:it.done?"line-through":"none",wordBreak:"break-word"}}>{it.texto||"—"}</div>
@@ -2190,7 +2203,7 @@ function ActividadDetalle({a,contactos,empresas,oportunidades,catalogos,onEdit,o
         {modo==="proyecto"&&subs.length>0&&<div style={{marginBottom:10}}>
           <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>SUBTAREAS · {subs.filter(x=>x.estatus==="Cerrada").length}/{subs.length}</div>
           <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
-            {subs.map((st,i)=>{const sc=EST_COLOR[st.estatus||"Programada"]||"#64748b";return <div key={st.id||i} style={{padding:"6px 0",borderBottom:i<subs.length-1?"1px solid #14141f":"none"}}>
+            {[...subs].sort(cmpSubs).map((st,i)=>{const sc=EST_COLOR[st.estatus||"Programada"]||"#64748b";return <div key={st.id||i} style={{padding:"6px 0",borderBottom:i<subs.length-1?"1px solid #14141f":"none"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
                 <div style={{fontSize:11,color:st.estatus==="Cerrada"?"#64748b":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",flex:1,minWidth:0,wordBreak:"break-word"}}>{st.titulo||"—"}</div>
                 <span style={{...S.tag(sc),fontSize:8,flexShrink:0}}>{st.estatus||"Programada"}</span>
@@ -2212,7 +2225,7 @@ function ActividadDetalle({a,contactos,empresas,oportunidades,catalogos,onEdit,o
   </div>;
 }
 
-function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,onEdit,asc,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct,featTag}){
+function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showContacto,onTap,onEdit,asc,hoyEst,selectable,selected,onToggleSel,hoy,noSort,onSinRespuesta,onPatchAct,featTag}){
   const[expandidos,setExpandidos]=useState(new Set());  // mecanismo 2: subtareas Proyecto/Checklist
   const[expandDesc,setExpandDesc]=useState(new Set());  // mecanismo 1: descripción en TODAS las tarjetas
   const[selSub,setSelSub]=useState({});     // {actId: Set<subId>}
@@ -2223,8 +2236,8 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
   const toggleHist=(actId,nivel)=>setHistorial(p=>({...p,[actId]:p[actId]===nivel?null:nivel}));
   const toggleSubSel=(actId,subId)=>setSelSub(p=>{const prev=new Set(p[actId]||[]);prev.has(subId)?prev.delete(subId):prev.add(subId);return{...p,[actId]:prev};});
   const selSubCount=(actId)=>(selSub[actId]||new Set()).size;
-  const sorted=noSort?acts:acts.slice().sort((a,b)=>{const hK=(h)=>h||"99:99";const fa=(proyFecha(a)||a.fecha||"")+hK(a.hora),fb=(proyFecha(b)||b.fecha||"")+hK(b.hora);return asc?fa.localeCompare(fb):fb.localeCompare(fa);});
-  let hoyIdx=-1;if(hoy){for(let i=0;i<sorted.length;i++){const fx=proyFecha(sorted[i])||sorted[i].fecha||"";if(asc?(fx>=hoy):(fx<=hoy)){hoyIdx=i;break;}}}
+  const sorted=noSort?acts:acts.slice().sort((a,b)=>cmpEFP(nEFP(a),nEFP(b),"asc"));
+  let hoyIdx=-1;if(hoy){for(let i=0;i<sorted.length;i++){if(hoyEst&&proyEstatus(sorted[i])!=="Programada")continue;const fx=proyFecha(sorted[i])||sorted[i].fecha||"";if(asc?(fx>=hoy):(fx<=hoy)){hoyIdx=i;break;}}}
   if(sorted.length===0)return <div style={{fontSize:11,color:"#475569",padding:"4px 0"}}>Sin actividades registradas.</div>;
   return <div>{sorted.map((a,i)=>{const c=contactos.find(x=>x.id===a.contactoId);const efEst=proyEstatus(a);const col=EST_COLOR[efEst]||"#64748b";const op=a.oportunidadId&&(oportunidades||[]).find(o=>o.id===a.oportunidadId);const isSel=selectable&&selected&&selected.indexOf(a.id)>-1;const empN=(c&&empresas&&cEmpresas(c)[0])?((empresas.find(e=>e.id===cEmpresas(c)[0].empresaId)||{}).nombre||""):"";const _hoy=hoyISO();const _pend=(efEst==="Programada"||efEst==="En Proceso");const efFech=proyFecha(a)||a.fecha||"";const _rez=(_pend&&efFech&&efFech<_hoy)?Math.max(0,Math.round((Date.parse(_hoy)-Date.parse(efFech))/86400000)):0;const _rezC=_rez>=7?"#ef4444":_rez>=3?"#fb923c":_rez>=1?"#fbbf24":null;const esInterno=a.enfoque!=="Contactar";const esContactarA=a.enfoque==="Contactar";const modo=a.modoTarea||"unica";const tituloCard=esInterno?(a.asunto||a.tipoAccion||"Actividad"):(showContacto&&c?c.nombreCompleto:(a.tipoAccion||"Actividad"));
     const isExp=expandidos.has(a.id);     // mecanismo 2: expand subtareas
@@ -2405,13 +2418,7 @@ function ActividadesList({acts,allActs,contactos,oportunidades,empresas,showCont
           <button style={{...S.pill(false,"#64748b"),padding:"2px 8px",fontSize:10}} onClick={()=>setSelSub(p=>({...p,[a.id]:new Set()}))}>Ninguna</button>
           {selSubCount(a.id)>0&&<button style={{...S.pill(true,"#a78bfa"),padding:"2px 10px",fontSize:10,fontWeight:700}} onClick={()=>setBatchSub({actId:a.id,fecha:"",estatus:"",prioridad:""})}>✏ Editar {selSubCount(a.id)}</button>}
         </div>
-        {[...(a.subtareas||[])].sort((x,y)=>{
-          const xCerr=x.estatus==="Cerrada",yCerr=y.estatus==="Cerrada";
-          if(xCerr!==yCerr)return xCerr?1:-1;
-          const fd=(x.fecha||"9999").localeCompare(y.fecha||"9999");
-          if(fd!==0)return fd;
-          return (PRIOR_RANK[x.prioridad||"Media"]??2)-(PRIOR_RANK[y.prioridad||"Media"]??2);
-        }).map((st,idx)=>{
+        {[...(a.subtareas||[])].sort(cmpSubs).map((st,idx)=>{
           const origIdx=(a.subtareas||[]).findIndex(s=>s.id===st.id);
           const isSel=(selSub[a.id]||new Set()).has(st.id);
           return <div key={st.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 8px",marginBottom:4,background:isSel?"#1e1b4b":"#0f172a",borderRadius:7,border:`1px solid ${isSel?"#a78bfa":(EST_COLOR[st.estatus||"Programada"]||"#64748b")}33`}}>
@@ -2478,7 +2485,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const[q,setQ]=useState("");
   const[fEmpresa,setFEmpresa]=useState("");
   const[fPrioridad,setFPrioridad]=useState([]);
-  const[ordCampo,setOrdCampo]=useState("fechaPrio");
+  const[ordCampo,setOrdCampo]=useState("");
   const[ordDir,setOrdDir]=useState("asc");
   const[fRezago,setFRezago]=useState(false);
   const[selMode,setSelMode]=useState(false);
@@ -2519,13 +2526,14 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
   const ordenadas=base.slice().sort((a,b)=>{
     const fa=proyFecha(a)||a.fecha||"", fb=proyFecha(b)||b.fecha||"";
     const hK=(h)=>h||"99:99"; // sin hora → siempre al final dentro de la misma fecha
+    if(ordCampo==="")return cmpEFP(nEFP(a),nEFP(b),ordDir);
     let r;
     if(ordCampo==="prioridad"){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;if(r===0)r=(fa+hK(a.hora)).localeCompare(fb+hK(b.hora));}
     else if(ordCampo==="fecha"){r=fa.localeCompare(fb);if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));}
     else {r=fa.localeCompare(fb);if(r===0){const pa=PRIOR_RANK[a.prioridad]==null?9:PRIOR_RANK[a.prioridad],pb=PRIOR_RANK[b.prioridad]==null?9:PRIOR_RANK[b.prioridad];r=pa-pb;}if(r===0)r=hK(a.hora).localeCompare(hK(b.hora));}
     return ordDir==="asc"?r:-r;
   });
-  const repHoyIdx=(()=>{const h=hoyISO();const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
+  const repHoyIdx=(()=>{const h=hoyISO();if(ordCampo===""){const asc0=ordDir==="asc";for(let i=0;i<ordenadas.length;i++){if(proyEstatus(ordenadas[i])!=="Programada")continue;const fx=proyFecha(ordenadas[i])||ordenadas[i].fecha||"";if(asc0?(fx>=h):(fx<=h))return i;}return -1;}const ascF=((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc");for(let i=0;i<ordenadas.length;i++){const fx=ordenadas[i].fecha||"";if(ascF?(fx>=h):(fx<=h))return i;}return -1;})();
   const sinFechaCount=(actividades||[]).filter(a=>!(proyFecha(a)||a.fecha||"")).length;
   const featTag=(catalogos.etiqAgenda||[])[0];
   const nFil=(fContacto?1:0)+(fEmpresa?1:0)+(fPrioridad.length?1:0)+(fTipos.length?1:0)+(fEtC?1:0)+(fEtO?1:0)+((desde||hasta)?1:0)+(fRezago?1:0)+(selMode?1:0)+(filtros.length?1:0)+(fSinFecha?1:0)+(fFeat?1:0)+(fStarred?1:0);
@@ -2586,9 +2594,10 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
         <div style={{marginBottom:8}}>
           <div style={{fontSize:9,color:"#64748b",marginBottom:5,fontWeight:700,textTransform:"uppercase",letterSpacing:.5}}>Orden</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-            <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
-            <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
-            <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
+            <button style={{...S.pill(ordCampo==="",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo("")}>Estatus</button>
+            <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo(v=>v==="fechaPrio"?"":"fechaPrio")}>Fecha+Prio</button>
+            <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo(v=>v==="fecha"?"":"fecha")}>Fecha</button>
+            <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdCampo(v=>v==="prioridad"?"":"prioridad")}>Prioridad</button>
             <button style={{...S.pill(false,"#60a5fa"),padding:"4px 9px",fontSize:11}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
           </div>
         </div>
@@ -2645,7 +2654,7 @@ function Agenda({actividades,contactos,catalogos,oportunidades,empresas,openAct,
     {/* ── CONTENIDO ── */}
     <div id="ag-top" style={{...S.sec,paddingTop:4}}>
       <div style={{fontSize:11,color:"#64748b",marginBottom:6}}>{base.length} de {actividades.length} actividades</div>
-      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={(ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc"} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>verAct?verAct(a):openAct(a,a.contactoId)} onEdit={(a)=>openAct(a,a.contactoId)} featTag={featTag}/>}
+      {modo==="lista"&&<ActividadesList acts={ordenadas} allActs={actividades} contactos={contactos} oportunidades={oportunidades} empresas={empresas} showContacto={true} asc={ordCampo===""?ordDir==="asc":((ordCampo==="fecha"||ordCampo==="fechaPrio")&&ordDir==="asc")} hoyEst={ordCampo===""} noSort={true} hoy={hoyISO()} selectable={selMode} selected={sel} onToggleSel={toggleSel} onSinRespuesta={onSinRespuesta} onPatchAct={(id,patch)=>onEditActs([id],patch)} onTap={(a)=>verAct?verAct(a):openAct(a,a.contactoId)} onEdit={(a)=>openAct(a,a.contactoId)} featTag={featTag}/>}
       {(modo==="rptCom"||modo==="rptTar"||modo==="rptAcc")&&(()=>{
         const esCom=modo==="rptCom";
         const enfRpt=modo==="rptCom"?"Contactar":modo==="rptTar"?"Tareas":"Acciones";
