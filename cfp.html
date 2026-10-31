@@ -266,7 +266,11 @@ const crmOpoById=(id)=>crmOpos().find(o=>o.id===id)||null;
 const crmOpoLabel=(o)=>{if(!o)return"desvinculada";const e=(lsCRM('empresas',[]).find(x=>x.id===o.empresaId)||{}).nombre;const c=(lsCRM('contactos',[]).find(x=>x.id===(o.contactoPrincipalId||o.contactoId))||{}).nombreCompleto;return o.concepto+(e?" · "+e:(c?" · "+c:""));};
 const crmOpoConcretada=(o)=>!!o&&o.etapa==="Oportunidad Concretada";
 const crmComProd=(p)=>(p.comisionDirecta!=null&&p.comisionDirecta!=="")?Number(p.comisionDirecta):((Number(p.montoNegocio)||0)*(Number(p.indiceComision)||0)/100);
-const crmIngresoProdMes=(p,mes)=>{const com=crmComProd(p),metas=p.metas||{};if(p.recurrente){let u=0;for(const k in metas){if(k<=mes)u+=Number(metas[k])||0;}return u*com;}return (Number(metas[mes])||0)*com;};
+// Misma fórmula que la matriz de Objetivos de CFC: recurrencia mensual/anual/único y descuento de lo ya logrado (p.metas = escenario oficial)
+const crmIngresoProdMes=(p,mes)=>{const com=crmComProd(p),metas=p.metas||{},logr=p.logrado||{};const rec=p.recurrencia||(p.recurrente===true?"mensual":"único");const rem=(k)=>Math.max(0,(Number(metas[k])||0)-(Number(logr[k])||0));
+  if(rec==="mensual"){let u=0;for(const k in metas){if(k<=mes)u+=rem(k);}return u*com;}
+  if(rec==="anual"){const mM=mes.slice(5),mY=mes.slice(0,4);let u=0;for(const k in metas){if(k.slice(5)===mM&&k.slice(0,4)<=mY)u+=rem(k);}return u*com;}
+  return rem(mes)*com;};
 const fmtShort = n=>{const v=Math.abs(n||0);if(v>=1000000)return`$${(v/1e6).toFixed(1)}M`;if(v>=1000)return`$${(v/1000).toFixed(1)}k`;return fmt(n);};
 const fmtDate  = d=>{if(!d)return"";const[y,m,day]=d.split("-");return`${day}/${m}/${y}`;};
 const todayStr = ()=>{
@@ -1840,10 +1844,16 @@ function App(){
       let sm2=curSm+1+i;let sy2=curSy;
       while(sm2>11){sm2-=12;sy2++;}
       // Sumar todos los presupuestos de ingresos
-      const totalIng=catIng.reduce((s,c)=>{
+      const totalIngPres=catIng.reduce((s,c)=>{
         if(c.subs.length>0)return s+c.subs.reduce((ss,sub)=>ss+(presupuestos[presKey(sub.id,sm2,sy2)]||0),0);
         return s+(presupuestos[presKey(c.id,sm2,sy2)]||0);
       },0);
+      // Ingresos Programados/Proyectados ya registrados en ese mes, solo de categorías ligadas a soluciones Nexus
+      // (el presupuesto de esas soluciones ya descuenta lo logrado, así que no se duplican)
+      const mkProy=`${sy2}-${String(sm2+1).padStart(2,"0")}`;
+      let solIdsN=[];try{solIdsN=(lsCRM('catalogos',{}).solucion||[]).map(x=>x.id);}catch(e){}
+      const ingProyMov=movs.filter(r=>r.tipoOp==="Ingreso"&&["PROGRAMADO","PROYECTADO"].includes(r.estatus)&&r.fecha&&r.fecha.slice(0,7)===mkProy&&(solIdsN.includes(r.subcat)||solIdsN.includes(r.cat))&&(parseInt(r.prioridad)||1)<=(prioI||3)).reduce((x,r)=>x+(r.monto||0),0);
+      const totalIng=totalIngPres+ingProyMov;
       // Sumar todos los presupuestos de egresos
       const totalEg=catEg.reduce((s,c)=>{
         if(c.subs.length>0)return s+c.subs.reduce((ss,sub)=>ss+(presupuestos[presKey(sub.id,sm2,sy2)]||0),0);
@@ -1854,11 +1864,12 @@ function App(){
       // Semáforo
       const semaforo=saldoFin<0?"rojo":(saldoFin<saldoAcum*0.2||resultado<0)?"amarillo":"verde";
       // Detalle por categoría
-      const detalleIng=catIng.map(c=>{
+      const detalleIngBase=catIng.map(c=>{
         const subs=c.subs.map(s=>({...s,pres:presupuestos[presKey(s.id,sm2,sy2)]||0})).filter(s=>s.pres>0);
         const catPres=c.subs.length>0?subs.reduce((s,x)=>s+x.pres,0):(presupuestos[presKey(c.id,sm2,sy2)]||0);
         return{...c,pres:catPres,subs};
       }).filter(c=>c.pres>0);
+      const detalleIng=ingProyMov>0?[...detalleIngBase,{id:"__proyReg",nombre:"Proyectados registrados (CFP)",subs:[],pres:ingProyMov}]:detalleIngBase;
       const detalleEg=catEg.map(c=>{
         const subs=c.subs.map(s=>({...s,pres:presupuestos[presKey(s.id,sm2,sy2)]||0})).filter(s=>s.pres>0);
         const catPres=c.subs.length>0?subs.reduce((s,x)=>s+x.pres,0):(presupuestos[presKey(c.id,sm2,sy2)]||0);
