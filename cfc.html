@@ -1151,12 +1151,13 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
   const restanteMes=(p,mes)=>Math.max(0,(Number(metasDe(p,esc)[mes])||0)-(Number((p.logrado||{})[mes])||0));
   const pRec=(p)=>p.recurrencia||(p.recurrente===true?"mensual":"único"); // backward compat
   const cierreProd=(p,mes)=>restanteMes(p,mes)*comResultProd(p);
-  const ingresoProd=(p,mes)=>{
-    const com=comResultProd(p),metas=metasDe(p,esc),logrado=p.logrado||{},rec=pRec(p);
+  const ingresoProdE=(p,mes,e)=>{
+    const com=comResultProd(p),metas=metasDe(p,e),logrado=p.logrado||{},rec=pRec(p);
     if(rec==="mensual"){let u=0;for(const k in metas){if(k<=mes)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
     if(rec==="anual"){const mesM=mes.slice(5),mesY=mes.slice(0,4);let u=0;for(const k in metas){if(k.slice(5)===mesM&&k.slice(0,4)<=mesY)u+=Math.max(0,(Number(metas[k])||0)-(Number(logrado[k])||0));}return u*com;}
-    return restanteMes(p,mes)*com; // único
+    return Math.max(0,(Number(metas[mes])||0)-(Number(logrado[mes])||0))*com; // único
   };
+  const ingresoProd=(p,mes)=>ingresoProdE(p,mes,esc);
   const sols=(catalogos.solucion||[]).map(s=>({s,prods:productos.filter(p=>p.solucionId===s.id)})).filter(g=>g.prods.length>0);
   const sumProds=(prods,mes,fn)=>prods.reduce((a,p)=>a+fn(p,mes),0);
   const WCOL=120,WMES=68;
@@ -1169,9 +1170,10 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
       <button style={{...S.pill(modo==="matriz",GOLD),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("matriz")}>Matriz</button>
       <button style={{...S.pill(modo==="reporte","#2dd4bf"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("reporte")}>Reporte</button>
       <button style={{...S.pill(modo==="productos","#a78bfa"),flex:1,fontSize:11,padding:"8px 4px"}} onClick={()=>setModo("productos")}>Productos</button>
+      <button style={{...S.pill(modo==="comparar","#fbbf24"),flex:1,fontSize:10,padding:"8px 4px"}} onClick={()=>setModo("comparar")}>Comparar</button>
       <button style={{...S.pill(modo==="prospeccion","#2dd4bf"),flex:1,fontSize:10,padding:"8px 4px"}} onClick={()=>setModo("prospeccion")}>Prospección</button>
     </div></div>
-    {modo!=="prospeccion"&&<div style={S.sec}>
+    {modo!=="prospeccion"&&modo!=="comparar"&&<div style={S.sec}>
       <div style={{display:"flex",gap:5}}>
         {ESCENARIOS.map(e=><button key={e.id} style={{...S.pill(esc===e.id,e.color),flex:1,fontSize:11,padding:"7px 4px",fontWeight:700}} onClick={()=>setEsc(e.id)}>{e.nombre}{escOficial===e.id?" ★":""}</button>)}
       </div>
@@ -1181,14 +1183,14 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
       </div>
     </div>}
     {modo==="prospeccion"&&<PipelineProspeccion contactos={contactos} oportunidades={oportunidades} catalogos={catalogos} productos={productos}/>}
-    {modo==="matriz"&&<div style={S.sec}>
+    {(modo==="matriz"||modo==="comparar")&&<div style={S.sec}>
       <div style={S.g2}>
         <div><div style={S.fl}>Mes inicial</div><input type="month" style={S.inp} value={ini} onChange={e=>setIni(e.target.value||ini)}/></div>
         <div><div style={S.fl}>Meses a proyectar</div>
           <div style={{display:"flex",gap:5}}>{[3,6,12].map(n=><button key={n} style={{...S.pill(nMeses===n,GOLD),flex:1}} onClick={()=>setNMeses(n)}>{n}</button>)}</div>
         </div>
       </div>
-      <div style={{fontSize:9,color:"#475569",marginTop:8,lineHeight:1.4}}>Captura la meta en <b>unidades</b> (admite decimales) por producto y mes. La comisión y el acumulado se calculan solos. Editar una celda guarda directo en el producto.</div>
+      {modo==="matriz"&&<div style={{fontSize:9,color:"#475569",marginTop:8,lineHeight:1.4}}>Captura la meta en <b>unidades</b> (admite decimales) por producto y mes. La comisión y el acumulado se calculan solos. Editar una celda guarda directo en el producto.</div>}
     </div>}
     {modo==="matriz"&&(productos.length===0
       ? <div style={S.sec}><div style={{...S.card(),textAlign:"center",color:"#475569",fontSize:12,padding:"24px 12px"}}>No hay productos todavía. Créalos en <span style={{color:"#2dd4bf",fontWeight:700,cursor:"pointer"}} onClick={onProductos}>Catálogos → Productos</span> y aquí defines sus metas.</div></div>
@@ -1264,6 +1266,54 @@ function Objetivos({productos,setProductos,catalogos,setCatalogos,contactos,opor
               </div>;})}
             </div>)}
         <div style={{fontSize:9,color:"#475569",marginTop:4,lineHeight:1.5}}>Incluye productos con meta del mes y recurrentes con acumulado vivo. El total coincide con el Ingreso Nexus Proyectado que alimenta el presupuesto del CFP.</div>
+      </div>;
+    })()}
+    {modo==="comparar"&&(()=>{
+      const totE=(e,m,prods)=>prods.reduce((a,p)=>a+ingresoProdE(p,m,e),0);
+      const totPer=(e,prods)=>meses.reduce((a,m)=>a+totE(e,m,prods),0);
+      const logrM=(m)=>productos.reduce((a,p)=>a+(Number((p.logrado||{})[m])||0)*comResultProd(p),0);
+      const logrPer=meses.reduce((a,m)=>a+logrM(m),0);
+      const cel=(extra)=>({...cellNum,...extra});
+      return <div style={S.sec}>
+        <div style={{...S.card(),padding:0,overflowX:"auto"}}>
+          <div style={{minWidth:WCOL+(meses.length+1)*WMES}}>
+            <div style={{display:"flex",borderBottom:"1px solid #1e293b",padding:"0 0 0 10px"}}>
+              <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:800,color:"#64748b",padding:"8px 0"}}>INGRESO PROY.</div>
+              {meses.map(m=><div key={m} style={{...cellHd,paddingTop:8,paddingBottom:8,color:"#cbd5e1"}}>{etiquetaMes(m)}</div>)}
+              <div style={{...cellHd,paddingTop:8,paddingBottom:8,color:GOLD}}>TOTAL</div>
+            </div>
+            {ESCENARIOS.map(e=><div key={e.id} style={{display:"flex",alignItems:"center",padding:"0 0 0 10px",borderBottom:"1px solid #14141f"}}>
+              <div style={{width:WCOL,flexShrink:0,fontSize:11,fontWeight:700,color:e.color,padding:"8px 0"}}>{e.nombre}{escOficial===e.id?" ★":""}</div>
+              {meses.map(m=><div key={m} style={cel({color:e.color})}>{money(totE(e.id,m,productos))}</div>)}
+              <div style={cel({color:e.color,fontWeight:800})}>{money(totPer(e.id,productos))}</div>
+            </div>)}
+            <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a0a14",borderBottom:"1px solid #14141f"}}>
+              <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#64748b",padding:"6px 0"}}>Rango (Opt − Mín)</div>
+              {meses.map(m=><div key={m} style={cel({})}>{money(totE("opt",m,productos)-totE("min",m,productos))}</div>)}
+              <div style={cel({fontWeight:700})}>{money(totPer("opt",productos)-totPer("min",productos))}</div>
+            </div>
+            <div style={{display:"flex",padding:"0 0 0 10px",background:"#0a140a"}}>
+              <div style={{width:WCOL,flexShrink:0,fontSize:9,fontWeight:700,color:"#22c55e",padding:"6px 0"}}>Logrado (real)</div>
+              {meses.map(m=><div key={m} style={cel({color:"#22c55e"})}>{money(logrM(m))}</div>)}
+              <div style={cel({color:"#22c55e",fontWeight:700})}>{money(logrPer)}</div>
+            </div>
+          </div>
+        </div>
+        <div style={{...S.card(),padding:0,marginTop:12}}>
+          <div style={{display:"flex",padding:"8px 10px",borderBottom:"1px solid #1e293b",fontSize:9,fontWeight:800,color:"#64748b"}}>
+            <div style={{flex:1}}>POR SOLUCIÓN · total del periodo</div>
+            {ESCENARIOS.map(e=><div key={e.id} style={{width:74,textAlign:"right",color:e.color}}>{e.nombre}</div>)}
+          </div>
+          {sols.map(g=><div key={g.s.id} style={{display:"flex",alignItems:"center",padding:"7px 10px",borderBottom:"1px solid #14141f"}}>
+            <div style={{flex:1,minWidth:0,fontSize:11,fontWeight:600,color:"#2dd4bf",wordBreak:"break-word"}}>{g.s.nombre}</div>
+            {ESCENARIOS.map(e=><div key={e.id} style={{width:74,textAlign:"right",fontSize:10,color:e.color}}>{money(totPer(e.id,g.prods))}</div>)}
+          </div>)}
+          <div style={{display:"flex",padding:"8px 10px",background:"#1a1505",borderTop:"2px solid "+GOLD,borderRadius:"0 0 11px 11px"}}>
+            <div style={{flex:1,fontSize:10,fontWeight:800,color:GOLD}}>TOTAL</div>
+            {ESCENARIOS.map(e=><div key={e.id} style={{width:74,textAlign:"right",fontSize:10,fontWeight:800,color:e.color}}>{money(totPer(e.id,productos))}</div>)}
+          </div>
+        </div>
+        <div style={{fontSize:9,color:"#475569",marginTop:10,lineHeight:1.5}}>Cada escenario calcula el <b style={{color:"#2dd4bf"}}>Ingreso proy.</b> con sus propias metas y descuenta lo ya logrado. El periodo es el que eliges arriba. ★ = escenario oficial que alimenta CFP. «Logrado (real)» es lo capturado en el mes × comisión, igual para los tres escenarios.</div>
       </div>;
     })()}
     {modo==="productos"&&(()=>{
