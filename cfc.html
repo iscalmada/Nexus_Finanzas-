@@ -1868,7 +1868,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
   const[esCopia,setEsCopia]=useState(false);
   const[showAvance,setShowAvance]=useState(false);
   const[moveToProjectId,setMoveToProjectId]=useState("");
-  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",enfoque:"Contactar",modoTarea:"unica",...init,...(init&&init.modoTarea&&init.modoTarea!=="unica"?{estatus:proyEstatus(init)}:{})}));
+  const[f,setF]=useState(()=>({estatus:"Programada",fecha:hoyISO(),prioridad:"Media",enfoque:"Contactar",modoTarea:"unica",...init,...(init&&init.modoTarea&&init.modoTarea!=="unica"?{estatus:proyEstatus(init)}:{}),...(init&&init.items?{items:[...init.items].sort(cmpItems)}:{}),...(init&&init.subtareas?{subtareas:[...init.subtareas].sort(cmpSubs)}:{})}));
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const esContactar=f.enfoque==="Contactar";
   const esInterno=!esContactar;
@@ -1921,7 +1921,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
         const forzado=usuarioCerro&&nDone<nTot;
         const compEst=usuarioCerro?"Cerrada":(sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada");
         if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${nTot-nDone} subtarea${nTot-nDone!==1?"s":""} sin concluir. ¿Cerrar de todas formas?`))return;
-        onSave({...f,contactoId:f.contactoId||null,oportunidadId:f.oportunidadId||null,servicioSolucion:null,fecha:compFecha,estatus:compEst,cierreForzado:forzado});
+        onSave({...f,contactoId:f.contactoId||null,oportunidadId:f.oportunidadId||null,servicioSolucion:null,fecha:compFecha,estatus:compEst,cierreForzado:forzado,subtareas:[...(f.subtareas||[])].sort(cmpSubs)});
       } else {
         if(modo==="checklist"){
           const done=(f.items||[]).filter(i=>i.done).length;const total=(f.items||[]).length;
@@ -1931,7 +1931,7 @@ function ActividadModal({init,contactos,empresas,catalogos,oportunidades,activid
           const forzado=usuarioCerro&&total>0&&done<total;
           const compEst=usuarioCerro?"Cerrada":(total>0&&done===total?"Cerrada":done>0?"En Proceso":"Programada");
           if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${total-done} subactividad${total-done!==1?"es":""} sin concluir. ¿Cerrar de todas formas?`))return;
-          onSave({...f,servicioSolucion:null,estatus:compEst,cierreForzado:forzado});
+          onSave({...f,servicioSolucion:null,estatus:compEst,cierreForzado:forzado,items:[...(f.items||[])].sort(cmpItems)});
         } else {
           
           if(!f.tipoAccion){alert("Indica el tipo de acción");return;}

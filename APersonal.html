@@ -31,6 +31,18 @@ const EST_COLOR={Programada:"#fbbf24","En Proceso":"#60a5fa",Cerrada:"#22c55e"};
 const PRIOR=["Muy Alta","Alta","Media","Baja"];
 const PRIOR_COLOR={"Muy Alta":"#ef4444",Alta:"#fb923c",Media:"#fbbf24",Baja:"#94a3b8"};
 const PRIOR_RANK={"Muy Alta":0,Alta:1,Media:2,Baja:3};
+/* Orden por defecto de listas: Estatus (En Proceso, Programada, Cerrada) → Fecha (asc; en Cerradas desc) → Prioridad → Hora */
+const EST_RANK={"En Proceso":0,Programada:1,Cerrada:2};
+const nEFP=(a)=>({e:proyEstatus(a),f:proyFecha(a)||a.fecha||"",p:proyPrioridad(a),h:a.hora||""});
+const nEFPSub=(x)=>({e:x.estatus||"Programada",f:x.fecha||"",p:x.prioridad||"Media",h:""});
+const cmpEFP=(x,y,dir)=>{
+  const ra=EST_RANK[x.e]!=null?EST_RANK[x.e]:1,rb=EST_RANK[y.e]!=null?EST_RANK[y.e]:1;if(ra!==rb)return ra-rb;
+  if(x.f!==y.f){if(!x.f)return 1;if(!y.f)return -1;const asc=(dir!=="desc")!==(ra===2);const c=x.f.localeCompare(y.f);return asc?c:-c;}
+  const pa=PRIOR_RANK[x.p]!=null?PRIOR_RANK[x.p]:2,pb=PRIOR_RANK[y.p]!=null?PRIOR_RANK[y.p]:2;if(pa!==pb)return pa-pb;
+  return (x.h||"99:99").localeCompare(y.h||"99:99");
+};
+const cmpSubs=(x,y)=>cmpEFP(nEFPSub(x),nEFPSub(y),"asc");
+const cmpItems=(x,y)=>x.done!==y.done?(x.done?1:-1):((PRIOR_RANK[x.prioridad||"Media"]!=null?PRIOR_RANK[x.prioridad||"Media"]:2)-(PRIOR_RANK[y.prioridad||"Media"]!=null?PRIOR_RANK[y.prioridad||"Media"]:2));
 const MODO_NEXT={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Programada"};
 function loadLS(k,def){try{const v=localStorage.getItem(PFX+k);return v!==null?JSON.parse(v):def;}catch(e){return def;}}
 function saveLS(k,v){try{localStorage.setItem(PFX+k,JSON.stringify(v));}catch(e){}}
@@ -217,7 +229,7 @@ function SubtareasEditor({subtareas,onChange,onIndependizar}){
 }
 /* ── Modal de Actividad ── */
 function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreateContacto,catContactar,catTareas,catAcciones,catEtiquetas,actividades,onSave,onSaveExtra,onDelete,onClose}){
-  const[f,setF]=useState(()=>({enfoque:"Contactar",estatus:"Programada",fecha:hoyISO(),prioridad:"Media",modoTarea:"unica",...(init||{}),...(init&&init.modoTarea&&init.modoTarea!=="unica"?{estatus:proyEstatus(init)}:{})}));
+  const[f,setF]=useState(()=>({enfoque:"Contactar",estatus:"Programada",fecha:hoyISO(),prioridad:"Media",modoTarea:"unica",...(init||{}),...(init&&init.modoTarea&&init.modoTarea!=="unica"?{estatus:proyEstatus(init)}:{}),...(init&&init.items?{items:[...init.items].sort(cmpItems)}:{}),...(init&&init.subtareas?{subtareas:[...init.subtareas].sort(cmpSubs)}:{})}));
   const[moveToProject,setMoveToProject]=useState("");
   const[esCopia,setEsCopia]=useState(false);
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -260,7 +272,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
         const forzado=usuarioCerro&&nDone<nTot;
         const compEst=usuarioCerro?"Cerrada":(sts.every(s=>s==="Cerrada")?"Cerrada":sts.some(s=>s==="En Proceso"||s==="Cerrada")?"En Proceso":"Programada");
         if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${nTot-nDone} subtarea${nTot-nDone!==1?"s":""} sin concluir. ¿Cerrar de todas formas?`))return;
-        onSave({...f,fecha:compFecha,estatus:compEst,cierreForzado:forzado});
+        onSave({...f,fecha:compFecha,estatus:compEst,cierreForzado:forzado,subtareas:[...(f.subtareas||[])].sort(cmpSubs)});
       } else if(modo==="checklist"){
                 const done=(f.items||[]).filter(i=>i.done).length,tot=(f.items||[]).length;
         const estIni=(init&&init.id)?proyEstatus(init):null;
@@ -268,7 +280,7 @@ function ActividadModal({init,cfcContactos,cfcEmpresas,cfcOportunidades,onCreate
         const forzado=usuarioCerro&&tot>0&&done<tot;
         const compEst=usuarioCerro?"Cerrada":(tot>0&&done===tot?"Cerrada":done>0?"En Proceso":"Programada");
         if(forzado&&!f.cierreForzado&&!window.confirm(`Hay ${tot-done} subactividad${tot-done!==1?"es":""} sin concluir. ¿Cerrar de todas formas?`))return;
-        onSave({...f,estatus:compEst,cierreForzado:forzado});
+        onSave({...f,estatus:compEst,cierreForzado:forzado,items:[...(f.items||[])].sort(cmpItems)});
       } else {
                 onSave({...f});
       }
@@ -469,7 +481,7 @@ function ActividadDetalle({a,cfcContactos,cfcEmpresas,cfcOportunidades,catEtique
         {modo==="checklist"&&items.length>0&&<div style={{marginBottom:10}}>
           <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>CHECKLIST · {items.filter(i=>i.done).length}/{items.length}</div>
           <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
-            {items.map((it,i)=><div key={it.id||i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:i<items.length-1?"1px solid #14141f":"none"}}>
+            {[...items].sort(cmpItems).map((it,i)=><div key={it.id||i} style={{display:"flex",gap:8,padding:"6px 0",borderBottom:i<items.length-1?"1px solid #14141f":"none"}}>
               <span style={{fontSize:12,color:it.done?"#22c55e":"#475569",flexShrink:0}}>{it.done?"☑":"☐"}</span>
               <div style={{minWidth:0,flex:1}}>
                 <div style={{fontSize:11,color:it.done?"#64748b":"#e2e8f0",textDecoration:it.done?"line-through":"none",wordBreak:"break-word"}}>{it.texto||"—"}</div>
@@ -482,7 +494,7 @@ function ActividadDetalle({a,cfcContactos,cfcEmpresas,cfcOportunidades,catEtique
         {modo==="proyecto"&&subs.length>0&&<div style={{marginBottom:10}}>
           <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:4}}>SUBTAREAS · {subs.filter(x=>x.estatus==="Cerrada").length}/{subs.length}</div>
           <div style={{background:"#0a0a14",borderRadius:8,padding:"4px 10px"}}>
-            {subs.map((st,i)=>{const sc=EST_COLOR[st.estatus||"Programada"]||"#64748b";return <div key={st.id||i} style={{padding:"6px 0",borderBottom:i<subs.length-1?"1px solid #14141f":"none"}}>
+            {[...subs].sort(cmpSubs).map((st,i)=>{const sc=EST_COLOR[st.estatus||"Programada"]||"#64748b";return <div key={st.id||i} style={{padding:"6px 0",borderBottom:i<subs.length-1?"1px solid #14141f":"none"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8}}>
                 <div style={{fontSize:11,color:st.estatus==="Cerrada"?"#64748b":"#e2e8f0",textDecoration:st.estatus==="Cerrada"?"line-through":"none",flex:1,minWidth:0,wordBreak:"break-word"}}>{st.titulo||"—"}</div>
                 <span style={{...S.tag(sc),fontSize:8,flexShrink:0}}>{st.estatus||"Programada"}</span>
@@ -625,7 +637,7 @@ function ActCard({a,cfcContactos,cfcEmpresas,cfcOportunidades,onTap,onEdit,expan
         <button style={{...S.pill(false,"#64748b"),padding:"2px 8px",fontSize:10}} onClick={()=>setSelSub(new Set())}>Ninguna</button>
         {selSub.size>0&&<button style={{...S.pill(true,"#a78bfa"),padding:"2px 10px",fontSize:10,fontWeight:700}} onClick={()=>setBatchSub({fecha:"",estatus:"",prioridad:""})}>✏ Editar {selSub.size}</button>}
       </div>
-      {[...(a.subtareas||[])].sort((x,y)=>{const xc=x.estatus==="Cerrada",yc=y.estatus==="Cerrada";if(xc!==yc)return xc?1:-1;return(x.fecha||"9999").localeCompare(y.fecha||"9999");}).map((st,idx)=>{
+      {[...(a.subtareas||[])].sort(cmpSubs).map((st,idx)=>{
         const isSel=selSub.has(st.id);
         return <div key={st.id} style={{display:"flex",gap:8,alignItems:"flex-start",padding:"6px 8px",marginBottom:4,background:isSel?"#1e1b4b":"#0f172a",borderRadius:7,border:`1px solid ${isSel?"#a78bfa":(EST_COLOR[st.estatus||"Programada"]||"#64748b")}33`}}>
           <input type="checkbox" checked={isSel} onChange={()=>setSelSub(p=>{const n=new Set(p);n.has(st.id)?n.delete(st.id):n.add(st.id);return n;})} style={{width:15,height:15,flexShrink:0,accentColor:"#a78bfa",marginTop:2,cursor:"pointer"}}/>
@@ -811,7 +823,7 @@ function App(){
   const[showFil,setShowFil]=useState(false);
   const[q,setQ]=useState("");
   // Orden
-  const[ordCampo,setOrdCampo]=useState("fechaPrio");
+  const[ordCampo,setOrdCampo]=useState("");
   const[ordDir,setOrdDir]=useState("asc");
   // Selección múltiple
   const[selMode,setSelMode]=useState(false);
@@ -874,6 +886,7 @@ function App(){
   };
   const ordenadas=base.slice().sort((a,b)=>{
     const fa=proyFecha(a)||a.fecha||"",fb=proyFecha(b)||b.fecha||"";
+    if(ordCampo==="")return cmpEFP(nEFP(a),nEFP(b),ordDir);
     const pa=PRIOR_RANK[proyPrioridad(a)]??2,pb=PRIOR_RANK[proyPrioridad(b)]??2;
     if(ordCampo==="fechaPrio"){
       const fc=fechaCmp(fa,fb);
@@ -908,7 +921,7 @@ function App(){
   const scrollBottom=()=>window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"});
   const scrollHoy=()=>{const el=document.getElementById("ap-hoy");if(el)el.scrollIntoView({behavior:"smooth",block:"start"});else window.scrollTo({top:0,behavior:"smooth"});};
   // Índice de "Hoy" en la lista
-  const hoyIdx=ordDir==="asc"?ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")>=hoy):ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")<=hoy);
+  const hoyIdx=ordCampo===""?ordenadas.findIndex(x=>proyEstatus(x)==="Programada"&&(ordDir==="asc"?((proyFecha(x)||x.fecha||"")>=hoy):((proyFecha(x)||x.fecha||"")<=hoy))):ordDir==="asc"?ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")>=hoy):ordenadas.findIndex(a=>(proyFecha(a)||a.fecha||"")<=hoy);
   const enfRptActual=modo==="rptContactar"?"Contactar":modo==="rptTareas"?"Tareas":modo==="rptAcciones"?"Acciones":null;
   const visibles=enfRptActual?ordenadas.filter(a=>a.enfoque===enfRptActual):ordenadas;
   // Reporte simplificado
@@ -1021,9 +1034,10 @@ function App(){
           <div style={{borderTop:"1px solid #1e293b",paddingTop:8,marginBottom:8}}>
             <div style={{fontSize:9,color:"#64748b",fontWeight:700,marginBottom:5,textTransform:"uppercase"}}>Orden</div>
             <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-              <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo("fechaPrio")}>Fecha+Prio</button>
-              <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo("fecha")}>Fecha</button>
-              <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo("prioridad")}>Prioridad</button>
+              <button style={{...S.pill(ordCampo==="",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo("")}>Estatus</button>
+              <button style={{...S.pill(ordCampo==="fechaPrio",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo(v=>v==="fechaPrio"?"":"fechaPrio")}>Fecha+Prio</button>
+              <button style={{...S.pill(ordCampo==="fecha",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo(v=>v==="fecha"?"":"fecha")}>Fecha</button>
+              <button style={{...S.pill(ordCampo==="prioridad",GOLD),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdCampo(v=>v==="prioridad"?"":"prioridad")}>Prioridad</button>
               <button style={{...S.pill(false,"#60a5fa"),padding:"4px 9px",fontSize:10}} onClick={()=>setOrdDir(d=>d==="asc"?"desc":"asc")}>{ordDir==="asc"?"↑ Asc":"↓ Desc"}</button>
             </div>
           </div>
