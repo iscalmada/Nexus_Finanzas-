@@ -227,7 +227,10 @@ function ContactoModal({init,catalogos,empresas,onCreateEmpresa,onSave,onClose})
   const toggleArea=(v)=>setF(p=>({...p,areasIntegradas:(p.areasIntegradas||[]).includes(v)?(p.areasIntegradas||[]).filter(x=>x!==v):[...(p.areasIntegradas||[]),v]}));
   const toggleEtiqueta=(id)=>setF(p=>({...p,etiquetas:(p.etiquetas||[]).includes(id)?(p.etiquetas||[]).filter(x=>x!==id):[...(p.etiquetas||[]),id]}));
   const save=()=>{ if(!f.nombre&&!f.nombreCompleto){alert("El nombre es obligatorio");return;}
-    const completo=f.nombreCompleto||[f.nombre,f.apellido].filter(Boolean).join(" ");
+    const _base=[f.nombre,f.apellido].filter(Boolean).join(" ");
+    // Si cambió el nombre o el apellido y el nombre completo guardado ya no los incluye, se recalcula (evita que búsquedas y otras pantallas vean un nombre desactualizado)
+    const _nc=f.nombreCompleto||"";const _nn=(s)=>(s||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+    const completo=(!_nc||(f.nombre&&!_nn(_base).split(/\s+/).filter(Boolean).every(t=>_nn(_nc).includes(t))))?(_base||_nc):_nc;
     const empsRaw=f.empresas||(f.empresaId?[{empresaId:f.empresaId,rol:f.rolEmpresa||""}]:[]);
     const emps=empsRaw.filter(x=>x&&x.empresaId);const prim=emps[0]||{};
     onSave({...f,nombreCompleto:completo,empresas:emps,empresaId:prim.empresaId||null,rolEmpresa:prim.rol||null}); };
@@ -1824,6 +1827,7 @@ const MODO_NEXT_EST={Programada:"En Proceso","En Proceso":"Cerrada",Cerrada:"Pro
 const aplicaPatchAct=(a,p)=>{const r={...a,...p};if(p&&p.estatus!==undefined&&p.cierreForzado===undefined&&(a.modoTarea==="checklist"||a.modoTarea==="proyecto")){if(p.estatus==="Cerrada"){const its=a.modoTarea==="checklist"?(r.items||[]).map(x=>!!x.done):(r.subtareas||[]).map(x=>x.estatus==="Cerrada");r.cierreForzado=its.length>0&&!its.every(Boolean);}else r.cierreForzado=false;}return r;};
 
 /* ════════ BUSCA CONTACTO/EMPRESA CFC ════════ */
+function normTxt(s){return (s||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();}
 function BuscaCtoEmpCFC({contactos,empresas,value,onChange,placeholder,onAdd}){
   const[q,setQ]=useState("");
   const[open,setOpen]=useState(false);
@@ -1832,17 +1836,19 @@ function BuscaCtoEmpCFC({contactos,empresas,value,onChange,placeholder,onAdd}){
   const empName=(c)=>{const ids=getEmpIds(c);const e=ids[0]&&empresas.find(x=>x.id===ids[0]);return e?e.nombre:"";};
   const results=useMemo(()=>{
     if(q.trim().length<2)return[];
-    const ql=q.toLowerCase();const items=[];const addedEmp=new Set();
-    contactos.forEach(c=>{if((c.nombreCompleto||"").toLowerCase().includes(ql)){items.push({kind:"cto",id:c.id,label:nombreDisplay(c),sub:empName(c)});}});
+    const qn=normTxt(q).trim();const toks=qn.split(/\s+/).filter(Boolean);const items=[];const addedEmp=new Set();
+    // Busca en nombre + apellido + nombre completo + alias (sin acentos, todas las palabras, cualquier orden).
+    // Primero los que empiezan con lo escrito; dentro de cada grupo, orden alfabético por el nombre que se muestra.
+    contactos.map((c)=>{const nk=normTxt(c.nombre?[c.nombre,c.apellido].filter(Boolean).join(" "):c.nombreCompleto);const n=normTxt([c.nombre,c.apellido,c.nombreCompleto,c.alias].filter(Boolean).join(" "));if(!toks.every(t=>n.includes(t)))return null;return{c,nk,s:(nk.startsWith(qn)||normTxt(c.nombreCompleto).startsWith(qn))?0:toks.every(t=>(" "+n).includes(" "+t))?1:2};}).filter(Boolean).sort((a,b)=>a.s-b.s||a.nk.localeCompare(b.nk)).forEach(({c})=>items.push({kind:"cto",id:c.id,label:nombreDisplay(c),sub:empName(c)}));
     empresas.forEach(emp=>{
-      if((emp.nombre||"").toLowerCase().includes(ql)&&!addedEmp.has(emp.id)){
+      if(normTxt(emp.nombre).includes(qn)&&!addedEmp.has(emp.id)){
         const linked=contactos.filter(c=>getEmpIds(c).includes(emp.id));
         if(linked.length===0){items.push({kind:"emp",id:null,empId:emp.id,label:emp.nombre,sub:"(sin contacto)"});}
         else{linked.forEach(c=>items.push({kind:"cto_emp",id:c.id,label:nombreDisplay(c),sub:emp.nombre}));}
         addedEmp.add(emp.id);
       }
     });
-    return items.slice(0,10);
+    return items.slice(0,60);
   },[q,contactos,empresas]);
   if(sel)return <div style={{display:"flex",gap:6,alignItems:"center"}}>
     <div style={{...S.inp,flex:1,fontSize:13}}>{nombreDisplay(sel)}{empName(sel)&&<span style={{color:"#60a5fa",fontSize:11}}> · {empName(sel)}</span>}</div>
@@ -3103,6 +3109,12 @@ function App(){
     if(!localStorage.getItem(PFX+"migCaps")){
       cs=cs.map(c=>({...c,nombre:titleCase(c.nombre),apellido:titleCase(c.apellido),nombreCompleto:titleCase(c.nombreCompleto)}));
       try{localStorage.setItem(PFX+"migCaps","1");}catch(e){}
+    }
+    if(!localStorage.getItem(PFX+"migNomCompleto2")){
+      // Repara nombres completos desactualizados: solo si ya no incluyen el nombre o el apellido actuales
+      const nn=(s)=>(s||"").toString().normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+      cs=cs.map(c=>{if(!c.nombre)return c;const base=[c.nombre,c.apellido].filter(Boolean).join(" ");const nc=c.nombreCompleto||"";const ok=nc&&nn(base).split(/\s+/).filter(Boolean).every(t=>nn(nc).includes(t));return ok?c:{...c,nombreCompleto:base};});
+      try{localStorage.setItem(PFX+"migNomCompleto2","1");}catch(e){}
     }
     if(!localStorage.getItem(PFX+"migAliadoTipo")){
       cs=cs.map(c=>{ if(c.tipoAliado&&!c.tiposAliado){const{tipoAliado,...rest}=c;return {...rest,tiposAliado:[tipoAliado]};} return c; });
